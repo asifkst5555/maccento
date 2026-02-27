@@ -1,0 +1,258 @@
+{
+  "total": 42,
+  "issues": [],
+  "rows": [
+    {
+      "bp": "1440",
+      "path": "/",
+      "status": 200,
+      "errors": []
+    },
+    {
+      "bp": "1440",
+      "path": "/about-us",
+      "status": 200,
+      "errors": []
+    },
+    {
+      "bp": "1440",
+      "path": "/our-services",
+      "status": 200,
+      "errors": []
+    },
+    {
+      "bp": "1440",
+      "path": "/portfolio",
+      "status": 200,
+      "errors": []
+    },
+    {
+      "bp": "1440",
+      "path": "/our-plan",
+      "status": 200,
+      "errors": []
+    },
+    {
+      "bp": "1440",
+      "path": "/login",
+      "status": 200,
+      "errors": []
+    },
+    {
+      "bp": "1440",
+      "path": "/signup",
+      "status": 200,
+      "errors": []
+    },
+    {
+      "bp": "1280",
+      "path": "/",
+      "status": 200,
+      "errors": []
+    },
+    {
+      "bp": "1280",
+      "path": "/about-us",
+      "status": 200,
+      "errors": []
+    },
+    {
+      "bp": "1280",
+      "path": "/our-services",
+      "status": 200,
+      "errors": []
+    },
+    {
+      "bp": "1280",
+      "path": "/portfolio",
+      "status": 200,
+      "errors": []
+    },
+    {
+      "bp": "1280",
+      "path": "/our-plan",
+      "status": 200,
+      "errors": []
+    },
+    {
+      "bp": "1280",
+      "path": "/login",
+      "status": 200,
+      "errors": []
+    },
+    {
+      "bp": "1280",
+      "path": "/signup",
+      "status": 200,
+      "errors": []
+    },
+    {
+      "bp": "1024",
+      "path": "/",
+      "status": 200,
+      "errors": []
+    },
+    {
+      "bp": "1024",
+      "path": "/about-us",
+      "status": 200,
+      "errors": []
+    },
+    {
+      "bp": "1024",
+      "path": "/our-services",
+      "status": 200,
+      "errors": []
+    },
+    {
+      "bp": "1024",
+      "path": "/portfolio",
+      "status": 200,
+      "errors": []
+    },
+    {
+      "bp": "1024",
+      "path": "/our-plan",
+      "status": 200,
+      "errors": []
+    },
+    {
+      "bp": "1024",
+      "path": "/login",
+      "status": 200,
+      "errors": []
+    },
+    {
+      "bp": "1024",
+      "path": "/signup",
+      "status": 200,
+      "errors": []
+    },
+    {
+      "bp": "768",
+      "path": "/",
+      "status": 200,
+      "errors": []
+    },
+    {
+      "bp": "768",
+      "path": "/about-us",
+      "status": 200,
+      "errors": []
+    },
+    {
+      "bp": "768",
+      "path": "/our-services",
+      "status": 200,
+      "errors": []
+    },
+    {
+      "bp": "768",
+      "path": "/portfolio",
+      "status": 200,
+      "errors": []
+    },
+    {
+      "bp": "768",
+      "path": "/our-plan",
+      "status": 200,
+      "errors": []
+    },
+    {
+      "bp": "768",
+      "path": "/login",
+      "status": 200,
+      "errors": []
+    },
+    {
+      "bp": "768",
+      "path": "/signup",
+      "status": 200,
+      "errors": []
+    },
+    {
+      "bp": "480",
+      "path": "/",
+      "status": 200,
+      "errors": []
+    },
+    {
+      "bp": "480",
+      "path": "/about-us",
+      "status": 200,
+      "errors": []
+    },
+    {
+      "bp": "480",
+      "path": "/our-services",
+      "status": 200,
+      "errors": []
+    },
+    {
+      "bp": "480",
+      "path": "/portfolio",
+      "status": 200,
+      "errors": []
+    },
+    {
+      "bp": "480",
+      "path": "/our-plan",
+      "status": 200,
+      "errors": []
+    },
+    {
+      "bp": "480",
+      "path": "/login",
+      "status": 200,
+      "errors": []
+    },
+    {
+      "bp": "480",
+      "path": "/signup",
+      "status": 200,
+      "errors": []
+    },
+    {
+      "bp": "390",
+      "path": "/",
+      "status": 200,
+      "errors": []
+    },
+    {
+      "bp": "390",
+      "path": "/about-us",
+      "status": 200,
+      "errors": []
+    },
+    {
+      "bp": "390",
+      "path": "/our-services",
+      "status": 200,
+      "errors": []
+    },
+    {
+      "bp": "390",
+      "path": "/portfolio",
+      "status": 200,
+      "errors": []
+    },
+    {
+      "bp": "390",
+      "path": "/our-plan",
+      "status": 200,
+      "errors": []
+    },
+    {
+      "bp": "390",
+      "path": "/login",
+      "status": 200,
+      "errors": []
+    },
+    {
+      "bp": "390",
+      "path": "/signup",
+      "status": 200,
+      "errors": []
+    }
+  ]
+}

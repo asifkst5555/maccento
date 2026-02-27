@@ -1,0 +1,1173 @@
+{
+  "generatedAt": "2026-02-24T21:52:39.732Z",
+  "totalChecks": 42,
+  "issueCount": 30,
+  "results": [
+    {
+      "breakpoint": "1440",
+      "page": "home",
+      "path": "/",
+      "status": 200,
+      "consoleIssues": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_CONNECTION_TIMED_OUT"
+        }
+      ],
+      "pageErrors": [],
+      "metrics": {
+        "overflowX": 0,
+        "hiddenVisibleHeadings": 0
+      }
+    },
+    {
+      "breakpoint": "1440",
+      "page": "about",
+      "path": "/about-us",
+      "status": 200,
+      "consoleIssues": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_CONNECTION_TIMED_OUT"
+        }
+      ],
+      "pageErrors": [],
+      "metrics": {
+        "overflowX": 0,
+        "hiddenVisibleHeadings": 0
+      }
+    },
+    {
+      "breakpoint": "1440",
+      "page": "services",
+      "path": "/our-services",
+      "status": 200,
+      "consoleIssues": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_CONNECTION_TIMED_OUT"
+        }
+      ],
+      "pageErrors": [],
+      "metrics": {
+        "overflowX": 0,
+        "hiddenVisibleHeadings": 0
+      }
+    },
+    {
+      "breakpoint": "1440",
+      "page": "portfolio",
+      "path": "/portfolio",
+      "status": 200,
+      "consoleIssues": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_DNS_NO_MATCHING_SUPPORTED_ALPN"
+        }
+      ],
+      "pageErrors": [],
+      "metrics": {
+        "overflowX": 0,
+        "hiddenVisibleHeadings": 0
+      }
+    },
+    {
+      "breakpoint": "1440",
+      "page": "plan",
+      "path": "/our-plan",
+      "status": 200,
+      "consoleIssues": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_CONNECTION_TIMED_OUT"
+        }
+      ],
+      "pageErrors": [],
+      "metrics": {
+        "overflowX": 0,
+        "hiddenVisibleHeadings": 0
+      }
+    },
+    {
+      "breakpoint": "1440",
+      "page": "login",
+      "path": "/login",
+      "status": 200,
+      "consoleIssues": [],
+      "pageErrors": [],
+      "metrics": {
+        "overflowX": 0,
+        "hiddenVisibleHeadings": 0
+      }
+    },
+    {
+      "breakpoint": "1440",
+      "page": "signup",
+      "path": "/signup",
+      "status": 200,
+      "consoleIssues": [],
+      "pageErrors": [],
+      "metrics": {
+        "overflowX": 0,
+        "hiddenVisibleHeadings": 0
+      }
+    },
+    {
+      "breakpoint": "1280",
+      "page": "home",
+      "path": "/",
+      "status": 200,
+      "consoleIssues": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_CONNECTION_TIMED_OUT"
+        }
+      ],
+      "pageErrors": [],
+      "metrics": {
+        "overflowX": 0,
+        "hiddenVisibleHeadings": 0
+      }
+    },
+    {
+      "breakpoint": "1280",
+      "page": "about",
+      "path": "/about-us",
+      "status": 200,
+      "consoleIssues": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_CONNECTION_TIMED_OUT"
+        }
+      ],
+      "pageErrors": [],
+      "metrics": {
+        "overflowX": 0,
+        "hiddenVisibleHeadings": 0
+      }
+    },
+    {
+      "breakpoint": "1280",
+      "page": "services",
+      "path": "/our-services",
+      "status": 200,
+      "consoleIssues": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_CONNECTION_TIMED_OUT"
+        }
+      ],
+      "pageErrors": [],
+      "metrics": {
+        "overflowX": 0,
+        "hiddenVisibleHeadings": 0
+      }
+    },
+    {
+      "breakpoint": "1280",
+      "page": "portfolio",
+      "path": "/portfolio",
+      "status": 200,
+      "consoleIssues": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_CONNECTION_TIMED_OUT"
+        }
+      ],
+      "pageErrors": [],
+      "metrics": {
+        "overflowX": 0,
+        "hiddenVisibleHeadings": 0
+      }
+    },
+    {
+      "breakpoint": "1280",
+      "page": "plan",
+      "path": "/our-plan",
+      "status": 200,
+      "consoleIssues": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_DNS_NO_MATCHING_SUPPORTED_ALPN"
+        }
+      ],
+      "pageErrors": [],
+      "metrics": {
+        "overflowX": 0,
+        "hiddenVisibleHeadings": 0
+      }
+    },
+    {
+      "breakpoint": "1280",
+      "page": "login",
+      "path": "/login",
+      "status": 200,
+      "consoleIssues": [],
+      "pageErrors": [],
+      "metrics": {
+        "overflowX": 0,
+        "hiddenVisibleHeadings": 0
+      }
+    },
+    {
+      "breakpoint": "1280",
+      "page": "signup",
+      "path": "/signup",
+      "status": 200,
+      "consoleIssues": [],
+      "pageErrors": [],
+      "metrics": {
+        "overflowX": 0,
+        "hiddenVisibleHeadings": 0
+      }
+    },
+    {
+      "breakpoint": "1024",
+      "page": "home",
+      "path": "/",
+      "status": 200,
+      "consoleIssues": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_CONNECTION_TIMED_OUT"
+        }
+      ],
+      "pageErrors": [],
+      "metrics": {
+        "overflowX": 0,
+        "hiddenVisibleHeadings": 0
+      }
+    },
+    {
+      "breakpoint": "1024",
+      "page": "about",
+      "path": "/about-us",
+      "status": 200,
+      "consoleIssues": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_CONNECTION_TIMED_OUT"
+        }
+      ],
+      "pageErrors": [],
+      "metrics": {
+        "overflowX": 0,
+        "hiddenVisibleHeadings": 0
+      }
+    },
+    {
+      "breakpoint": "1024",
+      "page": "services",
+      "path": "/our-services",
+      "status": 200,
+      "consoleIssues": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_CONNECTION_TIMED_OUT"
+        }
+      ],
+      "pageErrors": [],
+      "metrics": {
+        "overflowX": 0,
+        "hiddenVisibleHeadings": 0
+      }
+    },
+    {
+      "breakpoint": "1024",
+      "page": "portfolio",
+      "path": "/portfolio",
+      "status": 200,
+      "consoleIssues": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_CONNECTION_TIMED_OUT"
+        }
+      ],
+      "pageErrors": [],
+      "metrics": {
+        "overflowX": 0,
+        "hiddenVisibleHeadings": 0
+      }
+    },
+    {
+      "breakpoint": "1024",
+      "page": "plan",
+      "path": "/our-plan",
+      "status": 200,
+      "consoleIssues": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_DNS_NO_MATCHING_SUPPORTED_ALPN"
+        }
+      ],
+      "pageErrors": [],
+      "metrics": {
+        "overflowX": 0,
+        "hiddenVisibleHeadings": 0
+      }
+    },
+    {
+      "breakpoint": "1024",
+      "page": "login",
+      "path": "/login",
+      "status": 200,
+      "consoleIssues": [],
+      "pageErrors": [],
+      "metrics": {
+        "overflowX": 0,
+        "hiddenVisibleHeadings": 0
+      }
+    },
+    {
+      "breakpoint": "1024",
+      "page": "signup",
+      "path": "/signup",
+      "status": 200,
+      "consoleIssues": [],
+      "pageErrors": [],
+      "metrics": {
+        "overflowX": 0,
+        "hiddenVisibleHeadings": 0
+      }
+    },
+    {
+      "breakpoint": "768",
+      "page": "home",
+      "path": "/",
+      "status": 200,
+      "consoleIssues": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_CONNECTION_TIMED_OUT"
+        }
+      ],
+      "pageErrors": [],
+      "metrics": {
+        "overflowX": 0,
+        "hiddenVisibleHeadings": 0
+      }
+    },
+    {
+      "breakpoint": "768",
+      "page": "about",
+      "path": "/about-us",
+      "status": 200,
+      "consoleIssues": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_CONNECTION_TIMED_OUT"
+        }
+      ],
+      "pageErrors": [],
+      "metrics": {
+        "overflowX": 0,
+        "hiddenVisibleHeadings": 0
+      }
+    },
+    {
+      "breakpoint": "768",
+      "page": "services",
+      "path": "/our-services",
+      "status": 200,
+      "consoleIssues": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_CONNECTION_TIMED_OUT"
+        }
+      ],
+      "pageErrors": [],
+      "metrics": {
+        "overflowX": 0,
+        "hiddenVisibleHeadings": 0
+      }
+    },
+    {
+      "breakpoint": "768",
+      "page": "portfolio",
+      "path": "/portfolio",
+      "status": 200,
+      "consoleIssues": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_CONNECTION_TIMED_OUT"
+        }
+      ],
+      "pageErrors": [],
+      "metrics": {
+        "overflowX": 0,
+        "hiddenVisibleHeadings": 0
+      }
+    },
+    {
+      "breakpoint": "768",
+      "page": "plan",
+      "path": "/our-plan",
+      "status": 200,
+      "consoleIssues": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_DNS_NO_MATCHING_SUPPORTED_ALPN"
+        }
+      ],
+      "pageErrors": [],
+      "metrics": {
+        "overflowX": 0,
+        "hiddenVisibleHeadings": 0
+      }
+    },
+    {
+      "breakpoint": "768",
+      "page": "login",
+      "path": "/login",
+      "status": 200,
+      "consoleIssues": [],
+      "pageErrors": [],
+      "metrics": {
+        "overflowX": 0,
+        "hiddenVisibleHeadings": 0
+      }
+    },
+    {
+      "breakpoint": "768",
+      "page": "signup",
+      "path": "/signup",
+      "status": 200,
+      "consoleIssues": [],
+      "pageErrors": [],
+      "metrics": {
+        "overflowX": 0,
+        "hiddenVisibleHeadings": 0
+      }
+    },
+    {
+      "breakpoint": "480",
+      "page": "home",
+      "path": "/",
+      "status": 200,
+      "consoleIssues": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_CONNECTION_TIMED_OUT"
+        }
+      ],
+      "pageErrors": [],
+      "metrics": {
+        "overflowX": 0,
+        "hiddenVisibleHeadings": 0
+      }
+    },
+    {
+      "breakpoint": "480",
+      "page": "about",
+      "path": "/about-us",
+      "status": 200,
+      "consoleIssues": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_CONNECTION_TIMED_OUT"
+        }
+      ],
+      "pageErrors": [],
+      "metrics": {
+        "overflowX": 0,
+        "hiddenVisibleHeadings": 0
+      }
+    },
+    {
+      "breakpoint": "480",
+      "page": "services",
+      "path": "/our-services",
+      "status": 200,
+      "consoleIssues": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_CONNECTION_TIMED_OUT"
+        }
+      ],
+      "pageErrors": [],
+      "metrics": {
+        "overflowX": 0,
+        "hiddenVisibleHeadings": 0
+      }
+    },
+    {
+      "breakpoint": "480",
+      "page": "portfolio",
+      "path": "/portfolio",
+      "status": 200,
+      "consoleIssues": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_CONNECTION_TIMED_OUT"
+        }
+      ],
+      "pageErrors": [],
+      "metrics": {
+        "overflowX": 0,
+        "hiddenVisibleHeadings": 0
+      }
+    },
+    {
+      "breakpoint": "480",
+      "page": "plan",
+      "path": "/our-plan",
+      "status": 200,
+      "consoleIssues": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_DNS_NO_MATCHING_SUPPORTED_ALPN"
+        }
+      ],
+      "pageErrors": [],
+      "metrics": {
+        "overflowX": 0,
+        "hiddenVisibleHeadings": 0
+      }
+    },
+    {
+      "breakpoint": "480",
+      "page": "login",
+      "path": "/login",
+      "status": 200,
+      "consoleIssues": [],
+      "pageErrors": [],
+      "metrics": {
+        "overflowX": 0,
+        "hiddenVisibleHeadings": 0
+      }
+    },
+    {
+      "breakpoint": "480",
+      "page": "signup",
+      "path": "/signup",
+      "status": 200,
+      "consoleIssues": [],
+      "pageErrors": [],
+      "metrics": {
+        "overflowX": 0,
+        "hiddenVisibleHeadings": 0
+      }
+    },
+    {
+      "breakpoint": "390",
+      "page": "home",
+      "path": "/",
+      "status": 200,
+      "consoleIssues": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_CONNECTION_TIMED_OUT"
+        }
+      ],
+      "pageErrors": [],
+      "metrics": {
+        "overflowX": 0,
+        "hiddenVisibleHeadings": 0
+      }
+    },
+    {
+      "breakpoint": "390",
+      "page": "about",
+      "path": "/about-us",
+      "status": 200,
+      "consoleIssues": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_CONNECTION_TIMED_OUT"
+        }
+      ],
+      "pageErrors": [],
+      "metrics": {
+        "overflowX": 0,
+        "hiddenVisibleHeadings": 0
+      }
+    },
+    {
+      "breakpoint": "390",
+      "page": "services",
+      "path": "/our-services",
+      "status": 200,
+      "consoleIssues": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_CONNECTION_TIMED_OUT"
+        }
+      ],
+      "pageErrors": [],
+      "metrics": {
+        "overflowX": 0,
+        "hiddenVisibleHeadings": 0
+      }
+    },
+    {
+      "breakpoint": "390",
+      "page": "portfolio",
+      "path": "/portfolio",
+      "status": 200,
+      "consoleIssues": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_CONNECTION_TIMED_OUT"
+        }
+      ],
+      "pageErrors": [],
+      "metrics": {
+        "overflowX": 0,
+        "hiddenVisibleHeadings": 0
+      }
+    },
+    {
+      "breakpoint": "390",
+      "page": "plan",
+      "path": "/our-plan",
+      "status": 200,
+      "consoleIssues": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_DNS_NO_MATCHING_SUPPORTED_ALPN"
+        }
+      ],
+      "pageErrors": [],
+      "metrics": {
+        "overflowX": 0,
+        "hiddenVisibleHeadings": 0
+      }
+    },
+    {
+      "breakpoint": "390",
+      "page": "login",
+      "path": "/login",
+      "status": 200,
+      "consoleIssues": [],
+      "pageErrors": [],
+      "metrics": {
+        "overflowX": 0,
+        "hiddenVisibleHeadings": 0
+      }
+    },
+    {
+      "breakpoint": "390",
+      "page": "signup",
+      "path": "/signup",
+      "status": 200,
+      "consoleIssues": [],
+      "pageErrors": [],
+      "metrics": {
+        "overflowX": 0,
+        "hiddenVisibleHeadings": 0
+      }
+    }
+  ],
+  "issues": [
+    {
+      "breakpoint": "1440",
+      "page": "home",
+      "path": "/",
+      "status": 200,
+      "consoleIssues": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_CONNECTION_TIMED_OUT"
+        }
+      ],
+      "pageErrors": [],
+      "metrics": {
+        "overflowX": 0,
+        "hiddenVisibleHeadings": 0
+      }
+    },
+    {
+      "breakpoint": "1440",
+      "page": "about",
+      "path": "/about-us",
+      "status": 200,
+      "consoleIssues": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_CONNECTION_TIMED_OUT"
+        }
+      ],
+      "pageErrors": [],
+      "metrics": {
+        "overflowX": 0,
+        "hiddenVisibleHeadings": 0
+      }
+    },
+    {
+      "breakpoint": "1440",
+      "page": "services",
+      "path": "/our-services",
+      "status": 200,
+      "consoleIssues": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_CONNECTION_TIMED_OUT"
+        }
+      ],
+      "pageErrors": [],
+      "metrics": {
+        "overflowX": 0,
+        "hiddenVisibleHeadings": 0
+      }
+    },
+    {
+      "breakpoint": "1440",
+      "page": "portfolio",
+      "path": "/portfolio",
+      "status": 200,
+      "consoleIssues": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_DNS_NO_MATCHING_SUPPORTED_ALPN"
+        }
+      ],
+      "pageErrors": [],
+      "metrics": {
+        "overflowX": 0,
+        "hiddenVisibleHeadings": 0
+      }
+    },
+    {
+      "breakpoint": "1440",
+      "page": "plan",
+      "path": "/our-plan",
+      "status": 200,
+      "consoleIssues": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_CONNECTION_TIMED_OUT"
+        }
+      ],
+      "pageErrors": [],
+      "metrics": {
+        "overflowX": 0,
+        "hiddenVisibleHeadings": 0
+      }
+    },
+    {
+      "breakpoint": "1280",
+      "page": "home",
+      "path": "/",
+      "status": 200,
+      "consoleIssues": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_CONNECTION_TIMED_OUT"
+        }
+      ],
+      "pageErrors": [],
+      "metrics": {
+        "overflowX": 0,
+        "hiddenVisibleHeadings": 0
+      }
+    },
+    {
+      "breakpoint": "1280",
+      "page": "about",
+      "path": "/about-us",
+      "status": 200,
+      "consoleIssues": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_CONNECTION_TIMED_OUT"
+        }
+      ],
+      "pageErrors": [],
+      "metrics": {
+        "overflowX": 0,
+        "hiddenVisibleHeadings": 0
+      }
+    },
+    {
+      "breakpoint": "1280",
+      "page": "services",
+      "path": "/our-services",
+      "status": 200,
+      "consoleIssues": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_CONNECTION_TIMED_OUT"
+        }
+      ],
+      "pageErrors": [],
+      "metrics": {
+        "overflowX": 0,
+        "hiddenVisibleHeadings": 0
+      }
+    },
+    {
+      "breakpoint": "1280",
+      "page": "portfolio",
+      "path": "/portfolio",
+      "status": 200,
+      "consoleIssues": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_CONNECTION_TIMED_OUT"
+        }
+      ],
+      "pageErrors": [],
+      "metrics": {
+        "overflowX": 0,
+        "hiddenVisibleHeadings": 0
+      }
+    },
+    {
+      "breakpoint": "1280",
+      "page": "plan",
+      "path": "/our-plan",
+      "status": 200,
+      "consoleIssues": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_DNS_NO_MATCHING_SUPPORTED_ALPN"
+        }
+      ],
+      "pageErrors": [],
+      "metrics": {
+        "overflowX": 0,
+        "hiddenVisibleHeadings": 0
+      }
+    },
+    {
+      "breakpoint": "1024",
+      "page": "home",
+      "path": "/",
+      "status": 200,
+      "consoleIssues": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_CONNECTION_TIMED_OUT"
+        }
+      ],
+      "pageErrors": [],
+      "metrics": {
+        "overflowX": 0,
+        "hiddenVisibleHeadings": 0
+      }
+    },
+    {
+      "breakpoint": "1024",
+      "page": "about",
+      "path": "/about-us",
+      "status": 200,
+      "consoleIssues": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_CONNECTION_TIMED_OUT"
+        }
+      ],
+      "pageErrors": [],
+      "metrics": {
+        "overflowX": 0,
+        "hiddenVisibleHeadings": 0
+      }
+    },
+    {
+      "breakpoint": "1024",
+      "page": "services",
+      "path": "/our-services",
+      "status": 200,
+      "consoleIssues": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_CONNECTION_TIMED_OUT"
+        }
+      ],
+      "pageErrors": [],
+      "metrics": {
+        "overflowX": 0,
+        "hiddenVisibleHeadings": 0
+      }
+    },
+    {
+      "breakpoint": "1024",
+      "page": "portfolio",
+      "path": "/portfolio",
+      "status": 200,
+      "consoleIssues": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_CONNECTION_TIMED_OUT"
+        }
+      ],
+      "pageErrors": [],
+      "metrics": {
+        "overflowX": 0,
+        "hiddenVisibleHeadings": 0
+      }
+    },
+    {
+      "breakpoint": "1024",
+      "page": "plan",
+      "path": "/our-plan",
+      "status": 200,
+      "consoleIssues": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_DNS_NO_MATCHING_SUPPORTED_ALPN"
+        }
+      ],
+      "pageErrors": [],
+      "metrics": {
+        "overflowX": 0,
+        "hiddenVisibleHeadings": 0
+      }
+    },
+    {
+      "breakpoint": "768",
+      "page": "home",
+      "path": "/",
+      "status": 200,
+      "consoleIssues": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_CONNECTION_TIMED_OUT"
+        }
+      ],
+      "pageErrors": [],
+      "metrics": {
+        "overflowX": 0,
+        "hiddenVisibleHeadings": 0
+      }
+    },
+    {
+      "breakpoint": "768",
+      "page": "about",
+      "path": "/about-us",
+      "status": 200,
+      "consoleIssues": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_CONNECTION_TIMED_OUT"
+        }
+      ],
+      "pageErrors": [],
+      "metrics": {
+        "overflowX": 0,
+        "hiddenVisibleHeadings": 0
+      }
+    },
+    {
+      "breakpoint": "768",
+      "page": "services",
+      "path": "/our-services",
+      "status": 200,
+      "consoleIssues": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_CONNECTION_TIMED_OUT"
+        }
+      ],
+      "pageErrors": [],
+      "metrics": {
+        "overflowX": 0,
+        "hiddenVisibleHeadings": 0
+      }
+    },
+    {
+      "breakpoint": "768",
+      "page": "portfolio",
+      "path": "/portfolio",
+      "status": 200,
+      "consoleIssues": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_CONNECTION_TIMED_OUT"
+        }
+      ],
+      "pageErrors": [],
+      "metrics": {
+        "overflowX": 0,
+        "hiddenVisibleHeadings": 0
+      }
+    },
+    {
+      "breakpoint": "768",
+      "page": "plan",
+      "path": "/our-plan",
+      "status": 200,
+      "consoleIssues": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_DNS_NO_MATCHING_SUPPORTED_ALPN"
+        }
+      ],
+      "pageErrors": [],
+      "metrics": {
+        "overflowX": 0,
+        "hiddenVisibleHeadings": 0
+      }
+    },
+    {
+      "breakpoint": "480",
+      "page": "home",
+      "path": "/",
+      "status": 200,
+      "consoleIssues": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_CONNECTION_TIMED_OUT"
+        }
+      ],
+      "pageErrors": [],
+      "metrics": {
+        "overflowX": 0,
+        "hiddenVisibleHeadings": 0
+      }
+    },
+    {
+      "breakpoint": "480",
+      "page": "about",
+      "path": "/about-us",
+      "status": 200,
+      "consoleIssues": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_CONNECTION_TIMED_OUT"
+        }
+      ],
+      "pageErrors": [],
+      "metrics": {
+        "overflowX": 0,
+        "hiddenVisibleHeadings": 0
+      }
+    },
+    {
+      "breakpoint": "480",
+      "page": "services",
+      "path": "/our-services",
+      "status": 200,
+      "consoleIssues": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_CONNECTION_TIMED_OUT"
+        }
+      ],
+      "pageErrors": [],
+      "metrics": {
+        "overflowX": 0,
+        "hiddenVisibleHeadings": 0
+      }
+    },
+    {
+      "breakpoint": "480",
+      "page": "portfolio",
+      "path": "/portfolio",
+      "status": 200,
+      "consoleIssues": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_CONNECTION_TIMED_OUT"
+        }
+      ],
+      "pageErrors": [],
+      "metrics": {
+        "overflowX": 0,
+        "hiddenVisibleHeadings": 0
+      }
+    },
+    {
+      "breakpoint": "480",
+      "page": "plan",
+      "path": "/our-plan",
+      "status": 200,
+      "consoleIssues": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_DNS_NO_MATCHING_SUPPORTED_ALPN"
+        }
+      ],
+      "pageErrors": [],
+      "metrics": {
+        "overflowX": 0,
+        "hiddenVisibleHeadings": 0
+      }
+    },
+    {
+      "breakpoint": "390",
+      "page": "home",
+      "path": "/",
+      "status": 200,
+      "consoleIssues": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_CONNECTION_TIMED_OUT"
+        }
+      ],
+      "pageErrors": [],
+      "metrics": {
+        "overflowX": 0,
+        "hiddenVisibleHeadings": 0
+      }
+    },
+    {
+      "breakpoint": "390",
+      "page": "about",
+      "path": "/about-us",
+      "status": 200,
+      "consoleIssues": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_CONNECTION_TIMED_OUT"
+        }
+      ],
+      "pageErrors": [],
+      "metrics": {
+        "overflowX": 0,
+        "hiddenVisibleHeadings": 0
+      }
+    },
+    {
+      "breakpoint": "390",
+      "page": "services",
+      "path": "/our-services",
+      "status": 200,
+      "consoleIssues": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_CONNECTION_TIMED_OUT"
+        }
+      ],
+      "pageErrors": [],
+      "metrics": {
+        "overflowX": 0,
+        "hiddenVisibleHeadings": 0
+      }
+    },
+    {
+      "breakpoint": "390",
+      "page": "portfolio",
+      "path": "/portfolio",
+      "status": 200,
+      "consoleIssues": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_CONNECTION_TIMED_OUT"
+        }
+      ],
+      "pageErrors": [],
+      "metrics": {
+        "overflowX": 0,
+        "hiddenVisibleHeadings": 0
+      }
+    },
+    {
+      "breakpoint": "390",
+      "page": "plan",
+      "path": "/our-plan",
+      "status": 200,
+      "consoleIssues": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_DNS_NO_MATCHING_SUPPORTED_ALPN"
+        }
+      ],
+      "pageErrors": [],
+      "metrics": {
+        "overflowX": 0,
+        "hiddenVisibleHeadings": 0
+      }
+    }
+  ]
+}
