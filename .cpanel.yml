@@ -1,9 +1,16 @@
 ---
 deployment:
   tasks:
-    - /bin/echo "Maccento: Deploy hook triggered from cPanel Git Version Control."
-    - /bin/echo "Run Laravel deployment commands in cPanel Terminal:"
-    - /bin/echo "cd /home/cotp5210/repositories/maccento"
-    - /bin/echo "composer install --no-dev --optimize-autoloader"
-    - /bin/echo "php artisan migrate --force"
-    - /bin/echo "php artisan optimize"
+    - export APPPATH=/home/cotp5210/repositories/maccento
+    - export PUBLICPATH=/home/cotp5210/public_html
+    - /bin/mkdir -p "$PUBLICPATH/assets"
+    - /usr/bin/rsync -a --delete "$APPPATH/public/assets/" "$PUBLICPATH/assets/"
+    - /usr/bin/rsync -a "$APPPATH/public/.htaccess" "$PUBLICPATH/.htaccess"
+    - /usr/bin/rsync -a "$APPPATH/public/index.php" "$PUBLICPATH/index.php"
+    - /bin/sed -i "s#require __DIR__.'/../vendor/autoload.php';#require '/home/cotp5210/repositories/maccento/vendor/autoload.php';#g" "$PUBLICPATH/index.php"
+    - /bin/sed -i "s#\$app = require_once __DIR__.'/../bootstrap/app.php';#\$app = require_once '/home/cotp5210/repositories/maccento/bootstrap/app.php';#g" "$PUBLICPATH/index.php"
+    - cd "$APPPATH"
+    - /usr/local/bin/ea-php83 /opt/cpanel/composer/bin/composer install --no-dev --optimize-autoloader --no-interaction || composer install --no-dev --optimize-autoloader --no-interaction
+    - /usr/local/bin/ea-php83 artisan migrate --force || php artisan migrate --force
+    - /usr/local/bin/ea-php83 artisan optimize:clear || php artisan optimize:clear
+    - /usr/local/bin/ea-php83 artisan optimize || php artisan optimize

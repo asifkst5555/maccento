@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Maccento | Real Estate Media</title>
   <link rel="icon" type="image/x-icon" href="{{ asset('assets/media/favicon.ico') }}">
-  <link rel="stylesheet" href="{{ asset('assets/css/site.css') }}">
+  <link rel="stylesheet" href="{{ asset('assets/css/site.css') }}?v={{ @filemtime(public_path('assets/css/site.css')) ?: time() }}">
 </head>
 <body>
   @php
