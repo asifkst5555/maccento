@@ -1,0 +1,9 @@
+---
+deployment:
+  tasks:
+    - /bin/echo "Maccento: Deploy hook triggered from cPanel Git Version Control."
+    - /bin/echo "Run Laravel deployment commands in cPanel Terminal:"
+    - /bin/echo "cd /home/cotp5210/repositories/maccento"
+    - /bin/echo "composer install --no-dev --optimize-autoloader"
+    - /bin/echo "php artisan migrate --force"
+    - /bin/echo "php artisan optimize"
