@@ -22,58 +22,23 @@
       @if ($errors->any())
       <div class="auth-alert auth-alert-error">{{ $errors->first() }}</div>
       @endif
-      @if (session('otp_debug_code'))
-      <div class="auth-alert auth-alert-info">Debug OTP: {{ session('otp_debug_code') }}</div>
-      @endif
 
-      <div class="signin-shell">
-        <form class="auth-form" action="{{ route('login.request-otp') }}" method="post">
-          @csrf
-          <label class="auth-label" for="auth-email-phone">Email or Phone Number</label>
-          <input
-            id="auth-email-phone"
-            class="auth-input auth-input-signin"
-            type="text"
-            name="identifier"
-            value="{{ old('identifier', $identifier ?? '') }}"
-            placeholder="you@agency.com or +1 514 000 0000"
-            autocomplete="username"
-            required
-          >
-          <button class="auth-btn auth-btn-verify" type="submit" name="channel" value="auto">Send Verification Code</button>
-        </form>
+      <form class="auth-form" method="post" action="{{ route('login.store') }}">
+        @csrf
+        <label class="auth-label" for="auth-email">Email Address</label>
+        <input id="auth-email" class="auth-input auth-input-signin" type="email" name="email" value="{{ old('email') }}" placeholder="you@agency.com" required>
 
-        <div class="auth-divider"><span>Choose OTP Channel</span></div>
+        <label class="auth-label" for="auth-password">Password</label>
+        <input id="auth-password" class="auth-input auth-input-signin" type="password" name="password" placeholder="Enter your password" required>
 
-        <div class="auth-otp-grid auth-otp-request">
-          <form action="{{ route('login.request-otp') }}" method="post">
-            @csrf
-            <input type="hidden" name="identifier" value="{{ old('identifier', $identifier ?? '') }}">
-            <button type="submit" class="auth-otp-btn" name="channel" value="sms">Send via SMS</button>
-          </form>
-          <form action="{{ route('login.request-otp') }}" method="post">
-            @csrf
-            <input type="hidden" name="identifier" value="{{ old('identifier', $identifier ?? '') }}">
-            <button type="submit" class="auth-otp-btn" name="channel" value="email">Send via Email</button>
-          </form>
-        </div>
-
-        @if (($otpRequested ?? false) || session('otp_requested'))
-        <form class="auth-form auth-verify-form" action="{{ route('login.verify-otp') }}" method="post">
-          @csrf
-          <label class="auth-label" for="auth-otp">Enter OTP</label>
-          <input id="auth-otp" class="auth-input auth-input-signin" type="text" name="otp" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="6-digit code" required>
-          <input type="hidden" name="identifier" value="{{ old('identifier', $identifier ?? '') }}">
-          <button class="auth-btn auth-btn-verify" type="submit">Verify &amp; Sign In</button>
-        </form>
-        @endif
-      </div>
+        <label class="auth-check"><input type="checkbox" name="remember" value="1"> Remember me</label>
+        <button class="auth-btn auth-btn-verify" type="submit">Sign In</button>
+      </form>
 
       <div class="signin-foot">
         <p class="auth-create">Don't have an account? <a href="{{ route('signup') }}">Create Account</a></p>
-
         <p class="auth-terms">
-          By signing up to create an account I accept Company's
+          By signing in you accept Company's
           <a href="#">Terms of use</a> &amp; <a href="#">Privacy Policy</a>.
         </p>
       </div>

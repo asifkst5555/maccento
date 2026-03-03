@@ -566,7 +566,7 @@
                 <li>24h delivery</li>
                 <li>MLS-ready formatting</li>
               </ul>
-              <a class="btn package-cta" href="{{ route('login') }}">Get Started</a>
+              <button class="btn package-cta" type="button" data-pbx-package="essential">Get Started</button>
             </div>
           </div>
 
@@ -583,7 +583,7 @@
                 <li>Video teaser (MLS + social)</li>
                 <li>24h delivery</li>
               </ul>
-              <a class="btn package-cta" href="{{ route('login') }}">Get Started</a>
+              <button class="btn package-cta" type="button" data-pbx-package="signature">Get Started</button>
             </div>
           </div>
 
@@ -600,7 +600,7 @@
                 <li>Cinematic walkthrough video</li>
                 <li>Social reel cut + floor plan</li>
               </ul>
-              <a class="btn package-cta" href="{{ route('login') }}">Get Started</a>
+              <button class="btn package-cta" type="button" data-pbx-package="prestige">Get Started</button>
             </div>
           </div>
 
@@ -617,14 +617,14 @@
                 <li>Day-to-dusk and object removal</li>
                 <li>Flexible delivery timeline</li>
               </ul>
-              <a class="btn package-cta" href="{{ route('login') }}">Build My Plan</a>
+              <button class="btn package-cta" type="button" data-pbx-package="custom">Build My Plan</button>
             </div>
           </div>
         </div>
         <div class="packages-included-card">
           <h3>Included</h3>
           <p>These perks are included with all our photography services, for a difference you can see.</p>
-          <a class="btn package-cta included-mobile-cta" href="{{ route('login') }}">Get Started</a>
+          <button class="btn package-cta included-mobile-cta" type="button" data-pbx-package="custom">Get Started</button>
           <ul class="packages-included-list">
             <li>HDR</li>
             <li>Window masking</li>
@@ -952,6 +952,151 @@
     </div>
   </footer>
 
+  <section class="pbx-root" data-pbx-root aria-label="Build my package">
+    <div class="pbx-modal" id="pbx-modal" data-pbx-modal hidden>
+      <div class="pbx-backdrop" data-pbx-close></div>
+      <div class="pbx-card" role="dialog" aria-modal="true" aria-labelledby="pbx-title">
+        <header class="pbx-head">
+          <div>
+            <h2 id="pbx-title" class="pbx-title">Build my package</h2>
+            <p class="pbx-subtitle">Get an instant estimate in 2-5 quick steps.</p>
+          </div>
+          <button class="pbx-close" type="button" data-pbx-close aria-label="Close package builder">&times;</button>
+        </header>
+
+        <div class="pbx-step-meta">
+          <span data-pbx-step-label>Step 1 of 4</span>
+          <span class="pbx-divider"></span>
+          <strong data-pbx-total>Estimated Total: 0 USD</strong>
+        </div>
+
+        <form class="pbx-form" data-pbx-form>
+          <section class="pbx-step is-active" data-pbx-step="0">
+            <h3>What type of listing is this?</h3>
+            <div class="pbx-grid">
+              <label class="pbx-option"><input type="radio" name="listing_type" value="home"> Home</label>
+              <label class="pbx-option"><input type="radio" name="listing_type" value="condo"> Condo</label>
+              <label class="pbx-option"><input type="radio" name="listing_type" value="rental"> Rental</label>
+              <label class="pbx-option"><input type="radio" name="listing_type" value="chalet"> Chalet</label>
+              <label class="pbx-option"><input type="radio" name="listing_type" value="other"> Other</label>
+            </div>
+          </section>
+
+          <section class="pbx-step" data-pbx-step="1">
+            <h3>What services do you need?</h3>
+            <div class="pbx-grid">
+              <label class="pbx-option"><input type="checkbox" name="services[]" value="photo"> Photo</label>
+              <label class="pbx-option"><input type="checkbox" name="services[]" value="video"> Video</label>
+              <label class="pbx-option"><input type="checkbox" name="services[]" value="drone"> Drone</label>
+              <label class="pbx-option"><input type="checkbox" name="services[]" value="floor_plan"> Floor Plan</label>
+              <label class="pbx-option"><input type="checkbox" name="services[]" value="social_media"> Social Media</label>
+            </div>
+          </section>
+
+          <section class="pbx-step" data-pbx-step="2">
+            <h3>Select options and add-ons</h3>
+            <div class="pbx-stack">
+              <label class="pbx-field" data-pbx-photo-options hidden>
+                <span>Photo count</span>
+                <select name="photo_count">
+                  <option value="">Select photo count</option>
+                  <option value="up_to_20">Up to 20</option>
+                  <option value="21_30">21-30</option>
+                  <option value="31_45">31-45</option>
+                  <option value="46_plus">46+</option>
+                </select>
+              </label>
+
+              <label class="pbx-field" data-pbx-video-options hidden>
+                <span>Video type</span>
+                <select name="video_type">
+                  <option value="">Select video type</option>
+                  <option value="walkthrough">Walkthrough</option>
+                  <option value="cinematic">Cinematic</option>
+                  <option value="reel">Reel / Social</option>
+                </select>
+              </label>
+
+              <label class="pbx-field" data-pbx-drone-options hidden>
+                <span>Drone mode</span>
+                <select name="drone_mode">
+                  <option value="">Select drone mode</option>
+                  <option value="photo">Photo</option>
+                  <option value="video">Video</option>
+                  <option value="both">Photo + Video</option>
+                </select>
+              </label>
+
+              <div class="pbx-addon-grid">
+                <label class="pbx-option"><input type="checkbox" name="add_ons[virtual_staging]"> Virtual Staging</label>
+                <label class="pbx-option"><input type="checkbox" name="add_ons[day_to_dusk]"> Day-to-Dusk</label>
+                <label class="pbx-option"><input type="checkbox" name="add_ons[priority_editing]"> Priority Editing</label>
+              </div>
+            </div>
+          </section>
+
+          <section class="pbx-step" data-pbx-step="3">
+            <h3>Finalize your request</h3>
+            <div class="pbx-stack">
+              <label class="pbx-field"><span>Full name</span><input type="text" name="contact_name" maxlength="120" placeholder="Your full name"></label>
+              <label class="pbx-field"><span>Email</span><input type="email" name="contact_email" maxlength="255" placeholder="you@company.com"></label>
+              <label class="pbx-field"><span>Phone</span><input type="text" name="contact_phone" maxlength="30" placeholder="+1 514 000 0000"></label>
+              <label class="pbx-field"><span>Message</span><textarea name="message" maxlength="1000" rows="3" placeholder="Any detail about timeline, location, or access..."></textarea></label>
+            </div>
+
+            <div class="pbx-recap">
+              <h4>Package recap</h4>
+              <ul data-pbx-line-items></ul>
+              <ul class="pbx-notes" data-pbx-notes></ul>
+            </div>
+          </section>
+
+          <footer class="pbx-actions">
+            <button type="button" class="pbx-btn pbx-btn-ghost" data-pbx-prev disabled>Previous</button>
+            <button type="button" class="pbx-btn pbx-btn-primary" data-pbx-next>Next</button>
+            <button type="submit" class="pbx-btn pbx-btn-primary" data-pbx-submit hidden>Request booking</button>
+          </footer>
+          <p class="pbx-status" data-pbx-status aria-live="polite"></p>
+        </form>
+
+        <div class="pbx-processing" data-pbx-processing hidden aria-live="polite" aria-busy="true">
+          <div class="pbx-processing-float">
+            <span class="pbx-spinner" aria-hidden="true"></span>
+            <span>Processing your package request...</span>
+          </div>
+        </div>
+
+        <div class="pbx-success" data-pbx-success style="display:none;">
+          <div class="pbx-success-card">
+            <h3>Request Submitted</h3>
+            <p>Your package request has been received successfully.</p>
+            <p><strong>Quote ID:</strong> <span data-pbx-success-quote>-</span></p>
+            <div class="pbx-success-actions">
+              <button class="pbx-btn pbx-btn-ghost" type="button" data-pbx-success-close>Close</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="site-chat" aria-label="AI chat assistant">
+    <button class="site-chat-toggle" type="button" data-chat-toggle aria-expanded="false" aria-controls="site-chat-panel" aria-label="Open AI chat assistant">
+      <img class="site-chat-toggle-icon" src="{{ asset('assets/media/icon/ai_icon.png') }}" alt="" aria-hidden="true">
+    </button>
+    <div id="site-chat-panel" class="site-chat-panel" data-chat-panel>
+      <div class="site-chat-head">
+        <h2 class="site-chat-title">Maccento AI Assistant</h2>
+        <p class="site-chat-sub">Ask about services, pricing ranges, and booking.</p>
+      </div>
+      <div class="site-chat-log" data-chat-log></div>
+      <form class="site-chat-form" data-chat-form>
+        <input class="site-chat-input" type="text" name="message" data-chat-input maxlength="1800" placeholder="Type your message..." required>
+        <button class="site-chat-send" type="submit">Send</button>
+      </form>
+    </div>
+  </section>
+
   <script>
     (function () {
       const portfolioButtons = document.querySelectorAll('.portfolio-btn');
@@ -971,6 +1116,298 @@
       const lightboxPrev = document.querySelector('[data-portfolio-prev]');
       const lightboxNext = document.querySelector('[data-portfolio-next]');
       const lightboxStageWrap = document.querySelector('[data-portfolio-stage-wrap]');
+      const initChatWidget = () => {
+        if (window.__maccentoChatInit) return;
+        window.__maccentoChatInit = true;
+
+        const chatToggle = document.querySelector('[data-chat-toggle]');
+        const chatPanel = document.querySelector('[data-chat-panel]');
+        const chatLog = document.querySelector('[data-chat-log]');
+        const chatForm = document.querySelector('[data-chat-form]');
+        const chatInput = document.querySelector('[data-chat-input]');
+        if (!chatToggle || !chatPanel || !chatLog || !chatForm || !chatInput) return;
+
+        const storageKey = 'maccento_chat_conversation_id';
+        let conversationId = null;
+        let loading = false;
+        const chatText = {
+          en: {
+            estimateTitle: 'Custom package estimate',
+            estimateListing: 'Listing',
+            estimateServices: 'Services',
+            estimateTotal: 'Estimated total',
+            estimateMore: 'more items',
+            estimateUse: 'Use this estimate in Build My Package',
+            estimateEdit: 'Edit options before submit',
+            builderNotReady: 'Package builder is not ready yet. Please try again in a moment.',
+            assistantFallback: 'Thanks. Our team will contact you shortly.',
+            thinking: 'Maccento AI is thinking',
+            unavailable: 'Assistant is temporarily unavailable. Please try again.',
+            connectError: 'Could not connect to assistant right now.',
+            greeting: 'Hi, I am Maccento AI. Tell me your property type, location, and required service.',
+          },
+          fr: {
+            estimateTitle: 'Estimation forfait sur mesure',
+            estimateListing: 'Type',
+            estimateServices: 'Services',
+            estimateTotal: 'Total estime',
+            estimateMore: 'elements supplementaires',
+            estimateUse: 'Utiliser cette estimation dans Creer mon forfait',
+            estimateEdit: 'Modifier les options avant soumission',
+            builderNotReady: 'Le configurateur n est pas pret. Veuillez reessayer dans un instant.',
+            assistantFallback: 'Merci. Notre equipe vous contactera bientot.',
+            thinking: 'Maccento AI analyse votre demande',
+            unavailable: 'Assistant temporairement indisponible. Veuillez reessayer.',
+            connectError: 'Connexion a l assistant impossible pour le moment.',
+            greeting: 'Bonjour, je suis Maccento AI. Indiquez votre type de propriete, la localisation, et le service souhaite.',
+          },
+        };
+        const getCurrentLanguage = () => {
+          const active = document.querySelector('.lang-btn.active');
+          if (active && active.getAttribute('data-lang') === 'fr') return 'fr';
+          try {
+            const stored = localStorage.getItem('site-lang');
+            if (stored === 'fr' || stored === 'en') return stored;
+          } catch (error) {
+          }
+          return 'en';
+        };
+        const chatT = (key) => {
+          const lang = getCurrentLanguage();
+          return (chatText[lang] && chatText[lang][key]) || chatText.en[key] || key;
+        };
+
+        const appendMessage = (type, text) => {
+          const message = document.createElement('div');
+          message.className = `site-chat-msg ${type}`;
+          message.textContent = text;
+          chatLog.appendChild(message);
+          chatLog.scrollTop = chatLog.scrollHeight;
+          return message;
+        };
+
+        const appendEstimateCard = (preview, draft = null) => {
+          if (!preview || typeof preview !== 'object') return;
+
+          const total = Number(preview.total || 0);
+          const currency = (preview.currency || 'USD').toString();
+          const lineItems = Array.isArray(preview.line_items) ? preview.line_items : [];
+          const services = Array.isArray(draft?.services) ? draft.services : [];
+          const listingType = (draft?.listing_type || '').toString();
+
+          const card = document.createElement('div');
+          card.className = 'site-chat-estimate';
+
+          const title = document.createElement('p');
+          title.className = 'site-chat-estimate-title';
+          title.textContent = chatT('estimateTitle');
+          card.appendChild(title);
+
+          if (listingType || services.length) {
+            const summary = document.createElement('p');
+            summary.className = 'site-chat-estimate-summary';
+            const parts = [];
+            if (listingType) parts.push(`${chatT('estimateListing')}: ${listingType}`);
+            if (services.length) parts.push(`${chatT('estimateServices')}: ${services.join(', ')}`);
+            summary.textContent = parts.join(' | ');
+            card.appendChild(summary);
+          }
+
+          const totalText = document.createElement('p');
+          totalText.className = 'site-chat-estimate-total';
+          totalText.textContent = `${chatT('estimateTotal')}: ${total.toLocaleString()} ${currency}`;
+          card.appendChild(totalText);
+
+          if (lineItems.length) {
+            const list = document.createElement('ul');
+            list.className = 'site-chat-estimate-list';
+            lineItems.slice(0, 4).forEach((item) => {
+              const row = document.createElement('li');
+              const label = (item?.label || 'Item').toString();
+              const amount = Number(item?.amount || 0).toLocaleString();
+              row.textContent = `${label}: ${amount} ${currency}`;
+              list.appendChild(row);
+            });
+            if (lineItems.length > 4) {
+              const more = document.createElement('li');
+              more.textContent = `+${lineItems.length - 4} ${chatT('estimateMore')}`;
+              list.appendChild(more);
+            }
+            card.appendChild(list);
+          }
+
+          const actions = document.createElement('div');
+          actions.className = 'site-chat-estimate-actions';
+          const applyBtn = document.createElement('button');
+          applyBtn.type = 'button';
+          applyBtn.className = 'site-chat-estimate-btn';
+          applyBtn.textContent = chatT('estimateUse');
+          applyBtn.addEventListener('click', () => {
+            if (typeof window.maccentoOpenPackageBuilderFromChat === 'function') {
+              window.maccentoOpenPackageBuilderFromChat(draft || {}, preview || {});
+            } else {
+              appendMessage('system', chatT('builderNotReady'));
+            }
+          });
+          actions.appendChild(applyBtn);
+
+          const editBtn = document.createElement('button');
+          editBtn.type = 'button';
+          editBtn.className = 'site-chat-estimate-link';
+          editBtn.textContent = chatT('estimateEdit');
+          editBtn.addEventListener('click', () => {
+            if (typeof window.maccentoOpenPackageBuilderFromChat === 'function') {
+              window.maccentoOpenPackageBuilderFromChat(draft || {}, preview || {}, { startStep: 2 });
+            } else {
+              appendMessage('system', chatT('builderNotReady'));
+            }
+          });
+          actions.appendChild(editBtn);
+          card.appendChild(actions);
+
+          chatLog.appendChild(card);
+          chatLog.scrollTop = chatLog.scrollHeight;
+        };
+
+        const appendAssistantResponse = (text, metadata = null) => {
+          appendMessage('bot', text || chatT('assistantFallback'));
+          const preview = metadata && typeof metadata === 'object' ? metadata.package_preview : null;
+          const draft = metadata && typeof metadata === 'object' ? metadata.package_draft : null;
+          if (preview) {
+            appendEstimateCard(preview, draft);
+          }
+        };
+
+        const appendThinking = () => {
+          const message = document.createElement('div');
+          message.className = 'site-chat-msg bot thinking';
+          message.innerHTML = `<span class="site-chat-thinking-label">${chatT('thinking')}</span><span class="site-chat-thinking-dots" aria-hidden="true"><span></span><span></span><span></span></span>`;
+          chatLog.appendChild(message);
+          chatLog.scrollTop = chatLog.scrollHeight;
+          return message;
+        };
+
+        const setLoading = (state) => {
+          loading = state;
+          chatInput.disabled = state;
+          const submitButton = chatForm.querySelector('button[type="submit"]');
+          if (submitButton) submitButton.disabled = state;
+        };
+
+        const createSession = async () => {
+          const visitorId = localStorage.getItem('maccento_chat_visitor') || `visitor-${Date.now().toString(36)}`;
+          localStorage.setItem('maccento_chat_visitor', visitorId);
+
+          const response = await fetch('/api/chat/session', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify({
+              channel: 'website_widget',
+              visitor_id: visitorId,
+              language: getCurrentLanguage(),
+            }),
+          });
+
+          if (!response.ok) throw new Error('Could not start chat session.');
+          const data = await response.json();
+          conversationId = data.conversation_id;
+          localStorage.setItem(storageKey, String(conversationId));
+        };
+
+        const ensureSession = async () => {
+          if (conversationId) return;
+
+          const storedId = localStorage.getItem(storageKey);
+          if (!storedId) {
+            await createSession();
+            return;
+          }
+
+          const check = await fetch(`/api/chat/history/${storedId}`, {
+            headers: { 'Accept': 'application/json' },
+          });
+
+          if (check.ok) {
+            conversationId = storedId;
+            const history = await check.json();
+            if (Array.isArray(history.messages) && history.messages.length > 0) {
+              chatLog.innerHTML = '';
+              history.messages.forEach((item) => {
+                const role = item.role === 'user' ? 'user' : 'bot';
+                if (role === 'bot') {
+                  appendAssistantResponse(item.content || '', item.metadata || null);
+                } else {
+                  appendMessage(role, item.content || '');
+                }
+              });
+            }
+            return;
+          }
+
+          localStorage.removeItem(storageKey);
+          await createSession();
+        };
+
+        const sendMessage = async (text) => {
+          setLoading(true);
+          const thinkingMessage = appendThinking();
+          try {
+            await ensureSession();
+            const response = await fetch(`/api/chat/message/${conversationId}`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+              body: JSON.stringify({
+                content: text,
+                language: getCurrentLanguage(),
+              }),
+            });
+
+            if (!response.ok) {
+              appendMessage('system', chatT('unavailable'));
+              return;
+            }
+
+            const data = await response.json();
+            appendAssistantResponse(
+              data.assistant?.content || 'Thanks. Our team will contact you shortly.',
+              data.assistant?.metadata || null
+            );
+          } catch (error) {
+            appendMessage('system', chatT('unavailable'));
+          } finally {
+            if (thinkingMessage && thinkingMessage.parentNode) {
+              thinkingMessage.remove();
+            }
+            setLoading(false);
+          }
+        };
+
+        chatToggle.addEventListener('click', async () => {
+          const isOpen = chatPanel.classList.toggle('is-open');
+          chatToggle.setAttribute('aria-expanded', String(isOpen));
+          if (isOpen) {
+            if (!chatLog.childElementCount) {
+              appendMessage('bot', chatT('greeting'));
+            }
+            try {
+              await ensureSession();
+            } catch (error) {
+              appendMessage('system', chatT('connectError'));
+            }
+            chatInput.focus();
+          }
+        });
+
+        chatForm.addEventListener('submit', async (event) => {
+          event.preventDefault();
+          if (loading) return;
+          const text = chatInput.value.trim();
+          if (!text) return;
+          appendMessage('user', text);
+          chatInput.value = '';
+          await sendMessage(text);
+        });
+      };
       const getFilterIndex = (filter) => Array.from(portfolioButtons).findIndex(
         (btn) => btn.getAttribute('data-filter') === filter
       );
@@ -2103,6 +2540,554 @@
       } catch (e) {
       }
       applyLanguage(initialLang);
+      initChatWidget();
+    })();
+  </script>
+  <script>
+    (function () {
+      const root = document.querySelector('[data-pbx-root]');
+      if (!root) return;
+
+      const modal = root.querySelector('[data-pbx-modal]');
+      const openBtn = root.querySelector('[data-pbx-open]');
+      const packagePresetButtons = Array.from(document.querySelectorAll('[data-pbx-package]'));
+      const closeButtons = root.querySelectorAll('[data-pbx-close]');
+      const form = root.querySelector('[data-pbx-form]');
+      const steps = Array.from(root.querySelectorAll('[data-pbx-step]'));
+      const prevBtn = root.querySelector('[data-pbx-prev]');
+      const nextBtn = root.querySelector('[data-pbx-next]');
+      const submitBtn = root.querySelector('[data-pbx-submit]');
+      const stepLabel = root.querySelector('[data-pbx-step-label]');
+      const totalLabel = root.querySelector('[data-pbx-total]');
+      const lineItemsEl = root.querySelector('[data-pbx-line-items]');
+      const notesEl = root.querySelector('[data-pbx-notes]');
+      const statusEl = root.querySelector('[data-pbx-status]');
+      const processingEl = root.querySelector('[data-pbx-processing]');
+      const successWrap = root.querySelector('[data-pbx-success]');
+      const successQuoteEl = root.querySelector('[data-pbx-success-quote]');
+      const successCloseBtn = root.querySelector('[data-pbx-success-close]');
+      const photoWrap = root.querySelector('[data-pbx-photo-options]');
+      const videoWrap = root.querySelector('[data-pbx-video-options]');
+      const droneWrap = root.querySelector('[data-pbx-drone-options]');
+      if (!modal || !form || !prevBtn || !nextBtn || !submitBtn || !stepLabel || !totalLabel || !lineItemsEl || !notesEl || !statusEl || !processingEl || !successWrap || !successQuoteEl || !successCloseBtn || !photoWrap || !videoWrap || !droneWrap) return;
+
+      const labels = {
+        en: {
+          open: 'Build my package',
+          title: 'Build my package',
+          subtitle: 'Get an instant estimate in 2-5 quick steps.',
+          step: 'Step',
+          of: 'of',
+          total: 'Estimated Total:',
+          next: 'Next',
+          previous: 'Previous',
+          submit: 'Request booking',
+          sending: 'Submitting your request...',
+          success: 'Request submitted successfully. Quote ID:',
+          errListing: 'Please select listing type.',
+          errServices: 'Please select at least one service.',
+          errContact: 'Please add your name and email or phone.',
+          errGeneric: 'Unable to submit now. Please try again.',
+        },
+        fr: {
+          open: 'Creer mon forfait',
+          title: 'Creer mon forfait',
+          subtitle: 'Obtenez une estimation instantanee en 2-5 etapes.',
+          step: 'Etape',
+          of: 'sur',
+          total: 'Total estime :',
+          next: 'Suivant',
+          previous: 'Precedent',
+          submit: 'Demander reservation',
+          sending: 'Soumission en cours...',
+          success: 'Demande envoyee. ID du devis :',
+          errListing: 'Veuillez selectionner le type de propriete.',
+          errServices: 'Veuillez selectionner au moins un service.',
+          errContact: 'Ajoutez votre nom et un email ou telephone.',
+          errGeneric: 'Impossible de soumettre maintenant. Reessayez.',
+        },
+      };
+
+      const state = {
+        package_code: 'custom',
+        listing_type: '',
+        services: [],
+        photo_count: '',
+        video_type: '',
+        drone_mode: '',
+        add_ons: {
+          virtual_staging: false,
+          day_to_dusk: false,
+          priority_editing: false,
+        },
+        contact_name: '',
+        contact_email: '',
+        contact_phone: '',
+        message: '',
+      };
+
+      let currentStep = 0;
+      let quote = { total: 0, currency: 'USD', line_items: [], notes: [] };
+      let calcAbortController = null;
+      const fixedPackages = new Set(['essential', 'signature', 'prestige']);
+      const presets = {
+        essential: {
+          package_code: 'essential',
+          listing_type: 'condo',
+          services: ['photo'],
+          photo_count: '',
+          video_type: '',
+          drone_mode: '',
+          add_ons: {
+            virtual_staging: false,
+            day_to_dusk: false,
+            priority_editing: false,
+          },
+        },
+        signature: {
+          package_code: 'signature',
+          listing_type: 'home',
+          services: ['photo', 'drone', 'video'],
+          photo_count: '',
+          video_type: 'reel',
+          drone_mode: '',
+          add_ons: {
+            virtual_staging: false,
+            day_to_dusk: false,
+            priority_editing: false,
+          },
+        },
+        prestige: {
+          package_code: 'prestige',
+          listing_type: 'home',
+          services: ['photo', 'drone', 'video', 'floor_plan', 'social_media'],
+          photo_count: '',
+          video_type: 'cinematic',
+          drone_mode: '',
+          add_ons: {
+            virtual_staging: false,
+            day_to_dusk: false,
+            priority_editing: false,
+          },
+        },
+        custom: {
+          package_code: 'custom',
+          listing_type: 'other',
+          services: [],
+          photo_count: '',
+          video_type: '',
+          drone_mode: '',
+          add_ons: {
+            virtual_staging: false,
+            day_to_dusk: false,
+            priority_editing: false,
+          },
+        },
+      };
+
+      const getLang = () => {
+        const active = document.querySelector('.lang-btn.active');
+        return active && active.getAttribute('data-lang') === 'fr' ? 'fr' : 'en';
+      };
+
+      const t = (key) => labels[getLang()][key] || labels.en[key] || key;
+      const isFixedPackage = () => fixedPackages.has(state.package_code);
+
+      const visitorId = () => {
+        let id = localStorage.getItem('maccento_pbx_visitor');
+        if (!id) {
+          id = 'pbx-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
+          localStorage.setItem('maccento_pbx_visitor', id);
+        }
+        return id;
+      };
+
+      const applyLabels = () => {
+        const title = root.querySelector('.pbx-title');
+        const subtitle = root.querySelector('.pbx-subtitle');
+        if (title) title.textContent = t('title');
+        if (subtitle) subtitle.textContent = t('subtitle');
+        if (openBtn) openBtn.textContent = t('open');
+        prevBtn.textContent = t('previous');
+        nextBtn.textContent = t('next');
+        submitBtn.textContent = t('submit');
+        renderStep();
+        renderQuote();
+      };
+
+      const applyPackageMode = () => {
+        const fixed = isFixedPackage();
+        if (fixed) {
+          steps.forEach((step, index) => step.classList.toggle('is-active', index === 3));
+          stepLabel.textContent = 'Preset package selected';
+          prevBtn.hidden = true;
+          nextBtn.hidden = true;
+          submitBtn.hidden = false;
+          return;
+        }
+
+        prevBtn.hidden = false;
+        nextBtn.hidden = currentStep === steps.length - 1;
+        submitBtn.hidden = currentStep !== steps.length - 1;
+      };
+
+      const updateStateFromForm = () => {
+        const fd = new FormData(form);
+        state.listing_type = String(fd.get('listing_type') || '');
+        state.services = fd.getAll('services[]').map((v) => String(v));
+        state.photo_count = String(fd.get('photo_count') || '');
+        state.video_type = String(fd.get('video_type') || '');
+        state.drone_mode = String(fd.get('drone_mode') || '');
+        state.add_ons.virtual_staging = fd.get('add_ons[virtual_staging]') === 'on';
+        state.add_ons.day_to_dusk = fd.get('add_ons[day_to_dusk]') === 'on';
+        state.add_ons.priority_editing = fd.get('add_ons[priority_editing]') === 'on';
+        state.contact_name = String(fd.get('contact_name') || '').trim();
+        state.contact_email = String(fd.get('contact_email') || '').trim();
+        state.contact_phone = String(fd.get('contact_phone') || '').trim();
+        state.message = String(fd.get('message') || '').trim();
+      };
+
+      const applyStateToForm = () => {
+        const listing = form.querySelectorAll('input[name="listing_type"]');
+        listing.forEach((input) => {
+          input.checked = input.value === state.listing_type;
+        });
+
+        const serviceInputs = form.querySelectorAll('input[name="services[]"]');
+        serviceInputs.forEach((input) => {
+          input.checked = state.services.includes(input.value);
+        });
+
+        const photoCount = form.querySelector('[name="photo_count"]');
+        const videoType = form.querySelector('[name="video_type"]');
+        const droneMode = form.querySelector('[name="drone_mode"]');
+        if (photoCount) photoCount.value = state.photo_count || '';
+        if (videoType) videoType.value = state.video_type || '';
+        if (droneMode) droneMode.value = state.drone_mode || '';
+
+        const addOnVirtual = form.querySelector('[name="add_ons[virtual_staging]"]');
+        const addOnDay = form.querySelector('[name="add_ons[day_to_dusk]"]');
+        const addOnPriority = form.querySelector('[name="add_ons[priority_editing]"]');
+        if (addOnVirtual) addOnVirtual.checked = !!state.add_ons.virtual_staging;
+        if (addOnDay) addOnDay.checked = !!state.add_ons.day_to_dusk;
+        if (addOnPriority) addOnPriority.checked = !!state.add_ons.priority_editing;
+
+        const contactName = form.querySelector('[name="contact_name"]');
+        const contactEmail = form.querySelector('[name="contact_email"]');
+        const contactPhone = form.querySelector('[name="contact_phone"]');
+        const message = form.querySelector('[name="message"]');
+        if (contactName) contactName.value = state.contact_name || '';
+        if (contactEmail) contactEmail.value = state.contact_email || '';
+        if (contactPhone) contactPhone.value = state.contact_phone || '';
+        if (message) message.value = state.message || '';
+      };
+
+      const applyConditionalFields = () => {
+        const hasPhoto = state.services.includes('photo');
+        const hasVideo = state.services.includes('video');
+        const hasDrone = state.services.includes('drone');
+
+        photoWrap.hidden = !hasPhoto;
+        videoWrap.hidden = !hasVideo;
+        droneWrap.hidden = !hasDrone;
+
+        if (!hasPhoto) {
+          state.photo_count = '';
+          const field = form.querySelector('[name="photo_count"]');
+          if (field) field.value = '';
+        }
+        if (!hasVideo) {
+          state.video_type = '';
+          const field = form.querySelector('[name="video_type"]');
+          if (field) field.value = '';
+        }
+        if (!hasDrone) {
+          state.drone_mode = '';
+          const field = form.querySelector('[name="drone_mode"]');
+          if (field) field.value = '';
+        }
+      };
+
+      const renderStep = () => {
+        if (!isFixedPackage()) {
+          steps.forEach((step, index) => step.classList.toggle('is-active', index === currentStep));
+          stepLabel.textContent = `${t('step')} ${currentStep + 1} ${t('of')} ${steps.length}`;
+          prevBtn.disabled = currentStep === 0;
+        }
+        applyPackageMode();
+      };
+
+      const setProcessing = (active) => {
+        processingEl.hidden = !active;
+        processingEl.classList.toggle('is-active', active);
+        submitBtn.disabled = active;
+        prevBtn.disabled = active || currentStep === 0;
+        nextBtn.disabled = active;
+        closeButtons.forEach((btn) => {
+          btn.disabled = active;
+        });
+      };
+
+      const showSuccess = (quoteId) => {
+        successQuoteEl.textContent = quoteId || '-';
+        successWrap.style.display = 'grid';
+        successWrap.classList.add('is-open');
+      };
+
+      const hideSuccess = () => {
+        successWrap.style.display = 'none';
+        successWrap.classList.remove('is-open');
+      };
+
+      const renderQuote = () => {
+        const shownTotal = quote.display_total || quote.total || 0;
+        totalLabel.textContent = `${t('total')} ${shownTotal} ${quote.currency || 'USD'}`;
+        lineItemsEl.innerHTML = '';
+        notesEl.innerHTML = '';
+
+        (quote.line_items || []).forEach((item) => {
+          const li = document.createElement('li');
+          li.textContent = `${item.label}: ${item.amount} ${(quote.currency || 'USD')}`;
+          lineItemsEl.appendChild(li);
+        });
+        (quote.notes || []).forEach((note) => {
+          const li = document.createElement('li');
+          li.textContent = note;
+          notesEl.appendChild(li);
+        });
+      };
+
+      const calculate = async () => {
+        updateStateFromForm();
+        applyConditionalFields();
+        if (!isFixedPackage() && (!state.listing_type || state.services.length === 0)) {
+          quote = { total: 0, currency: 'USD', line_items: [], notes: [] };
+          renderQuote();
+          return;
+        }
+
+        if (calcAbortController) calcAbortController.abort();
+        calcAbortController = new AbortController();
+
+        try {
+          const response = await fetch('/api/package-builder/calculate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            signal: calcAbortController.signal,
+            body: JSON.stringify(isFixedPackage() ? {
+              package_code: state.package_code,
+            } : {
+              package_code: 'custom',
+              listing_type: state.listing_type,
+              services: state.services,
+              photo_count: state.photo_count || undefined,
+              video_type: state.video_type || undefined,
+              drone_mode: state.drone_mode || undefined,
+              add_ons: state.add_ons,
+            }),
+          });
+          if (!response.ok) return;
+          quote = await response.json();
+          renderQuote();
+        } catch (error) {
+        }
+      };
+
+      const validateStep = () => {
+        statusEl.textContent = '';
+        if (!isFixedPackage() && currentStep === 0 && !state.listing_type) {
+          statusEl.textContent = t('errListing');
+          return false;
+        }
+        if (!isFixedPackage() && currentStep === 1 && state.services.length === 0) {
+          statusEl.textContent = t('errServices');
+          return false;
+        }
+        if (currentStep === 3 && (!state.contact_name || (!state.contact_email && !state.contact_phone))) {
+          statusEl.textContent = t('errContact');
+          return false;
+        }
+        return true;
+      };
+
+      const openModal = (startStep = 0) => {
+        modal.hidden = false;
+        if (openBtn) openBtn.setAttribute('aria-expanded', 'true');
+        document.body.classList.add('pbx-lock');
+        currentStep = Math.min(Math.max(startStep, 0), steps.length - 1);
+        hideSuccess();
+        setProcessing(false);
+        renderStep();
+      };
+
+      const closeModal = () => {
+        modal.hidden = true;
+        if (openBtn) openBtn.setAttribute('aria-expanded', 'false');
+        document.body.classList.remove('pbx-lock');
+        hideSuccess();
+        setProcessing(false);
+      };
+
+      if (openBtn) {
+        openBtn.addEventListener('click', () => {
+          state.package_code = 'custom';
+          openModal(0);
+          calculate();
+        });
+      }
+      closeButtons.forEach((btn) => btn.addEventListener('click', closeModal));
+      successCloseBtn.addEventListener('click', closeModal);
+
+      packagePresetButtons.forEach((button) => {
+        button.addEventListener('click', () => {
+          const key = String(button.getAttribute('data-pbx-package') || 'custom');
+          const preset = presets[key] || presets.custom;
+          state.package_code = preset.package_code || 'custom';
+          state.listing_type = preset.listing_type;
+          state.services = [...preset.services];
+          state.photo_count = preset.photo_count;
+          state.video_type = preset.video_type;
+          state.drone_mode = preset.drone_mode;
+          state.add_ons = { ...preset.add_ons };
+          state.contact_name = '';
+          state.contact_email = '';
+          state.contact_phone = '';
+          state.message = '';
+
+          applyStateToForm();
+          openModal(isFixedPackage() ? 3 : 0);
+          calculate();
+        });
+      });
+
+      window.maccentoOpenPackageBuilderFromChat = (draft = {}, preview = {}, options = {}) => {
+        state.package_code = 'custom';
+        state.listing_type = typeof draft.listing_type === 'string' ? draft.listing_type : (state.listing_type || 'other');
+        state.services = Array.isArray(draft.services) ? draft.services.filter(Boolean) : [];
+        state.photo_count = typeof draft.photo_count === 'string' ? draft.photo_count : '';
+        state.video_type = typeof draft.video_type === 'string' ? draft.video_type : '';
+        state.drone_mode = typeof draft.drone_mode === 'string' ? draft.drone_mode : '';
+
+        const incomingAddOns = (draft && typeof draft.add_ons === 'object' && draft.add_ons !== null) ? draft.add_ons : {};
+        state.add_ons = {
+          virtual_staging: Boolean(incomingAddOns.virtual_staging),
+          day_to_dusk: Boolean(incomingAddOns.day_to_dusk),
+          priority_editing: Boolean(incomingAddOns.priority_editing),
+        };
+
+        applyStateToForm();
+        applyConditionalFields();
+
+        if (preview && typeof preview === 'object') {
+          quote = {
+            total: Number(preview.total || 0),
+            currency: String(preview.currency || 'USD'),
+            line_items: Array.isArray(preview.line_items) ? preview.line_items : [],
+            notes: Array.isArray(preview.notes) ? preview.notes : [],
+          };
+          renderQuote();
+        }
+
+        const hasMinimumDraft = state.listing_type && state.services.length > 0;
+        const requestedStep = Number(options.startStep);
+        let openStep = hasMinimumDraft ? 3 : 0;
+        if (!Number.isNaN(requestedStep) && requestedStep >= 0 && requestedStep <= 3) {
+          openStep = requestedStep;
+        }
+
+        openModal(openStep);
+        calculate();
+      };
+
+      nextBtn.addEventListener('click', () => {
+        updateStateFromForm();
+        if (!validateStep()) return;
+        if (currentStep < steps.length - 1) {
+          currentStep += 1;
+          renderStep();
+        }
+      });
+
+      prevBtn.addEventListener('click', () => {
+        if (currentStep > 0) {
+          currentStep -= 1;
+          renderStep();
+          statusEl.textContent = '';
+        }
+      });
+
+      form.addEventListener('change', calculate);
+      form.addEventListener('input', () => {
+        updateStateFromForm();
+      });
+
+      form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        updateStateFromForm();
+        if (!validateStep()) return;
+
+        setProcessing(true);
+        statusEl.textContent = t('sending');
+        try {
+          const response = await fetch('/api/package-builder/submit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify({
+              visitor_id: visitorId(),
+              package_code: state.package_code || 'custom',
+              listing_type: isFixedPackage() ? undefined : state.listing_type,
+              services: isFixedPackage() ? undefined : state.services,
+              photo_count: isFixedPackage() ? undefined : (state.photo_count || undefined),
+              video_type: isFixedPackage() ? undefined : (state.video_type || undefined),
+              drone_mode: isFixedPackage() ? undefined : (state.drone_mode || undefined),
+              add_ons: isFixedPackage() ? undefined : state.add_ons,
+              contact_name: state.contact_name,
+              contact_email: state.contact_email || undefined,
+              contact_phone: state.contact_phone || undefined,
+              message: state.message || undefined,
+              language: getLang(),
+            }),
+          });
+
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok) {
+            const firstError = data && data.errors
+              ? Object.values(data.errors).flat().find((msg) => typeof msg === 'string')
+              : null;
+            statusEl.textContent = firstError || data.message || t('errGeneric');
+            setProcessing(false);
+            return;
+          }
+
+          const confirmedQuoteId = String(data.quote_id || '').trim();
+          if (confirmedQuoteId === '') {
+            statusEl.textContent = 'Request could not be confirmed. Please try again.';
+            setProcessing(false);
+            return;
+          }
+
+          statusEl.textContent = `${t('success')} ${confirmedQuoteId}`;
+          showSuccess(confirmedQuoteId);
+          form.reset();
+          state.package_code = 'custom';
+          quote = { total: 0, currency: 'USD', line_items: [], notes: [] };
+          currentStep = 0;
+          calculate();
+          renderStep();
+        } catch (error) {
+          statusEl.textContent = t('errGeneric');
+        } finally {
+          setProcessing(false);
+        }
+      });
+
+      document.querySelectorAll('.lang-btn').forEach((btn) => {
+        btn.addEventListener('click', applyLabels);
+      });
+
+      renderStep();
+      renderQuote();
+      applyLabels();
     })();
   </script>
 </body>

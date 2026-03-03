@@ -41,6 +41,9 @@ return [
             'database' => env('DB_DATABASE', database_path('database.sqlite')),
             'prefix' => '',
             'foreign_key_constraints' => env('DB_FOREIGN_KEYS', true),
+            'options' => extension_loaded('pdo_sqlite') ? array_filter([
+                PDO::ATTR_TIMEOUT => (int) env('DB_TIMEOUT', 5),
+            ]) : [],
         ],
 
         'mysql' => [

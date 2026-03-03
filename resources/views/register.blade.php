@@ -29,6 +29,12 @@
         <label class="auth-label" for="auth-phone">Phone (optional)</label>
         <input id="auth-phone" class="auth-input auth-input-md" type="text" name="phone" value="{{ old('phone') }}" placeholder="+1 514 000 0000">
 
+        <label class="auth-label" for="auth-password">Password</label>
+        <input id="auth-password" class="auth-input auth-input-md" type="password" name="password" placeholder="At least 8 characters" required>
+
+        <label class="auth-label" for="auth-password-confirmation">Confirm Password</label>
+        <input id="auth-password-confirmation" class="auth-input auth-input-md" type="password" name="password_confirmation" placeholder="Re-enter password" required>
+
         <button class="auth-btn auth-btn-verify" type="submit">Create Account</button>
       </form>
 

@@ -12,11 +12,13 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // \App\Models\User::factory(10)->create();
-
-        // \App\Models\User::factory()->create([
-        //     'name' => 'Test User',
-        //     'email' => 'test@example.com',
-        // ]);
+        // Default profile keeps rich demo data.
+        // For minimal mode use:
+        // php artisan db:seed --class=CleanDemoSeeder
+        // For heavy mode (20+ leads/quotes/invoices) use:
+        // php artisan db:seed --class=HeavyDemoSeeder
+        $this->call([
+            DemoDataSeeder::class,
+        ]);
     }
 }
