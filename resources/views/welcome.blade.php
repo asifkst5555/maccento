@@ -1082,7 +1082,8 @@
 
   <section class="site-chat" aria-label="AI chat assistant">
     <button class="site-chat-toggle" type="button" data-chat-toggle aria-expanded="false" aria-controls="site-chat-panel" aria-label="Open AI chat assistant">
-      <img class="site-chat-toggle-icon" src="{{ asset('assets/media/icon/ai_icon.png') }}" alt="" aria-hidden="true">
+      <img class="site-chat-toggle-icon" src="{{ asset('assets/media/icon/ai_icon.png') }}" alt="" aria-hidden="true" onerror="this.style.display='none';this.parentElement.classList.add('no-icon');">
+      <span class="site-chat-toggle-fallback" aria-hidden="true">AI</span>
     </button>
     <div id="site-chat-panel" class="site-chat-panel" data-chat-panel>
       <div class="site-chat-head">

@@ -4493,8 +4493,9 @@ textarea.input{min-height:116px;resize:vertical;border-radius:20px;margin-top:8p
   position:fixed;
   right:24px;
   bottom:24px;
-  z-index:1200;
+  z-index:99999;
   width:auto;
+  display:block;
   font-family:"Inter", "Segoe UI", Arial, sans-serif;
 }
 .site-chat-toggle{
@@ -4543,6 +4544,15 @@ textarea.input{min-height:116px;resize:vertical;border-radius:20px;margin-top:8p
   object-fit:contain;
   display:block;
   filter:brightness(0) invert(1);
+}
+.site-chat-toggle-fallback{
+  display:none;
+  font-size:15px;
+  font-weight:800;
+  letter-spacing:.03em;
+}
+.site-chat-toggle.no-icon .site-chat-toggle-fallback{
+  display:block;
 }
 @keyframes site-chat-pulse{
   0%{

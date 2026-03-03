@@ -19,6 +19,7 @@ use App\Models\WebsiteFormSubmission;
 use App\Services\PanelNotificationService;
 use App\Services\QuoteNotificationService;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -47,32 +48,34 @@ class DashboardController extends Controller
         [$conversionFromDate, $conversionToDate] = $this->extractDateRange($request, 'conversion_from_date', 'conversion_to_date');
         $conversionFromDate ??= now()->subDays(30)->toDateString();
         $conversionToDate ??= now()->toDateString();
+        $dashboardError = null;
 
-        $stats = [
-            'total_users' => User::count(),
-            'total_leads' => LeadProfile::count(),
-            'qualified_leads' => LeadProfile::whereNotNull('qualified_at')->count(),
-            'pending_followups' => FollowUp::where('status', 'pending')->count(),
-            'overdue_followups' => FollowUp::where('status', 'pending')->where('due_at', '<', now())->count(),
-        ];
+        try {
+            $stats = [
+                'total_users' => User::count(),
+                'total_leads' => LeadProfile::count(),
+                'qualified_leads' => LeadProfile::whereNotNull('qualified_at')->count(),
+                'pending_followups' => FollowUp::where('status', 'pending')->count(),
+                'overdue_followups' => FollowUp::where('status', 'pending')->where('due_at', '<', now())->count(),
+            ];
 
-        $leadStatusSummary = LeadProfile::query()
-            ->selectRaw('status, count(*) as total')
-            ->groupBy('status')
-            ->pluck('total', 'status');
+            $leadStatusSummary = LeadProfile::query()
+                ->selectRaw('status, count(*) as total')
+                ->groupBy('status')
+                ->pluck('total', 'status');
 
-        $quoteTotal = QuoteBuild::count();
-        $quoteBooked = QuoteBuild::where('status', 'booked')->count();
-        $quoteContacted = QuoteBuild::where('status', 'contacted')->count();
-        $quoteLost = QuoteBuild::where('status', 'lost')->count();
-        $avgQuoteTotal = (int) round((float) QuoteBuild::query()->avg('estimated_total'));
-        $conversionRate = $quoteTotal > 0 ? round(($quoteBooked / $quoteTotal) * 100, 1) : 0.0;
-        $quoteStatusSummary = QuoteBuild::query()
-            ->selectRaw('status, count(*) as total')
-            ->groupBy('status')
-            ->pluck('total', 'status');
+            $quoteTotal = QuoteBuild::count();
+            $quoteBooked = QuoteBuild::where('status', 'booked')->count();
+            $quoteContacted = QuoteBuild::where('status', 'contacted')->count();
+            $quoteLost = QuoteBuild::where('status', 'lost')->count();
+            $avgQuoteTotal = (int) round((float) QuoteBuild::query()->avg('estimated_total'));
+            $conversionRate = $quoteTotal > 0 ? round(($quoteBooked / $quoteTotal) * 100, 1) : 0.0;
+            $quoteStatusSummary = QuoteBuild::query()
+                ->selectRaw('status, count(*) as total')
+                ->groupBy('status')
+                ->pluck('total', 'status');
 
-        $conversionBase = QuoteBuild::query()
+            $conversionBase = QuoteBuild::query()
             ->when($conversionFromDate !== null, function ($query) use ($conversionFromDate): void {
                 $query->where(function ($inner) use ($conversionFromDate): void {
                     $inner->whereDate('submitted_at', '>=', $conversionFromDate)
@@ -92,19 +95,19 @@ class DashboardController extends Controller
                 });
             });
 
-        $funnelTotal = (clone $conversionBase)->count();
-        $funnelReviewed = (clone $conversionBase)->whereIn('status', ['reviewed', 'contacted', 'booked'])->count();
-        $funnelContacted = (clone $conversionBase)->whereIn('status', ['contacted', 'booked'])->count();
-        $funnelBooked = (clone $conversionBase)->where('status', 'booked')->count();
-        $funnelLost = (clone $conversionBase)->where('status', 'lost')->count();
-        $funnelAvgTotal = (int) round((float) ((clone $conversionBase)->avg('estimated_total') ?? 0));
+            $funnelTotal = (clone $conversionBase)->count();
+            $funnelReviewed = (clone $conversionBase)->whereIn('status', ['reviewed', 'contacted', 'booked'])->count();
+            $funnelContacted = (clone $conversionBase)->whereIn('status', ['contacted', 'booked'])->count();
+            $funnelBooked = (clone $conversionBase)->where('status', 'booked')->count();
+            $funnelLost = (clone $conversionBase)->where('status', 'lost')->count();
+            $funnelAvgTotal = (int) round((float) ((clone $conversionBase)->avg('estimated_total') ?? 0));
 
-        $todayAiUsage = AiUsageLog::query()
-            ->whereDate('created_at', now()->toDateString())
-            ->selectRaw('count(*) as total_requests, sum(tokens_in + tokens_out) as total_tokens, sum(estimated_cost) as total_cost')
-            ->first();
+            $todayAiUsage = AiUsageLog::query()
+                ->whereDate('created_at', now()->toDateString())
+                ->selectRaw('count(*) as total_requests, sum(tokens_in + tokens_out) as total_tokens, sum(estimated_cost) as total_cost')
+                ->first();
 
-        $leads = LeadProfile::query()
+            $leads = LeadProfile::query()
             ->with('conversation:id,status,last_message_at')
             ->when($leadStatus !== '', function ($query) use ($leadStatus): void {
                 $query->where('status', $leadStatus);
@@ -122,7 +125,7 @@ class DashboardController extends Controller
             ->paginate(12, ['*'], 'leads_page')
             ->withQueryString();
 
-        $quotes = QuoteBuild::query()
+            $quotes = QuoteBuild::query()
             ->when($quoteStatus !== '', function ($query) use ($quoteStatus): void {
                 $query->where('status', $quoteStatus);
             })
@@ -144,7 +147,7 @@ class DashboardController extends Controller
             ->paginate(12, ['id', 'quote_id', 'status', 'estimated_total', 'currency', 'submitted_at', 'options'], 'quotes_page')
             ->withQueryString();
 
-        $pendingFollowUps = FollowUp::query()
+            $pendingFollowUps = FollowUp::query()
             ->with(['leadProfile:id,name,email,phone,service_type', 'owner:id,name'])
             ->where('status', 'pending')
             ->orderByRaw('CASE WHEN due_at < ? THEN 0 ELSE 1 END', [now()])
@@ -152,81 +155,125 @@ class DashboardController extends Controller
             ->limit(8)
             ->get();
 
-        $recentSubmissions = WebsiteFormSubmission::query()
+            $recentSubmissions = WebsiteFormSubmission::query()
             ->latest('submitted_at')
             ->limit(6)
             ->get(['id', 'name', 'email', 'phone', 'service', 'status', 'submitted_at']);
 
-        $trendDates = collect(range(6, 0))
-            ->map(static fn (int $offset): string => now()->subDays($offset)->toDateString());
+            $trendDates = collect(range(6, 0))
+                ->map(static fn (int $offset): string => now()->subDays($offset)->toDateString());
 
-        $leadTrendMap = LeadProfile::query()
+            $leadTrendMap = LeadProfile::query()
             ->selectRaw('date(created_at) as day, count(*) as total')
             ->whereDate('created_at', '>=', now()->subDays(6)->toDateString())
             ->groupBy('day')
             ->pluck('total', 'day');
 
-        $quoteTrendMap = QuoteBuild::query()
+            $quoteTrendMap = QuoteBuild::query()
             ->selectRaw('date(coalesce(submitted_at, created_at)) as day, count(*) as total')
             ->whereRaw('date(coalesce(submitted_at, created_at)) >= ?', [now()->subDays(6)->toDateString()])
             ->groupBy('day')
             ->pluck('total', 'day');
 
-        $leadTrend = $trendDates
-            ->map(static fn (string $day): int => (int) ($leadTrendMap[$day] ?? 0))
-            ->values();
+            $leadTrend = $trendDates
+                ->map(static fn (string $day): int => (int) ($leadTrendMap[$day] ?? 0))
+                ->values();
 
-        $quoteTrend = $trendDates
-            ->map(static fn (string $day): int => (int) ($quoteTrendMap[$day] ?? 0))
-            ->values();
+            $quoteTrend = $trendDates
+                ->map(static fn (string $day): int => (int) ($quoteTrendMap[$day] ?? 0))
+                ->values();
 
-        $trendMax = max(
-            1,
-            (int) max(
-                $leadTrend->max() ?? 0,
-                $quoteTrend->max() ?? 0
-            )
-        );
+            $trendMax = max(
+                1,
+                (int) max(
+                    $leadTrend->max() ?? 0,
+                    $quoteTrend->max() ?? 0
+                )
+            );
 
-        $funnelChart = collect([
-            ['key' => 'total', 'label' => 'Quoted', 'value' => (int) $funnelTotal],
-            ['key' => 'reviewed', 'label' => 'Reviewed', 'value' => (int) $funnelReviewed],
-            ['key' => 'contacted', 'label' => 'Contacted', 'value' => (int) $funnelContacted],
-            ['key' => 'booked', 'label' => 'Booked', 'value' => (int) $funnelBooked],
-            ['key' => 'lost', 'label' => 'Lost', 'value' => (int) $funnelLost],
-        ]);
-        $funnelMax = max(1, (int) $funnelChart->max('value'));
+            $funnelChart = collect([
+                ['key' => 'total', 'label' => 'Quoted', 'value' => (int) $funnelTotal],
+                ['key' => 'reviewed', 'label' => 'Reviewed', 'value' => (int) $funnelReviewed],
+                ['key' => 'contacted', 'label' => 'Contacted', 'value' => (int) $funnelContacted],
+                ['key' => 'booked', 'label' => 'Booked', 'value' => (int) $funnelBooked],
+                ['key' => 'lost', 'label' => 'Lost', 'value' => (int) $funnelLost],
+            ]);
+            $funnelMax = max(1, (int) $funnelChart->max('value'));
 
-        $leadStatusChart = collect($leadStatusSummary)
-            ->map(static fn ($count, $status): array => ['status' => (string) $status, 'count' => (int) $count])
-            ->sortByDesc('count')
-            ->values();
-        $leadStatusMax = max(1, (int) $leadStatusChart->max('count'));
+            $leadStatusChart = collect($leadStatusSummary)
+                ->map(static fn ($count, $status): array => ['status' => (string) $status, 'count' => (int) $count])
+                ->sortByDesc('count')
+                ->values();
+            $leadStatusMax = max(1, (int) $leadStatusChart->max('count'));
 
-        $quoteStatusChart = collect($quoteStatusSummary)
-            ->map(static fn ($count, $status): array => ['status' => (string) $status, 'count' => (int) $count])
-            ->sortByDesc('count')
-            ->values();
-        $quoteStatusMax = max(1, (int) $quoteStatusChart->max('count'));
+            $quoteStatusChart = collect($quoteStatusSummary)
+                ->map(static fn ($count, $status): array => ['status' => (string) $status, 'count' => (int) $count])
+                ->sortByDesc('count')
+                ->values();
+            $quoteStatusMax = max(1, (int) $quoteStatusChart->max('count'));
 
-        $trendLabels = $trendDates->map(static fn (string $day): string => Carbon::parse($day)->format('M d'))->values();
-        $trendLeadValues = $leadTrend->values();
-        $trendQuoteValues = $quoteTrend->values();
+            $trendLabels = $trendDates->map(static fn (string $day): string => Carbon::parse($day)->format('M d'))->values();
+            $trendLeadValues = $leadTrend->values();
+            $trendQuoteValues = $quoteTrend->values();
 
-        $plotWidth = 360;
-        $plotHeight = 120;
-        $plotPadding = 8;
-        $plotCount = max(1, $trendLeadValues->count());
-        $stepX = $plotCount > 1 ? ($plotWidth - ($plotPadding * 2)) / ($plotCount - 1) : 0;
-        $toPoints = static function ($series) use ($plotHeight, $plotPadding, $stepX, $trendMax): string {
-            return collect($series)->values()->map(function ($value, $index) use ($plotHeight, $plotPadding, $stepX, $trendMax): string {
-                $x = $plotPadding + ($index * $stepX);
-                $y = $plotHeight - $plotPadding - (((int) $value / $trendMax) * ($plotHeight - ($plotPadding * 2)));
-                return round($x, 2) . ',' . round($y, 2);
-            })->implode(' ');
-        };
-        $leadTrendPoints = $toPoints($trendLeadValues);
-        $quoteTrendPoints = $toPoints($trendQuoteValues);
+            $plotWidth = 360;
+            $plotHeight = 120;
+            $plotPadding = 8;
+            $plotCount = max(1, $trendLeadValues->count());
+            $stepX = $plotCount > 1 ? ($plotWidth - ($plotPadding * 2)) / ($plotCount - 1) : 0;
+            $toPoints = static function ($series) use ($plotHeight, $plotPadding, $stepX, $trendMax): string {
+                return collect($series)->values()->map(function ($value, $index) use ($plotHeight, $plotPadding, $stepX, $trendMax): string {
+                    $x = $plotPadding + ($index * $stepX);
+                    $y = $plotHeight - $plotPadding - (((int) $value / $trendMax) * ($plotHeight - ($plotPadding * 2)));
+                    return round($x, 2) . ',' . round($y, 2);
+                })->implode(' ');
+            };
+            $leadTrendPoints = $toPoints($trendLeadValues);
+            $quoteTrendPoints = $toPoints($trendQuoteValues);
+        } catch (Throwable $exception) {
+            report($exception);
+            $dashboardError = 'Dashboard data could not fully load. Please run database migration and cache clear.';
+
+            $stats = [
+                'total_users' => 0,
+                'total_leads' => 0,
+                'qualified_leads' => 0,
+                'pending_followups' => 0,
+                'overdue_followups' => 0,
+            ];
+            $leadStatusSummary = collect();
+            $quoteStatusSummary = collect();
+            $quoteTotal = 0;
+            $quoteBooked = 0;
+            $quoteContacted = 0;
+            $quoteLost = 0;
+            $avgQuoteTotal = 0;
+            $conversionRate = 0.0;
+            $funnelTotal = 0;
+            $funnelReviewed = 0;
+            $funnelContacted = 0;
+            $funnelBooked = 0;
+            $funnelLost = 0;
+            $funnelAvgTotal = 0;
+            $todayAiUsage = (object) ['total_requests' => 0, 'total_tokens' => 0, 'total_cost' => 0];
+            $leads = new LengthAwarePaginator([], 0, 12, 1, ['path' => $request->url(), 'pageName' => 'leads_page']);
+            $quotes = new LengthAwarePaginator([], 0, 12, 1, ['path' => $request->url(), 'pageName' => 'quotes_page']);
+            $pendingFollowUps = collect();
+            $recentSubmissions = collect();
+            $funnelChart = collect();
+            $funnelMax = 1;
+            $leadStatusChart = collect();
+            $leadStatusMax = 1;
+            $quoteStatusChart = collect();
+            $quoteStatusMax = 1;
+            $trendLabels = collect();
+            $trendLeadValues = collect();
+            $trendQuoteValues = collect();
+            $leadTrendPoints = '';
+            $quoteTrendPoints = '';
+            $trendMax = 1;
+            $trendDates = collect();
+        }
 
         return view('admin.dashboard', [
             'stats' => $stats,
@@ -301,6 +348,7 @@ class DashboardController extends Controller
                 'conversion_from_date' => $conversionFromDate,
                 'conversion_to_date' => $conversionToDate,
             ],
+            'dashboardError' => $dashboardError,
         ]);
     }
 

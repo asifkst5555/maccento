@@ -16,6 +16,13 @@
 </section>
 @endif
 
+@if(!empty($dashboardError))
+<section class="panel-card panel-alert-strip">
+  <span class="panel-badge panel-badge-danger">System Notice</span>
+  {{ $dashboardError }}
+</section>
+@endif
+
 @if($stats['overdue_followups'] > 0)
 <section class="panel-card panel-alert-strip">
   <span class="panel-badge panel-badge-danger">Overdue Alert</span>
