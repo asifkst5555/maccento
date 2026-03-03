@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'provider' => env('AI_PROVIDER', 'stub'),
+    'provider' => env('AI_PROVIDER', 'auto'),
     'default_model' => env('AI_MODEL', 'gpt-4o-mini'),
 
     'openai' => [

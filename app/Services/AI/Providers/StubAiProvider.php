@@ -14,9 +14,12 @@ class StubAiProvider implements AiProvider
             }
         }
 
-        $content = 'Thanks, I captured that. Could you share one more detail?';
+        $content = 'Thanks for your message. I can help with services, package options, and booking details. Could you share your property type and required service?';
         if ($lastUserMessage !== '') {
-            $content = 'Got it. ' . mb_substr(trim($lastUserMessage), 0, 120);
+            $normalized = strtolower(trim($lastUserMessage));
+            if (str_contains($normalized, 'bonjour') || str_contains($normalized, 'salut')) {
+                $content = 'Merci pour votre message. Je peux vous aider avec les services, les forfaits et la reservation. Quel est votre type de propriete et le service souhaite?';
+            }
         }
 
         return [
