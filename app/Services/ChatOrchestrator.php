@@ -158,6 +158,12 @@ class ChatOrchestrator
             $assistantResponseText = $baseAssistantText;
         }
 
+        // Enforce strict one-question flow while required fields are still missing.
+        // This prevents LLM responses that ask multiple questions in a single message.
+        if ($missingFields !== []) {
+            $assistantResponseText = $baseAssistantText;
+        }
+
         $assistantMessage = $conversation->messages()->create([
             'role' => 'assistant',
             'content' => $assistantResponseText,
