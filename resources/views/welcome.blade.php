@@ -1087,8 +1087,11 @@
     </button>
     <div id="site-chat-panel" class="site-chat-panel" data-chat-panel>
       <div class="site-chat-head">
-        <h2 class="site-chat-title">Maccento AI Assistant</h2>
-        <p class="site-chat-sub">Ask about services, pricing ranges, and booking.</p>
+        <div class="site-chat-head-main">
+          <h2 class="site-chat-title">Maccento AI Assistant</h2>
+          <p class="site-chat-sub">Ask about services, pricing ranges, and booking.</p>
+        </div>
+        <button class="site-chat-close" type="button" data-chat-close aria-label="Close chat">×</button>
       </div>
       <div class="site-chat-log" data-chat-log></div>
       <form class="site-chat-form" data-chat-form>
@@ -1123,6 +1126,7 @@
 
         const chatToggle = document.querySelector('[data-chat-toggle]');
         const chatPanel = document.querySelector('[data-chat-panel]');
+        const chatClose = document.querySelector('[data-chat-close]');
         const chatLog = document.querySelector('[data-chat-log]');
         const chatForm = document.querySelector('[data-chat-form]');
         const chatInput = document.querySelector('[data-chat-input]');
@@ -1398,6 +1402,13 @@
             chatInput.focus();
           }
         });
+
+        if (chatClose) {
+          chatClose.addEventListener('click', () => {
+            chatPanel.classList.remove('is-open');
+            chatToggle.setAttribute('aria-expanded', 'false');
+          });
+        }
 
         chatForm.addEventListener('submit', async (event) => {
           event.preventDefault();
