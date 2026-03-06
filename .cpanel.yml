@@ -16,4 +16,7 @@ deployment:
     - /usr/local/bin/ea-php83 artisan optimize || php artisan optimize
     - export DEPLOY_COMMIT=$(/usr/bin/git -C "$APPPATH" rev-parse --short HEAD || echo unknown)
     - export DEPLOY_TIME=$(/bin/date -u +"%Y-%m-%dT%H:%M:%SZ")
-    - /bin/printf '{"app":"maccento","commit":"%s","deployed_at_utc":"%s"}\n' "$DEPLOY_COMMIT" "$DEPLOY_TIME" > "$PUBLICPATH/deploy.json"
+    - export DEPLOY_ENV=$(/usr/bin/grep -E '^APP_ENV=' "$APPPATH/.env" | /usr/bin/head -n1 | /usr/bin/cut -d'=' -f2- | /bin/sed 's/^"//;s/"$//' || echo production)
+    - export DEPLOY_VERSION=$(/usr/bin/grep -E '^APP_VERSION=' "$APPPATH/.env" | /usr/bin/head -n1 | /usr/bin/cut -d'=' -f2- | /bin/sed 's/^"//;s/"$//' || true)
+    - if [ -z "$DEPLOY_VERSION" ]; then DEPLOY_VERSION="$DEPLOY_COMMIT"; fi
+    - /bin/printf '{"app":"maccento","app_version":"%s","environment":"%s","commit":"%s","deployed_at_utc":"%s"}\n' "$DEPLOY_VERSION" "$DEPLOY_ENV" "$DEPLOY_COMMIT" "$DEPLOY_TIME" > "$PUBLICPATH/deploy.json"
