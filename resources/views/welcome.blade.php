@@ -650,12 +650,9 @@
           </div>
         </div>
         <div class="video-media">
-          <div class="phone-shell">
-            <span class="phone-notch" aria-hidden="true"></span>
-            <video class="lazy-video" autoplay muted loop playsinline preload="none">
-              <source data-src="{{ asset('assets/media/webm/Videos1.webm') }}" type="video/webm">
-            </video>
-          </div>
+          <video class="lazy-video broker-video" autoplay muted loop playsinline preload="none" poster="{{ asset('assets/media/hero.webp') }}">
+            <source data-src="{{ asset('assets/media/webm/Videos3.webm') }}" type="video/webm">
+          </video>
         </div>
       </div>
     </section>
@@ -740,53 +737,51 @@
       </div>
     </section>
 
-    <section id="broker-content" class="section broker-trust">
-      <div class="container broker-trust-grid">
-        <div class="broker-copy">
-          <span class="broker-kicker">Broker Content</span>
-          <h2 class="section-title">Built for Brokers Who Want to Lead with Authority</h2>
-          <p class="section-sub">Professional on-camera content helps you build trust faster, strengthen your personal brand, and position yourself as the go-to expert for every listing.</p>
-        </div>
-        <div class="broker-media">
-          <video class="lazy-video broker-video" autoplay muted loop playsinline preload="none" poster="{{ asset('assets/media/hero.webp') }}">
-            <source data-src="{{ asset('assets/media/webm/Videos3.webm') }}" type="video/webm">
-          </video>
-        </div>
-      </div>
-    </section>
-
     <section id="creative-studio" class="section creative-studio">
       <div class="container">
-        <div class="creative-head">
-          <span class="creative-kicker">Creative Studio</span>
-          <h2 class="section-title">From Capture to Complete Digital Production</h2>
-          <p class="section-sub">Maccento goes beyond production by delivering post-production, social-ready content, and brand assets for photographers, videographers, real estate professionals, and architectural firms.</p>
-        </div>
+        <div class="creative-layout">
+          <div class="creative-main">
+            <div class="creative-head">
+              <span class="creative-kicker">Creative Studio</span>
+              <h2 class="section-title">From Capture to Complete Digital Production</h2>
+              <p class="section-sub">Maccento goes beyond production by delivering post-production, social-ready content, and brand assets for photographers, videographers, real estate professionals, and architectural firms.</p>
+            </div>
 
-        <div class="creative-grid">
-          <article class="creative-card">
-            <h3>Editing &amp; Content Production</h3>
-            <p>Professional editing workflows designed for fast turnaround, visual consistency, and multi-platform publishing.</p>
-            <ul class="creative-list" role="list">
-              <li>Broker Social Media Content</li>
-              <li>HDR Photo Editing</li>
-              <li>Video Editing</li>
-              <li>Lifestyle Clips</li>
-              <li>Podcast Clips</li>
-            </ul>
-          </article>
+            <div class="creative-grid">
+              <article class="creative-card">
+                <h3>Editing &amp; Content Production</h3>
+                <p>Professional editing workflows designed for fast turnaround, visual consistency, and multi-platform publishing.</p>
+                <ul class="creative-list" role="list">
+                  <li>Broker Social Media Content</li>
+                  <li>HDR Photo Editing</li>
+                  <li>Video Editing</li>
+                  <li>Lifestyle Clips</li>
+                  <li>Podcast Clips</li>
+                </ul>
+              </article>
 
-          <article class="creative-card">
-            <h3>Branding &amp; Visual Identity</h3>
-            <p>Creative brand support to help real estate professionals and firms look consistent, premium, and market-ready.</p>
-            <ul class="creative-list" role="list">
-              <li>Logo Creation</li>
-              <li>Brand Mockups</li>
-              <li>Website Development</li>
-              <li>Visual Brand Assets</li>
-              <li>Marketing Creative Packages</li>
-            </ul>
-          </article>
+              <article class="creative-card">
+                <h3>Branding &amp; Visual Identity</h3>
+                <p>Creative brand support to help real estate professionals and firms look consistent, premium, and market-ready.</p>
+                <ul class="creative-list" role="list">
+                  <li>Logo Creation</li>
+                  <li>Brand Mockups</li>
+                  <li>Website Development</li>
+                  <li>Visual Brand Assets</li>
+                  <li>Marketing Creative Packages</li>
+                </ul>
+              </article>
+            </div>
+          </div>
+
+          <div class="creative-side-video" aria-hidden="true">
+            <div class="phone-shell">
+              <span class="phone-notch" aria-hidden="true"></span>
+              <video class="lazy-video" autoplay muted loop playsinline preload="none">
+                <source data-src="{{ asset('assets/media/webm/Videos1.webm') }}" type="video/webm">
+              </video>
+            </div>
+          </div>
         </div>
       </div>
     </section>
