@@ -92,6 +92,7 @@
           @if($project->client)
           <a class="panel-link" href="{{ route('admin.clients.show', $project->client) }}">Open client</a>
           @endif
+          <a class="panel-link" href="{{ route('admin.invoices.index', ['invoice_project' => $project->id]) }}">Project Invoice</a>
         </article>
         @empty
         <p class="panel-muted">No projects in this stage.</p>
@@ -151,6 +152,7 @@
             @if($project->client)
             <a class="panel-link" href="{{ route('admin.clients.show', $project->client) }}">Open client</a>
             @endif
+            <a class="panel-link" href="{{ route('admin.invoices.index', ['invoice_project' => $project->id]) }}">Project Invoice</a>
           </td>
         </tr>
         @empty

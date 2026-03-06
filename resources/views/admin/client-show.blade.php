@@ -47,6 +47,7 @@
                   </select>
                   <button class="panel-btn" type="submit">Save</button>
                 </form>
+                <a class="panel-link" href="{{ route('admin.invoices.index', ['invoice_project' => $project->id]) }}">Project Invoice</a>
               </td>
             </tr>
             @empty

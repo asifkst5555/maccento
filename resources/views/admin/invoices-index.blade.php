@@ -37,8 +37,18 @@
 </section>
 
 <section class="panel-card">
+  @if(!empty($filters['invoice_project']))
+  <div class="panel-form-row" style="justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 10px;">
+    <span class="panel-badge">Project Filter: {{ $filters['invoice_project_title'] ?: ('Project #' . $filters['invoice_project']) }}</span>
+    <a class="panel-link" href="{{ route('admin.invoices.index') }}">Clear Project Filter</a>
+  </div>
+  @endif
+
   <div class="panel-sticky-filters">
     <form method="get" class="panel-form-row">
+      @if(!empty($filters['invoice_project']))
+      <input type="hidden" name="invoice_project" value="{{ $filters['invoice_project'] }}">
+      @endif
       <input class="panel-input" type="text" name="invoice_search" placeholder="Search invoice/client/project" value="{{ $filters['invoice_search'] }}">
       <select class="panel-select" name="invoice_status">
         <option value="">All invoices</option>

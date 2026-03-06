@@ -642,6 +642,7 @@ class DashboardController extends Controller
             ->withQueryString();
 
         $canManageMedia = in_array(strtolower(trim((string) $request->user()?->role)), ['owner', 'admin', 'manager'], true);
+        $canViewInvoices = in_array(strtolower(trim((string) $request->user()?->role)), ['owner', 'admin', 'manager'], true);
         $galleryPayloadByProject = $this->buildProjectGalleryPayloadMap($projects->getCollection(), false, true, false);
 
         return view('admin.media-delivery-index', [
@@ -650,6 +651,7 @@ class DashboardController extends Controller
                 'media_search' => $search,
             ],
             'canManageMedia' => $canManageMedia,
+            'canViewInvoices' => $canViewInvoices,
             'galleryPayloadByProject' => $galleryPayloadByProject,
         ]);
     }
@@ -872,12 +874,23 @@ class DashboardController extends Controller
     {
         $statusFilter = trim((string) $request->string('invoice_status'));
         $search = trim((string) $request->string('invoice_search'));
+        $projectFilter = $request->filled('invoice_project') ? (int) $request->input('invoice_project') : null;
+
+        $projectFilterTitle = null;
+        if ($projectFilter !== null && $projectFilter > 0) {
+            $projectFilterTitle = ClientProject::query()
+                ->where('id', $projectFilter)
+                ->value('title');
+        }
 
         $baseQuery = ClientInvoice::query()
             ->with([
                 'client:id,name,email,phone',
                 'project:id,title',
             ])
+            ->when($projectFilter !== null && $projectFilter > 0, function ($query) use ($projectFilter): void {
+                $query->where('client_project_id', $projectFilter);
+            })
             ->when($search !== '', function ($query) use ($search): void {
                 $query->where(function ($inner) use ($search): void {
                     $inner->where('invoice_number', 'like', "%{$search}%")
@@ -933,6 +946,8 @@ class DashboardController extends Controller
             'filters' => [
                 'invoice_status' => $statusFilter,
                 'invoice_search' => $search,
+                'invoice_project' => $projectFilter,
+                'invoice_project_title' => $projectFilterTitle,
             ],
         ]);
     }

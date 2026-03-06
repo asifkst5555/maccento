@@ -37,6 +37,9 @@
             <svg class="media-project-toggle-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 10l4 4 4-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </button>
           <a class="panel-link" href="{{ route('admin.clients.show', $project->client_id) }}">Open Client</a>
+          @if($canViewInvoices ?? false)
+          <a class="panel-link" href="{{ route('admin.invoices.index', ['invoice_project' => $project->id]) }}">Project Invoice</a>
+          @endif
           @if($galleryItems->isNotEmpty())
           <button
             class="panel-btn panel-btn-primary"
