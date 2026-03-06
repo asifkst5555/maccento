@@ -18,5 +18,7 @@ deployment:
     - export DEPLOY_TIME=$(/bin/date -u +"%Y-%m-%dT%H:%M:%SZ")
     - export DEPLOY_ENV=$(/usr/bin/grep -E '^APP_ENV=' "$APPPATH/.env" | /usr/bin/head -n1 | /usr/bin/cut -d'=' -f2- | /bin/sed 's/^"//;s/"$//' || echo production)
     - export DEPLOY_VERSION=$(/usr/bin/grep -E '^APP_VERSION=' "$APPPATH/.env" | /usr/bin/head -n1 | /usr/bin/cut -d'=' -f2- | /bin/sed 's/^"//;s/"$//' || true)
+    - export DEPLOYED_BY=$(/usr/bin/whoami || echo cpanel)
+    - export PHP_VERSION=$(/usr/local/bin/ea-php83 -r 'echo PHP_VERSION;' 2>/dev/null || php -r 'echo PHP_VERSION;' 2>/dev/null || echo unknown)
     - if [ -z "$DEPLOY_VERSION" ]; then DEPLOY_VERSION="$DEPLOY_COMMIT"; fi
-    - /bin/printf '{"app":"maccento","app_version":"%s","environment":"%s","commit":"%s","deployed_at_utc":"%s"}\n' "$DEPLOY_VERSION" "$DEPLOY_ENV" "$DEPLOY_COMMIT" "$DEPLOY_TIME" > "$PUBLICPATH/deploy.json"
+    - /bin/printf '{"app":"maccento","app_version":"%s","environment":"%s","commit":"%s","deployed_at_utc":"%s","deployed_by":"%s","php_version":"%s"}\n' "$DEPLOY_VERSION" "$DEPLOY_ENV" "$DEPLOY_COMMIT" "$DEPLOY_TIME" "$DEPLOYED_BY" "$PHP_VERSION" > "$PUBLICPATH/deploy.json"
