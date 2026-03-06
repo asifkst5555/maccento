@@ -14,3 +14,6 @@ deployment:
     - /usr/local/bin/ea-php83 artisan migrate --force || php artisan migrate --force
     - /usr/local/bin/ea-php83 artisan optimize:clear || php artisan optimize:clear
     - /usr/local/bin/ea-php83 artisan optimize || php artisan optimize
+    - export DEPLOY_COMMIT=$(/usr/bin/git -C "$APPPATH" rev-parse --short HEAD || echo unknown)
+    - export DEPLOY_TIME=$(/bin/date -u +"%Y-%m-%dT%H:%M:%SZ")
+    - /bin/printf '{"app":"maccento","commit":"%s","deployed_at_utc":"%s"}\n' "$DEPLOY_COMMIT" "$DEPLOY_TIME" > "$PUBLICPATH/deploy.json"
