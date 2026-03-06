@@ -7,6 +7,7 @@ use App\Models\Client;
 use App\Models\ClientInvoice;
 use App\Models\ClientMessage;
 use App\Models\ClientProject;
+use App\Models\ClientProjectMedia;
 use App\Models\ClientServiceRequest;
 use App\Models\FollowUp;
 use App\Models\LeadEvent;
@@ -15,6 +16,7 @@ use App\Models\PanelNotification;
 use App\Models\QuoteEvent;
 use App\Models\QuoteBuild;
 use App\Models\User;
+use App\Models\WatermarkSetting;
 use App\Models\WebsiteFormSubmission;
 use App\Services\PanelNotificationService;
 use App\Services\QuoteNotificationService;
@@ -22,11 +24,15 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Throwable;
 use Illuminate\View\View;
+use ZipArchive;
 
 class DashboardController extends Controller
 {
@@ -604,6 +610,261 @@ class DashboardController extends Controller
             'kanbanProjects' => $kanbanProjects,
             'projectStatuses' => $allowedStatuses,
             'canManageProjects' => $canManageProjects,
+        ]);
+    }
+
+    public function adminMediaDeliveryIndex(Request $request): View
+    {
+        $search = trim((string) $request->string('media_search'));
+
+        $projects = ClientProject::query()
+            ->with([
+                'client:id,name,email,phone',
+                'media' => function ($query): void {
+                    $query->latest('id');
+                },
+                'invoices:id,client_project_id,status',
+            ])
+            ->when($search !== '', function ($query) use ($search): void {
+                $query->where(function ($inner) use ($search): void {
+                    $inner->where('title', 'like', "%{$search}%")
+                        ->orWhere('service_type', 'like', "%{$search}%")
+                        ->orWhere('property_address', 'like', "%{$search}%")
+                        ->orWhereHas('client', function ($clientQuery) use ($search): void {
+                            $clientQuery->where('name', 'like', "%{$search}%")
+                                ->orWhere('email', 'like', "%{$search}%")
+                                ->orWhere('phone', 'like', "%{$search}%");
+                        });
+                });
+            })
+            ->latest('id')
+            ->paginate(12)
+            ->withQueryString();
+
+        $canManageMedia = in_array(strtolower(trim((string) $request->user()?->role)), ['owner', 'admin', 'manager'], true);
+        $galleryPayloadByProject = $this->buildProjectGalleryPayloadMap($projects->getCollection(), false, true, false);
+
+        return view('admin.media-delivery-index', [
+            'projects' => $projects,
+            'filters' => [
+                'media_search' => $search,
+            ],
+            'canManageMedia' => $canManageMedia,
+            'galleryPayloadByProject' => $galleryPayloadByProject,
+        ]);
+    }
+
+    public function adminMediaWatermarkSettingsIndex(Request $request): View
+    {
+        $this->ensurePipelineWriteAccess($request);
+
+        $settings = $this->getWatermarkSettings();
+        $renderConfig = $this->resolveWatermarkRenderConfig($settings);
+        $signature = (string) ($renderConfig['signature'] ?? '');
+        $logoExists = !blank($settings->logo_path)
+            && Storage::disk((string) ($settings->logo_disk ?: 'public'))->exists((string) $settings->logo_path);
+
+        $unpaidImageTotal = ClientProjectMedia::query()
+            ->where('type', 'image')
+            ->whereHas('project', function ($query): void {
+                $query->whereDoesntHave('invoices', function ($invoiceQuery): void {
+                    $invoiceQuery->where('status', 'paid');
+                });
+            })
+            ->count();
+
+        $upToDateWatermarks = ClientProjectMedia::query()
+            ->where('type', 'image')
+            ->where('watermark_signature', $signature)
+            ->whereHas('project', function ($query): void {
+                $query->whereDoesntHave('invoices', function ($invoiceQuery): void {
+                    $invoiceQuery->where('status', 'paid');
+                });
+            })
+            ->count();
+
+        $pendingRebuild = max(0, $unpaidImageTotal - $upToDateWatermarks);
+
+        return view('admin.media-watermark-settings', [
+            'settings' => $settings,
+            'logoExists' => $logoExists,
+            'unpaidImageTotal' => $unpaidImageTotal,
+            'upToDateWatermarks' => $upToDateWatermarks,
+            'pendingRebuild' => $pendingRebuild,
+        ]);
+    }
+
+    public function adminMediaWatermarkSettingsUpdate(Request $request): RedirectResponse
+    {
+        $this->ensurePipelineWriteAccess($request);
+
+        $validated = $request->validate([
+            'watermark_logo' => ['nullable', 'file', 'mimes:png', 'max:10240'],
+            'position' => ['required', 'in:top_left,top_right,bottom_left,bottom_right,center'],
+            'size' => ['required', 'in:small,medium,large'],
+            'opacity_percent' => ['required', 'integer', 'min:1', 'max:100'],
+        ]);
+
+        $settings = $this->getWatermarkSettings();
+        $oldDisk = (string) ($settings->logo_disk ?: 'public');
+        $oldPath = (string) ($settings->logo_path ?? '');
+
+        if ($request->hasFile('watermark_logo')) {
+            $storedPath = $request->file('watermark_logo')->store('watermark', 'public');
+            if ($storedPath) {
+                $settings->logo_disk = 'public';
+                $settings->logo_path = $storedPath;
+
+                if ($oldPath !== '' && Storage::disk($oldDisk)->exists($oldPath) && $oldPath !== $storedPath) {
+                    Storage::disk($oldDisk)->delete($oldPath);
+                }
+            }
+        }
+
+        $settings->position = (string) $validated['position'];
+        $settings->size = (string) $validated['size'];
+        $settings->opacity_percent = (int) $validated['opacity_percent'];
+        $settings->save();
+
+        $hasLogo = !blank($settings->logo_path)
+            && Storage::disk((string) ($settings->logo_disk ?: 'public'))->exists((string) $settings->logo_path);
+        $status = $hasLogo
+            ? 'Watermark settings saved. Existing unpaid previews will refresh automatically with the new logo settings.'
+            : 'Settings saved, but no PNG logo is uploaded yet. Upload a logo to apply branded watermark previews.';
+
+        return back()->with('status', $status);
+    }
+
+    public function adminMediaWatermarkRebuild(Request $request): RedirectResponse
+    {
+        $this->ensurePipelineWriteAccess($request);
+
+        $renderConfig = $this->resolveWatermarkRenderConfig();
+        $logoPath = (string) ($renderConfig['logo_absolute_path'] ?? '');
+        if ($logoPath === '' || !is_file($logoPath)) {
+            return back()->withErrors(['watermark_logo' => 'Please upload a PNG watermark logo before running rebuild.']);
+        }
+
+        $signature = (string) ($renderConfig['signature'] ?? '');
+        $processed = 0;
+        $skipped = 0;
+        $failed = 0;
+
+        ClientProjectMedia::query()
+            ->where('type', 'image')
+            ->with(['project.invoices:id,client_project_id,status'])
+            ->orderBy('id')
+            ->chunkById(200, function ($items) use (&$processed, &$skipped, &$failed, $renderConfig, $signature): void {
+                foreach ($items as $item) {
+                    try {
+                        if (!$item instanceof ClientProjectMedia) {
+                            continue;
+                        }
+
+                        $project = $item->project;
+                        if (!$project instanceof ClientProject) {
+                            $failed++;
+                            continue;
+                        }
+
+                        $isPaid = $project->invoices->contains(static fn (ClientInvoice $invoice): bool => $invoice->status === 'paid');
+                        if ($isPaid) {
+                            $skipped++;
+                            continue;
+                        }
+
+                        $generated = $this->generateHardWatermarkVariant((string) $item->disk, (string) $item->path, $this->projectMediaBasePath($project), $renderConfig);
+                        if (!is_array($generated) || blank($generated['path'] ?? null)) {
+                            $failed++;
+                            continue;
+                        }
+
+                        $newDisk = (string) ($generated['disk'] ?? (string) $item->disk);
+                        $newPath = (string) ($generated['path'] ?? '');
+                        if ($newPath === '') {
+                            $failed++;
+                            continue;
+                        }
+
+                        $oldDisk = (string) ($item->watermark_disk ?: '');
+                        $oldPath = (string) ($item->watermark_path ?: '');
+                        if ($oldDisk !== '' && $oldPath !== '' && ($oldDisk !== $newDisk || $oldPath !== $newPath) && Storage::disk($oldDisk)->exists($oldPath)) {
+                            Storage::disk($oldDisk)->delete($oldPath);
+                        }
+
+                        $item->watermark_disk = $newDisk;
+                        $item->watermark_path = $newPath;
+                        $item->watermark_signature = $signature;
+                        $item->save();
+
+                        $processed++;
+                    } catch (Throwable $exception) {
+                        report($exception);
+                        $failed++;
+                    }
+                }
+            });
+
+        return back()->with('status', "Watermark rebuild completed. Updated: {$processed}, skipped paid: {$skipped}, failed: {$failed}.");
+    }
+
+    public function adminMediaFolderMigrationRun(Request $request): RedirectResponse
+    {
+        $this->ensurePipelineWriteAccess($request);
+
+        try {
+            Artisan::call('media:migrate-project-folders');
+            $output = (string) Artisan::output();
+
+            $moved = 0;
+            $updated = 0;
+            $missing = 0;
+            $errors = 0;
+
+            if (preg_match('/Moved files:\s*(\d+)/i', $output, $matchMoved)) {
+                $moved = (int) ($matchMoved[1] ?? 0);
+            }
+
+            if (preg_match('/Updated DB rows:\s*(\d+)/i', $output, $matchUpdated)) {
+                $updated = (int) ($matchUpdated[1] ?? 0);
+            }
+
+            if (preg_match('/Missing files:\s*(\d+)/i', $output, $matchMissing)) {
+                $missing = (int) ($matchMissing[1] ?? 0);
+            }
+
+            if (preg_match('/Errors:\s*(\d+)/i', $output, $matchErrors)) {
+                $errors = (int) ($matchErrors[1] ?? 0);
+            }
+
+            if ($errors > 0) {
+                return back()->withErrors([
+                    'media_migration' => "Media folder migration finished with errors. Moved: {$moved}, Updated DB: {$updated}, Missing: {$missing}, Errors: {$errors}.",
+                ]);
+            }
+
+            return back()->with('status', "Media folder migration completed. Moved: {$moved}, Updated DB: {$updated}, Missing: {$missing}, Errors: {$errors}.");
+        } catch (Throwable $exception) {
+            report($exception);
+            return back()->withErrors(['media_migration' => 'Could not run media folder migration. Please try again.']);
+        }
+    }
+
+    public function adminMediaWatermarkLogoView(Request $request)
+    {
+        $this->ensurePipelineWriteAccess($request);
+
+        $settings = $this->getWatermarkSettings();
+        $disk = (string) ($settings->logo_disk ?: 'public');
+        $path = (string) ($settings->logo_path ?? '');
+
+        if ($path === '' || !Storage::disk($disk)->exists($path)) {
+            abort(404);
+        }
+
+        return response()->file(Storage::disk($disk)->path($path), [
+            'Content-Type' => 'image/png',
+            'Content-Disposition' => 'inline; filename="watermark-logo.png"',
         ]);
     }
 
@@ -1199,7 +1460,13 @@ class DashboardController extends Controller
     {
         $client->load([
             'projects' => function ($query): void {
-                $query->latest('id')->with('creator:id,name,email');
+                $query->latest('id')->with([
+                    'creator:id,name,email',
+                    'media' => function ($mediaQuery): void {
+                        $mediaQuery->latest('id');
+                    },
+                    'invoices:id,client_project_id,status',
+                ]);
             },
             'invoices' => function ($query): void {
                 $query->latest('id')->with('project:id,title');
@@ -1268,6 +1535,331 @@ class DashboardController extends Controller
         }
 
         return back()->with('status', 'Project status updated.');
+    }
+
+    public function adminProjectMediaStore(Request $request, ClientProject $project): RedirectResponse
+    {
+        $validated = $request->validate([
+            'media_files' => ['required', 'array', 'min:1'],
+            'media_files.*' => ['required', 'file', 'max:512000'],
+        ]);
+
+        $saved = 0;
+        $projectMediaBasePath = $this->projectMediaBasePath($project);
+        $watermarkSettings = $this->getWatermarkSettings();
+        $watermarkRenderConfig = $this->resolveWatermarkRenderConfig($watermarkSettings);
+        $watermarkSignature = (string) ($watermarkRenderConfig['signature'] ?? '');
+
+        foreach (($validated['media_files'] ?? []) as $file) {
+            $mimeType = (string) ($file->getClientMimeType() ?: '');
+            $type = str_starts_with($mimeType, 'image/') ? 'image' : (str_starts_with($mimeType, 'video/') ? 'video' : 'other');
+            if (!in_array($type, ['image', 'video'], true)) {
+                continue;
+            }
+
+            $storedPath = $file->store("{$projectMediaBasePath}/gallery", 'public');
+            if (!$storedPath) {
+                continue;
+            }
+
+            $watermarkDisk = null;
+            $watermarkPath = null;
+            $mediaWatermarkSignature = null;
+            if ($type === 'image') {
+                $watermarked = $this->generateHardWatermarkVariant('public', $storedPath, $projectMediaBasePath, $watermarkRenderConfig);
+                if (is_array($watermarked)) {
+                    $watermarkDisk = (string) ($watermarked['disk'] ?? 'public');
+                    $watermarkPath = (string) ($watermarked['path'] ?? '');
+                    if ($watermarkPath === '') {
+                        $watermarkDisk = null;
+                        $watermarkPath = null;
+                    } else {
+                        $mediaWatermarkSignature = $watermarkSignature;
+                    }
+                }
+            }
+
+            ClientProjectMedia::create([
+                'client_project_id' => $project->id,
+                'uploaded_by' => $request->user()?->id,
+                'type' => $type,
+                'disk' => 'public',
+                'path' => $storedPath,
+                'watermark_disk' => $watermarkDisk,
+                'watermark_path' => $watermarkPath,
+                'watermark_signature' => $mediaWatermarkSignature,
+                'original_name' => (string) ($file->getClientOriginalName() ?: basename($storedPath)),
+                'mime_type' => $mimeType !== '' ? $mimeType : null,
+                'size_bytes' => (int) $file->getSize(),
+            ]);
+
+            $saved++;
+        }
+
+        if ($saved === 0) {
+            return back()->withErrors(['media_files' => 'No valid image or video files were uploaded.']);
+        }
+
+        return back()->with('status', "{$saved} gallery file(s) uploaded.");
+    }
+
+    public function adminProjectDeliveryZipStore(Request $request, ClientProject $project): RedirectResponse
+    {
+        $validated = $request->validate([
+            'delivery_zip' => ['required', 'file', 'mimes:zip', 'max:1024000'],
+        ]);
+
+        $file = $validated['delivery_zip'];
+        $storedPath = $file->store($this->projectMediaBasePath($project) . '/delivery', 'public');
+
+        ClientProjectMedia::create([
+            'client_project_id' => $project->id,
+            'uploaded_by' => $request->user()?->id,
+            'type' => 'final_zip',
+            'disk' => 'public',
+            'path' => $storedPath,
+            'original_name' => (string) ($file->getClientOriginalName() ?: basename($storedPath)),
+            'mime_type' => (string) ($file->getClientMimeType() ?: 'application/zip'),
+            'size_bytes' => (int) $file->getSize(),
+        ]);
+
+        return back()->with('status', 'Final delivery ZIP uploaded.');
+    }
+
+    public function adminProjectMediaView(Request $request, ClientProject $project, ClientProjectMedia $media)
+    {
+        if ((int) $media->client_project_id !== (int) $project->id) {
+            abort(404);
+        }
+
+        $disk = (string) $media->disk;
+        $path = (string) $media->path;
+
+        if ((string) $media->type === 'image' && !$this->projectIsPaid($project)) {
+            $renderConfig = $this->resolveWatermarkRenderConfig();
+            $signature = (string) ($renderConfig['signature'] ?? '');
+
+            $existingWatermarkDisk = (string) ($media->watermark_disk ?: '');
+            $existingWatermarkPath = (string) ($media->watermark_path ?: '');
+            $hasExistingWatermark = $existingWatermarkDisk !== ''
+                && $existingWatermarkPath !== ''
+                && Storage::disk($existingWatermarkDisk)->exists($existingWatermarkPath);
+
+            $needsRefresh = !$hasExistingWatermark || (string) ($media->watermark_signature ?? '') !== $signature;
+
+            if ($needsRefresh) {
+                $generated = $this->generateHardWatermarkVariant((string) $media->disk, (string) $media->path, $this->projectMediaBasePath($project), $renderConfig);
+                if (is_array($generated) && !blank($generated['path'])) {
+                    if ($hasExistingWatermark && ($existingWatermarkDisk !== (string) ($generated['disk'] ?? '') || $existingWatermarkPath !== (string) ($generated['path'] ?? ''))) {
+                        Storage::disk($existingWatermarkDisk)->delete($existingWatermarkPath);
+                    }
+
+                    $media->watermark_disk = (string) ($generated['disk'] ?? (string) $media->disk);
+                    $media->watermark_path = (string) ($generated['path'] ?? '');
+                    $media->watermark_signature = $signature;
+                    $media->save();
+
+                    $disk = (string) $media->watermark_disk;
+                    $path = (string) $media->watermark_path;
+                } elseif ($hasExistingWatermark) {
+                    $disk = $existingWatermarkDisk;
+                    $path = $existingWatermarkPath;
+                }
+            } elseif ($hasExistingWatermark) {
+                $disk = $existingWatermarkDisk;
+                $path = $existingWatermarkPath;
+            }
+        }
+
+        if (!Storage::disk($disk)->exists($path)) {
+            abort(404);
+        }
+
+        $absolutePath = Storage::disk($disk)->path($path);
+        $mimeType = $media->mime_type ?: 'application/octet-stream';
+
+        return response()->file($absolutePath, [
+            'Content-Type' => $mimeType,
+            'Content-Disposition' => 'inline; filename="' . addslashes((string) $media->original_name) . '"',
+        ]);
+    }
+
+    public function userProjectMediaPreview(Request $request, ClientProject $project, ClientProjectMedia $media)
+    {
+        $this->ensureUserCanAccessProject($request, $project);
+
+        if ((int) $media->client_project_id !== (int) $project->id) {
+            abort(404);
+        }
+
+        if (!in_array((string) $media->type, ['image', 'video'], true)) {
+            abort(404);
+        }
+
+        $disk = (string) $media->disk;
+        $path = (string) $media->path;
+
+        if ((string) $media->type === 'image' && !$this->projectIsPaid($project)) {
+            $renderConfig = $this->resolveWatermarkRenderConfig();
+            $signature = (string) ($renderConfig['signature'] ?? '');
+
+            $existingWatermarkDisk = (string) ($media->watermark_disk ?: '');
+            $existingWatermarkPath = (string) ($media->watermark_path ?: '');
+            $hasExistingWatermark = $existingWatermarkDisk !== ''
+                && $existingWatermarkPath !== ''
+                && Storage::disk($existingWatermarkDisk)->exists($existingWatermarkPath);
+
+            $needsRefresh = !$hasExistingWatermark || (string) ($media->watermark_signature ?? '') !== $signature;
+
+            if ($needsRefresh) {
+                $generated = $this->generateHardWatermarkVariant((string) $media->disk, (string) $media->path, $this->projectMediaBasePath($project), $renderConfig);
+                if (is_array($generated) && !blank($generated['path'])) {
+                    if ($hasExistingWatermark && ($existingWatermarkDisk !== (string) ($generated['disk'] ?? '') || $existingWatermarkPath !== (string) ($generated['path'] ?? ''))) {
+                        Storage::disk($existingWatermarkDisk)->delete($existingWatermarkPath);
+                    }
+
+                    $media->watermark_disk = (string) ($generated['disk'] ?? (string) $media->disk);
+                    $media->watermark_path = (string) ($generated['path'] ?? '');
+                    $media->watermark_signature = $signature;
+                    $media->save();
+
+                    $disk = (string) $media->watermark_disk;
+                    $path = (string) $media->watermark_path;
+                } elseif ($hasExistingWatermark) {
+                    $disk = $existingWatermarkDisk;
+                    $path = $existingWatermarkPath;
+                } else {
+                    abort(404);
+                }
+            } elseif ($hasExistingWatermark) {
+                $disk = $existingWatermarkDisk;
+                $path = $existingWatermarkPath;
+            }
+        }
+
+        if (!Storage::disk($disk)->exists($path)) {
+            abort(404);
+        }
+
+        $absolutePath = Storage::disk($disk)->path($path);
+        $mimeType = $media->mime_type ?: 'application/octet-stream';
+
+        return response()->file($absolutePath, [
+            'Content-Type' => $mimeType,
+            'Content-Disposition' => 'inline; filename="' . addslashes((string) $media->original_name) . '"',
+        ]);
+    }
+
+    public function adminProjectMediaDestroy(Request $request, ClientProject $project, ClientProjectMedia $media): RedirectResponse
+    {
+        $this->ensurePipelineWriteAccess($request);
+
+        if ((int) $media->client_project_id !== (int) $project->id) {
+            abort(404);
+        }
+
+        $displayName = trim((string) $media->original_name) !== ''
+            ? (string) $media->original_name
+            : ('Media #' . $media->id);
+
+        try {
+            if (Storage::disk($media->disk)->exists($media->path)) {
+                Storage::disk($media->disk)->delete($media->path);
+            }
+
+            if (!blank($media->watermark_disk) && !blank($media->watermark_path)) {
+                $watermarkDisk = (string) $media->watermark_disk;
+                $watermarkPath = (string) $media->watermark_path;
+                if (Storage::disk($watermarkDisk)->exists($watermarkPath)) {
+                    Storage::disk($watermarkDisk)->delete($watermarkPath);
+                }
+            }
+
+            $media->delete();
+        } catch (Throwable $exception) {
+            report($exception);
+            return back()->withErrors(['media' => 'Could not delete media file. Please try again.']);
+        }
+
+        return back()->with('status', "Deleted media file: {$displayName}");
+    }
+
+    public function userProjectMediaDownload(Request $request, ClientProject $project, ClientProjectMedia $media): StreamedResponse
+    {
+        $this->ensureUserCanAccessProject($request, $project);
+
+        if ((int) $media->client_project_id !== (int) $project->id) {
+            abort(404);
+        }
+
+        if (!$this->projectIsPaid($project)) {
+            abort(403, 'Project is not paid yet. Downloads are locked.');
+        }
+
+        if (!Storage::disk($media->disk)->exists($media->path)) {
+            abort(404);
+        }
+
+        return Storage::disk($media->disk)->download($media->path, $media->original_name);
+    }
+
+    public function userProjectMediaZipDownload(Request $request, ClientProject $project): StreamedResponse
+    {
+        $this->ensureUserCanAccessProject($request, $project);
+
+        if (!$this->projectIsPaid($project)) {
+            abort(403, 'Project is not paid yet. Downloads are locked.');
+        }
+
+        $mediaItems = $project->media()
+            ->whereIn('type', ['image', 'video'])
+            ->orderBy('id')
+            ->get();
+
+        if ($mediaItems->isEmpty()) {
+            abort(404, 'No gallery files found for this project.');
+        }
+
+        $tmpDir = storage_path('app/tmp');
+        if (!is_dir($tmpDir)) {
+            mkdir($tmpDir, 0775, true);
+        }
+
+        $zipPath = $tmpDir . '/project-' . $project->id . '-gallery-' . now()->timestamp . '-' . Str::random(6) . '.zip';
+        $zip = new ZipArchive();
+        $opened = $zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE);
+        if ($opened !== true) {
+            abort(500, 'Could not create ZIP archive.');
+        }
+
+        $usedNames = [];
+        foreach ($mediaItems as $item) {
+            if (!Storage::disk($item->disk)->exists($item->path)) {
+                continue;
+            }
+
+            $baseName = trim((string) $item->original_name) !== '' ? $item->original_name : basename($item->path);
+            $name = $baseName;
+            $counter = 1;
+            while (isset($usedNames[strtolower($name)])) {
+                $dotPos = strrpos($baseName, '.');
+                if ($dotPos === false) {
+                    $name = $baseName . '-' . $counter;
+                } else {
+                    $name = substr($baseName, 0, $dotPos) . '-' . $counter . substr($baseName, $dotPos);
+                }
+                $counter++;
+            }
+
+            $usedNames[strtolower($name)] = true;
+            $zip->addFromString($name, Storage::disk($item->disk)->get($item->path));
+        }
+
+        $zip->close();
+
+        $downloadName = 'project-' . $project->id . '-gallery.zip';
+
+        return response()->download($zipPath, $downloadName)->deleteFileAfterSend(true);
     }
 
     public function adminClientInvoiceStore(Request $request, Client $client): RedirectResponse
@@ -1545,7 +2137,12 @@ class DashboardController extends Controller
         $client = Client::query()
             ->with([
                 'projects' => function ($query): void {
-                    $query->latest('id')->limit(8);
+                    $query->latest('id')->limit(8)->with([
+                        'media' => function ($mediaQuery): void {
+                            $mediaQuery->latest('id');
+                        },
+                        'invoices:id,client_project_id,status',
+                    ]);
                 },
                 'invoices' => function ($query): void {
                     $query->latest('id')->limit(8);
@@ -1567,11 +2164,16 @@ class DashboardController extends Controller
             ->latest('id')
             ->first();
 
+        $galleryPayloadByProject = $client
+            ? $this->buildProjectGalleryPayloadMap($client->projects, true, false, true)
+            : [];
+
         return view('user.dashboard', [
             'leads' => $leads,
             'quotes' => $quotes,
             'client' => $client,
             'projectStatuses' => ['accepted', 'shooting', 'editing', 'complete'],
+            'galleryPayloadByProject' => $galleryPayloadByProject,
         ]);
     }
 
@@ -1837,6 +2439,27 @@ class DashboardController extends Controller
         return back();
     }
 
+    public function notificationsReadAjax(Request $request, PanelNotification $notification): JsonResponse
+    {
+        abort_unless((int) $notification->user_id === (int) $request->user()?->id, 403);
+
+        if ($notification->read_at === null) {
+            $notification->read_at = now();
+            $notification->save();
+        }
+
+        $userId = (int) $request->user()?->id;
+        $unreadCount = PanelNotification::query()
+            ->where('user_id', $userId)
+            ->whereNull('read_at')
+            ->count();
+
+        return response()->json([
+            'ok' => true,
+            'unread_count' => $unreadCount,
+        ]);
+    }
+
     public function notificationsReadAll(Request $request): RedirectResponse
     {
         PanelNotification::query()
@@ -1845,6 +2468,55 @@ class DashboardController extends Controller
             ->update(['read_at' => now()]);
 
         return back();
+    }
+
+    public function notificationsReadAllAjax(Request $request): JsonResponse
+    {
+        $userId = (int) $request->user()?->id;
+
+        PanelNotification::query()
+            ->where('user_id', $userId)
+            ->whereNull('read_at')
+            ->update(['read_at' => now()]);
+
+        return response()->json([
+            'ok' => true,
+            'unread_count' => 0,
+        ]);
+    }
+
+    public function notificationsFeed(Request $request): JsonResponse
+    {
+        $userId = (int) $request->user()?->id;
+
+        $items = PanelNotification::query()
+            ->where('user_id', $userId)
+            ->latest('id')
+            ->limit(20)
+            ->get();
+
+        $unreadCount = PanelNotification::query()
+            ->where('user_id', $userId)
+            ->whereNull('read_at')
+            ->count();
+
+        $notifications = $items->map(function (PanelNotification $item): array {
+            return [
+                'id' => (int) $item->id,
+                'type' => (string) $item->type,
+                'title' => (string) $item->title,
+                'body' => (string) ($item->body ?? ''),
+                'action_url' => (string) ($item->action_url ?? ''),
+                'is_unread' => $item->read_at === null,
+                'created_human' => (string) ($item->created_at?->diffForHumans() ?? ''),
+            ];
+        })->values()->all();
+
+        return response()->json([
+            'ok' => true,
+            'unread_count' => $unreadCount,
+            'notifications' => $notifications,
+        ]);
     }
 
     /**
@@ -1927,6 +2599,404 @@ class DashboardController extends Controller
     {
         $role = strtolower(trim((string) $request->user()?->role));
         abort_unless(in_array($role, ['owner', 'admin'], true), 403);
+    }
+
+    private function ensureUserCanAccessProject(Request $request, ClientProject $project): void
+    {
+        $role = strtolower(trim((string) $request->user()?->role));
+        if (in_array($role, ['owner', 'admin', 'manager', 'photographer', 'editor'], true)) {
+            return;
+        }
+
+        $user = $request->user();
+        $project->loadMissing('client:id,user_id,email,phone');
+        $client = $project->client;
+
+        $allowed = $client !== null
+            && (
+                (int) ($client->user_id ?? 0) === (int) ($user?->id ?? 0)
+                || (!blank($client->email) && !blank($user?->email) && strcasecmp((string) $client->email, (string) $user->email) === 0)
+                || (!blank($client->phone) && !blank($user?->phone) && (string) $client->phone === (string) $user->phone)
+            );
+
+        abort_unless($allowed, 403);
+    }
+
+    private function projectIsPaid(ClientProject $project): bool
+    {
+        return $project->invoices()->where('status', 'paid')->exists();
+    }
+
+    /**
+     * @param iterable<ClientProject> $projects
+     * @return array<int,array<int,array<string,mixed>>>
+     */
+    private function buildProjectGalleryPayloadMap(iterable $projects, bool $useWatermarkPreview, bool $useAdminViewRoute = false, bool $useUserPreviewRoute = false): array
+    {
+        $payload = [];
+
+        foreach ($projects as $project) {
+            if (!$project instanceof ClientProject) {
+                continue;
+            }
+
+            $payload[(int) $project->id] = $this->buildProjectGalleryPayload($project, $useWatermarkPreview, $useAdminViewRoute, $useUserPreviewRoute);
+        }
+
+        return $payload;
+    }
+
+    /**
+     * @return array<int,array<string,mixed>>
+     */
+    private function buildProjectGalleryPayload(ClientProject $project, bool $useWatermarkPreview, bool $useAdminViewRoute = false, bool $useUserPreviewRoute = false): array
+    {
+        $project->loadMissing('media', 'invoices:id,client_project_id,status');
+        $isPaid = $project->invoices->contains(static fn (ClientInvoice $invoice): bool => $invoice->status === 'paid');
+
+        return $project->media
+            ->whereIn('type', ['image', 'video'])
+            ->values()
+            ->map(function (ClientProjectMedia $item) use ($useWatermarkPreview, $isPaid, $useAdminViewRoute, $useUserPreviewRoute, $project): array {
+                $previewMode = $useWatermarkPreview && !$isPaid;
+                $disk = $item->disk;
+                $path = $item->path;
+
+                if ($previewMode && $item->type === 'image' && !blank($item->watermark_disk) && !blank($item->watermark_path)) {
+                    $disk = (string) $item->watermark_disk;
+                    $path = (string) $item->watermark_path;
+                }
+
+                if ($useAdminViewRoute) {
+                    $url = route('admin.projects.media.view', ['project' => $project, 'media' => $item]);
+                } elseif ($useUserPreviewRoute) {
+                    $url = route('user.projects.media.preview', ['project' => $project, 'media' => $item]);
+                } else {
+                    $url = Storage::disk($disk)->url($path);
+                }
+
+                return [
+                    'id' => (int) $item->id,
+                    'name' => (string) $item->original_name,
+                    'type' => (string) $item->type,
+                    'mime' => (string) ($item->mime_type ?? ''),
+                    'url' => $url,
+                ];
+            })
+            ->all();
+    }
+
+    private function getWatermarkSettings(): WatermarkSetting
+    {
+        $settings = WatermarkSetting::query()->first();
+        if ($settings) {
+            return $settings;
+        }
+
+        return WatermarkSetting::query()->create([
+            'logo_disk' => null,
+            'logo_path' => null,
+            'position' => 'center',
+            'size' => 'medium',
+            'opacity_percent' => 62,
+        ]);
+    }
+
+    /**
+     * @return array{logo_absolute_path:?string,position:string,size:string,opacity_percent:int,signature:string}
+     */
+    private function resolveWatermarkRenderConfig(?WatermarkSetting $settings = null): array
+    {
+        $settings ??= $this->getWatermarkSettings();
+
+        $position = (string) ($settings->position ?: 'center');
+        if (!in_array($position, ['top_left', 'top_right', 'bottom_left', 'bottom_right', 'center'], true)) {
+            $position = 'center';
+        }
+
+        $size = (string) ($settings->size ?: 'medium');
+        if (!in_array($size, ['small', 'medium', 'large'], true)) {
+            $size = 'medium';
+        }
+
+        $opacityPercent = (int) ($settings->opacity_percent ?? 62);
+        if ($opacityPercent < 1) {
+            $opacityPercent = 1;
+        }
+        if ($opacityPercent > 100) {
+            $opacityPercent = 100;
+        }
+
+        $logoDisk = (string) ($settings->logo_disk ?: 'public');
+        $logoPath = (string) ($settings->logo_path ?? '');
+        $logoAbsolutePath = null;
+        if ($logoPath !== '' && Storage::disk($logoDisk)->exists($logoPath)) {
+            $logoAbsolutePath = Storage::disk($logoDisk)->path($logoPath);
+        }
+
+        $signature = hash('sha256', json_encode([
+            'logo_disk' => $logoDisk,
+            'logo_path' => $logoPath,
+            'position' => $position,
+            'size' => $size,
+            'opacity_percent' => $opacityPercent,
+        ]));
+
+        return [
+            'logo_absolute_path' => $logoAbsolutePath,
+            'position' => $position,
+            'size' => $size,
+            'opacity_percent' => $opacityPercent,
+            'signature' => $signature,
+        ];
+    }
+
+    private function watermarkScaleFromSize(string $size): float
+    {
+        if ($size === 'small') {
+            return 0.16;
+        }
+
+        if ($size === 'large') {
+            return 0.34;
+        }
+
+        return 0.24;
+    }
+
+    private function projectMediaBasePath(ClientProject $project): string
+    {
+        $projectTitle = trim((string) ($project->title ?? ''));
+        $slug = Str::slug($projectTitle);
+        if ($slug === '') {
+            $slug = 'project';
+        }
+
+        return 'media/' . $slug . '-' . (int) $project->id;
+    }
+
+    /**
+     * @return array{0:int,1:int}
+     */
+    private function resolveWatermarkCoordinates(int $canvasWidth, int $canvasHeight, int $markWidth, int $markHeight, string $position): array
+    {
+        $margin = max(12, (int) round(min($canvasWidth, $canvasHeight) * 0.03));
+
+        if ($position === 'top_left') {
+            return [$margin, $margin];
+        }
+
+        if ($position === 'top_right') {
+            return [max($margin, $canvasWidth - $markWidth - $margin), $margin];
+        }
+
+        if ($position === 'bottom_left') {
+            return [$margin, max($margin, $canvasHeight - $markHeight - $margin)];
+        }
+
+        if ($position === 'bottom_right') {
+            return [
+                max($margin, $canvasWidth - $markWidth - $margin),
+                max($margin, $canvasHeight - $markHeight - $margin),
+            ];
+        }
+
+        return [
+            (int) max($margin, floor(($canvasWidth - $markWidth) / 2)),
+            (int) max($margin, floor(($canvasHeight - $markHeight) / 2)),
+        ];
+    }
+
+    /**
+    * @param array{logo_absolute_path:?string,position:string,size:string,opacity_percent:int,signature:string} $renderConfig
+     * @return array{disk:string,path:string}|null
+     */
+    private function generateHardWatermarkVariant(string $disk, string $originalPath, string $projectMediaBasePath, array $renderConfig): ?array
+    {
+        try {
+            if (!Storage::disk($disk)->exists($originalPath)) {
+                return null;
+            }
+
+            $absoluteSourcePath = Storage::disk($disk)->path($originalPath);
+            $extension = strtolower(pathinfo($originalPath, PATHINFO_EXTENSION));
+            if ($extension === '') {
+                $extension = 'jpg';
+            }
+
+            $targetPath = trim($projectMediaBasePath, '/') . '/gallery-watermarked/' . Str::random(20) . '.' . $extension;
+            $absoluteTargetPath = Storage::disk($disk)->path($targetPath);
+            $targetDir = dirname($absoluteTargetPath);
+            if (!is_dir($targetDir)) {
+                mkdir($targetDir, 0775, true);
+            }
+
+            $generated = false;
+
+            if (class_exists('Imagick')) {
+                $generated = $this->generateWatermarkViaImagick($absoluteSourcePath, $absoluteTargetPath, $renderConfig);
+            }
+
+            if (!$generated && extension_loaded('gd')) {
+                $generated = $this->generateWatermarkViaGd($absoluteSourcePath, $absoluteTargetPath, $renderConfig);
+            }
+
+            if (!$generated || !file_exists($absoluteTargetPath)) {
+                return null;
+            }
+
+            return [
+                'disk' => $disk,
+                'path' => $targetPath,
+            ];
+        } catch (Throwable $exception) {
+            report($exception);
+            return null;
+        }
+    }
+
+    /**
+    * @param array{logo_absolute_path:?string,position:string,size:string,opacity_percent:int,signature:string} $renderConfig
+     */
+    private function generateWatermarkViaImagick(string $sourcePath, string $targetPath, array $renderConfig): bool
+    {
+        try {
+            $image = new \Imagick($sourcePath);
+            $width = $image->getImageWidth();
+            $height = $image->getImageHeight();
+
+            $logoPath = (string) ($renderConfig['logo_absolute_path'] ?? '');
+            $position = (string) ($renderConfig['position'] ?? 'center');
+            $size = (string) ($renderConfig['size'] ?? 'medium');
+            $opacityPercent = (int) ($renderConfig['opacity_percent'] ?? 62);
+            $opacityPercent = max(1, min(100, $opacityPercent));
+
+            if ($logoPath !== '' && is_file($logoPath)) {
+                $logo = new \Imagick($logoPath);
+                $scale = $this->watermarkScaleFromSize($size);
+                $targetWidth = max(56, (int) round(min($width, $height) * $scale));
+                $logo->resizeImage($targetWidth, 0, \Imagick::FILTER_LANCZOS, 1, true);
+                $logo->setImageAlphaChannel(\Imagick::ALPHACHANNEL_ACTIVATE);
+                $logo->evaluateImage(\Imagick::EVALUATE_MULTIPLY, $opacityPercent / 100, \Imagick::CHANNEL_ALPHA);
+
+                [$x, $y] = $this->resolveWatermarkCoordinates($width, $height, $logo->getImageWidth(), $logo->getImageHeight(), $position);
+                $image->compositeImage($logo, \Imagick::COMPOSITE_OVER, $x, $y);
+
+                $logo->clear();
+                $logo->destroy();
+            } else {
+                $draw = new \ImagickDraw();
+                $draw->setFillColor(new \ImagickPixel('rgba(255,255,255,0.22)'));
+                $draw->setGravity(\Imagick::GRAVITY_CENTER);
+                $draw->setTextAlignment(\Imagick::ALIGN_CENTER);
+                $draw->setFontSize((float) max(22, (int) round(min($width, $height) / 9)));
+                $image->annotateImage($draw, 0, 0, 0, 'MACCENTO PREVIEW');
+            }
+
+            $result = $image->writeImage($targetPath);
+            $image->clear();
+            $image->destroy();
+
+            return (bool) $result;
+        } catch (Throwable $exception) {
+            report($exception);
+            return false;
+        }
+    }
+
+    /**
+    * @param array{logo_absolute_path:?string,position:string,size:string,opacity_percent:int,signature:string} $renderConfig
+     */
+    private function generateWatermarkViaGd(string $sourcePath, string $targetPath, array $renderConfig): bool
+    {
+        $imageInfo = @getimagesize($sourcePath);
+        $mimeType = (string) ($imageInfo['mime'] ?? '');
+
+        $image = null;
+        if ($mimeType === 'image/jpeg' || $mimeType === 'image/jpg') {
+            $image = @imagecreatefromjpeg($sourcePath);
+        } elseif ($mimeType === 'image/png') {
+            $image = @imagecreatefrompng($sourcePath);
+        } elseif ($mimeType === 'image/webp' && function_exists('imagecreatefromwebp')) {
+            $image = @imagecreatefromwebp($sourcePath);
+        } elseif ($mimeType === 'image/gif') {
+            $image = @imagecreatefromgif($sourcePath);
+        }
+
+        if (!$image) {
+            return false;
+        }
+
+        $width = imagesx($image);
+        $height = imagesy($image);
+        imagealphablending($image, true);
+        imagesavealpha($image, true);
+
+        $logoPath = (string) ($renderConfig['logo_absolute_path'] ?? '');
+        $position = (string) ($renderConfig['position'] ?? 'center');
+        $size = (string) ($renderConfig['size'] ?? 'medium');
+        $opacityPercent = (int) ($renderConfig['opacity_percent'] ?? 62);
+        $opacityPercent = max(1, min(100, $opacityPercent));
+
+        if ($logoPath !== '' && is_file($logoPath)) {
+            $logo = @imagecreatefrompng($logoPath);
+            if ($logo) {
+                imagealphablending($logo, true);
+                imagesavealpha($logo, true);
+
+                $logoWidth = imagesx($logo);
+                $logoHeight = imagesy($logo);
+                $scale = $this->watermarkScaleFromSize($size);
+                $targetWidth = max(56, (int) round(min($width, $height) * $scale));
+                $targetHeight = max(32, (int) round(($logoHeight / max(1, $logoWidth)) * $targetWidth));
+
+                $resizedLogo = imagecreatetruecolor($targetWidth, $targetHeight);
+                imagealphablending($resizedLogo, false);
+                imagesavealpha($resizedLogo, true);
+                $transparent = imagecolorallocatealpha($resizedLogo, 0, 0, 0, 127);
+                imagefilledrectangle($resizedLogo, 0, 0, $targetWidth, $targetHeight, $transparent);
+                imagecopyresampled($resizedLogo, $logo, 0, 0, 0, 0, $targetWidth, $targetHeight, $logoWidth, $logoHeight);
+
+                if (function_exists('imagefilter')) {
+                    $alphaAmount = 100 - $opacityPercent;
+                    if ($alphaAmount > 0) {
+                        imagefilter($resizedLogo, IMG_FILTER_COLORIZE, 0, 0, 0, $alphaAmount);
+                    }
+                }
+
+                [$x, $y] = $this->resolveWatermarkCoordinates($width, $height, $targetWidth, $targetHeight, $position);
+                imagecopy($image, $resizedLogo, $x, $y, 0, 0, $targetWidth, $targetHeight);
+
+                imagedestroy($resizedLogo);
+                imagedestroy($logo);
+            }
+        } else {
+            $color = imagecolorallocatealpha($image, 255, 255, 255, 72);
+            $label = 'MACCENTO PREVIEW';
+            $font = 5;
+            $stepX = max(140, (int) floor($width / 3));
+            $stepY = max(90, (int) floor($height / 3));
+
+            for ($y = 12; $y < $height; $y += $stepY) {
+                for ($x = 12; $x < $width; $x += $stepX) {
+                    imagestring($image, $font, $x, $y, $label, $color);
+                }
+            }
+        }
+
+        $saved = false;
+        if ($mimeType === 'image/jpeg' || $mimeType === 'image/jpg') {
+            $saved = imagejpeg($image, $targetPath, 85);
+        } elseif ($mimeType === 'image/png') {
+            $saved = imagepng($image, $targetPath, 6);
+        } elseif ($mimeType === 'image/webp' && function_exists('imagewebp')) {
+            $saved = imagewebp($image, $targetPath, 85);
+        } elseif ($mimeType === 'image/gif') {
+            $saved = imagegif($image, $targetPath);
+        }
+
+        imagedestroy($image);
+        return (bool) $saved;
     }
 
     /**

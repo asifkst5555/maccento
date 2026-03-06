@@ -49,6 +49,7 @@ p{line-height:1.3 !important}
 .cinematic{--section-pt:96px;--section-pb:96px}
 .process{--section-pt:88px;--section-pb:96px}
 .broker-trust{--section-pt:96px;--section-pb:96px}
+.creative-studio{--section-pt:96px;--section-pb:96px}
 .testimonials{--section-pt:88px;--section-pb:96px}
 .brand-strip{--section-pt:88px;--section-pb:96px}
 .final-cta{--section-pt:120px;--section-pb:120px}
@@ -1893,6 +1894,98 @@ body.lightbox-open{
   object-fit:cover;
 }
 
+.creative-studio{
+  background:
+    radial-gradient(120% 130% at 0% 0%, rgba(229,57,53,.06) 0%, rgba(229,57,53,0) 42%),
+    linear-gradient(180deg, #ffffff 0%, #f8f9fb 100%);
+}
+.creative-head{
+  max-width:920px;
+  margin:0 auto 34px;
+  text-align:center;
+}
+.creative-kicker{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  margin:0 auto 12px;
+  padding:8px 14px;
+  border-radius:999px;
+  background:#fff;
+  border:1px solid rgba(229,57,53,.24);
+  color:var(--accent);
+  font-size:11px;
+  letter-spacing:.14em;
+  text-transform:uppercase;
+  font-weight:700;
+}
+.creative-kicker::before{
+  content:"";
+  width:8px;
+  height:8px;
+  border-radius:999px;
+  background:var(--accent);
+  box-shadow:0 0 0 5px rgba(229,57,53,.14);
+}
+.creative-head .section-title{
+  margin-bottom:10px;
+}
+.creative-head .section-sub{
+  margin:0 auto;
+  max-width:790px;
+}
+.creative-grid{
+  display:grid;
+  grid-template-columns:repeat(2, minmax(0, 1fr));
+  gap:20px;
+}
+.creative-card{
+  background:#fff;
+  border:1px solid #e4e7ec;
+  border-radius:18px;
+  padding:24px 24px 22px;
+  box-shadow:0 12px 26px rgba(17,24,39,.08);
+}
+.creative-card h3{
+  margin:0 0 8px;
+  font-size:28px;
+  line-height:1.1;
+  color:#141922;
+  letter-spacing:-0.02em;
+}
+.creative-card p{
+  margin:0 0 16px;
+  color:#59616d;
+  font-size:17px;
+  line-height:1.55;
+}
+.creative-list{
+  list-style:none;
+  margin:0;
+  padding:0;
+  display:grid;
+  gap:10px;
+}
+.creative-list li{
+  position:relative;
+  margin:0;
+  padding-left:24px;
+  color:#2e3b4d;
+  font-size:16px;
+  line-height:1.4;
+}
+.creative-list li::before{
+  content:"";
+  position:absolute;
+  top:.5em;
+  left:0;
+  width:10px;
+  height:10px;
+  border-radius:999px;
+  background:var(--accent);
+  box-shadow:0 0 0 4px rgba(229,57,53,.14);
+}
+
 .testimonials{background:#f6f2ef}
 .testimonials .section-title,
 .testimonials .section-sub{text-align:center}
@@ -3043,6 +3136,10 @@ textarea.input{min-height:116px;resize:vertical;border-radius:20px;margin-top:8p
   .broker-trust-grid{grid-template-columns:1fr;gap:20px}
   .broker-copy{text-align:center;max-width:760px;margin:0 auto}
   .broker-copy .section-sub{margin:0 auto}
+  .creative-grid{grid-template-columns:1fr;gap:16px}
+  .creative-card h3{font-size:24px}
+  .creative-card p{font-size:18px}
+  .creative-list li{font-size:18px}
   .brand-track{gap:28px}
   .brand-logo{width:134px;height:50px}
   .footer-social{margin-top:14px}
@@ -3168,6 +3265,7 @@ textarea.input{min-height:116px;resize:vertical;border-radius:20px;margin-top:8p
   .cinematic{--section-pt:64px;--section-pb:64px}
   .process{--section-pt:56px;--section-pb:64px}
   .broker-trust{--section-pt:64px;--section-pb:64px}
+  .creative-studio{--section-pt:64px;--section-pb:64px}
   .testimonials{--section-pt:56px;--section-pb:64px}
   .brand-strip{--section-pt:56px;--section-pb:56px}
   .final-cta{--section-pt:72px;--section-pb:72px}
@@ -3185,6 +3283,7 @@ textarea.input{min-height:116px;resize:vertical;border-radius:20px;margin-top:8p
   .packages .section-sub,
   .process .section-sub,
   .broker-trust .section-sub,
+  .creative-studio .section-sub,
   .testimonials .section-sub,
   .brand-strip .section-sub,
   .contact .section-sub{
@@ -3887,6 +3986,10 @@ textarea.input{min-height:116px;resize:vertical;border-radius:20px;margin-top:8p
   border-color:#c9d9f2;
   background:#f6fbff;
 }
+.panel-notify-item.is-hidden,
+.panel-notify-list .panel-muted.is-hidden{
+  display:none !important;
+}
 .panel-notify-title{
   margin:0;
   color:#10223e;
@@ -4049,22 +4152,88 @@ textarea.input{min-height:116px;resize:vertical;border-radius:20px;margin-top:8p
 }
 .panel-pager{
   margin-top:14px;
+  display:grid;
+  gap:10px;
 }
-.panel-pager nav{
+.panel-pager-summary{
+  margin:0;
+  color:#5f7597;
+  font-size:14px;
+  font-weight:600;
+}
+.panel-pager-controls{
   display:flex;
   flex-wrap:wrap;
   gap:8px;
+  align-items:center;
 }
-.panel-pager .relative.inline-flex{
+.panel-pager-btn,
+.panel-pager-page,
+.panel-pager-ellipsis{
   display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-width:40px;
+  min-height:40px;
+  border-radius:12px;
+  border:1px solid #cfdaea;
+  background:#fff;
+  color:#10223e;
+  text-decoration:none;
+  font-size:14px;
+  font-weight:600;
+  padding:0 12px;
 }
-.panel-pager a,
-.panel-pager span{
-  font-size:13px;
+.panel-pager-page{
+  min-width:40px;
+  padding:0 10px;
+}
+.panel-pager-page.is-active{
+  border-color:#16304f;
+  background:#16304f;
+  color:#fff;
+}
+.panel-pager-btn.is-disabled{
+  color:#8aa0bd;
+  background:#f4f7fb;
+  border-color:#dce5f2;
+  cursor:not-allowed;
+}
+.panel-pager-ellipsis{
+  border-style:dashed;
+  color:#7085a4;
 }
 .panel-stack{
   display:grid;
   gap:16px;
+}
+.media-project-card{
+  transition:box-shadow .2s ease, border-color .2s ease;
+}
+.media-project-header{
+  margin-bottom:0;
+}
+.media-project-toggle{
+  width:40px;
+  height:40px;
+  padding:0;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+}
+.media-project-toggle-icon{
+  width:18px;
+  height:18px;
+  transition:transform .2s ease;
+}
+.media-project-card.is-collapsed .media-project-toggle-icon{
+  transform:rotate(-90deg);
+}
+.media-project-details{
+  margin-top:12px;
+}
+.media-project-details[hidden]{
+  display:none !important;
 }
 .panel-list{
   margin:0;
@@ -5398,6 +5567,21 @@ textarea.input{min-height:116px;resize:vertical;border-radius:20px;margin-top:8p
   .panel-btn,
   .panel-link{
     min-height:42px;
+  }
+  .panel-pager-controls{
+    gap:6px;
+  }
+  .panel-pager-btn,
+  .panel-pager-page,
+  .panel-pager-ellipsis{
+    min-height:38px;
+    min-width:38px;
+    border-radius:10px;
+    font-size:13px;
+    padding:0 10px;
+  }
+  .panel-pager-summary{
+    font-size:13px;
   }
   .panel-table-wrap{
     overflow-x:auto;

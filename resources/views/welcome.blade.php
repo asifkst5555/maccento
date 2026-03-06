@@ -754,6 +754,42 @@
         </div>
       </div>
     </section>
+
+    <section id="creative-studio" class="section creative-studio">
+      <div class="container">
+        <div class="creative-head">
+          <span class="creative-kicker">Creative Studio</span>
+          <h2 class="section-title">From Capture to Complete Digital Production</h2>
+          <p class="section-sub">Maccento goes beyond production by delivering post-production, social-ready content, and brand assets for photographers, videographers, real estate professionals, and architectural firms.</p>
+        </div>
+
+        <div class="creative-grid">
+          <article class="creative-card">
+            <h3>Editing &amp; Content Production</h3>
+            <p>Professional editing workflows designed for fast turnaround, visual consistency, and multi-platform publishing.</p>
+            <ul class="creative-list" role="list">
+              <li>Broker Social Media Content</li>
+              <li>HDR Photo Editing</li>
+              <li>Video Editing</li>
+              <li>Lifestyle Clips</li>
+              <li>Podcast Clips</li>
+            </ul>
+          </article>
+
+          <article class="creative-card">
+            <h3>Branding &amp; Visual Identity</h3>
+            <p>Creative brand support to help real estate professionals and firms look consistent, premium, and market-ready.</p>
+            <ul class="creative-list" role="list">
+              <li>Logo Creation</li>
+              <li>Brand Mockups</li>
+              <li>Website Development</li>
+              <li>Visual Brand Assets</li>
+              <li>Marketing Creative Packages</li>
+            </ul>
+          </article>
+        </div>
+      </div>
+    </section>
     @endif
 
     @if($showPortfolio)

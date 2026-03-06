@@ -50,6 +50,7 @@
     <div class="panel-form-row" style="margin-bottom:0;">
       <a class="panel-btn {{ $filters['project_view'] === 'table' ? 'panel-btn-primary' : '' }}" href="{{ route('admin.projects.index', array_merge(request()->query(), ['project_view' => 'table'])) }}">Table View</a>
       <a class="panel-btn {{ $filters['project_view'] === 'kanban' ? 'panel-btn-primary' : '' }}" href="{{ route('admin.projects.index', array_merge(request()->query(), ['project_view' => 'kanban'])) }}">Kanban View</a>
+      <a class="panel-btn" href="{{ route('admin.media-delivery.index') }}">Open Media Delivery</a>
     </div>
   </div>
 

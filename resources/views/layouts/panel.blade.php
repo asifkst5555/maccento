@@ -87,6 +87,14 @@
             <span class="panel-nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5a2 2 0 0 1 2-2h7l2 2h3a2 2 0 0 1 2 2v2H4V5zm0 5h16v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-9zm4 3h8m-8 3h5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
             <span class="panel-nav-text">Projects</span>
           </a>
+          <a class="panel-nav-link @if(request()->routeIs('admin.media-delivery.*') && !request()->routeIs('admin.media-delivery.watermark.*')) is-active @endif" href="{{ route('admin.media-delivery.index') }}" title="Media Delivery">
+            <span class="panel-nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v3H4V6zm0 5h16v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-7zm3 2h10m-6 3h6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+            <span class="panel-nav-text">Media Delivery</span>
+          </a>
+          <a class="panel-nav-link @if(request()->routeIs('admin.media-delivery.watermark.*')) is-active @endif" href="{{ route('admin.media-delivery.watermark.index') }}" title="Watermark Settings">
+            <span class="panel-nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.2 6.4 20.2l1.1-6.2L3 9.6l6.2-.9L12 3z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg></span>
+            <span class="panel-nav-text">Watermark Settings</span>
+          </a>
 
           <p class="panel-nav-group-title">Accounts</p>
           <a class="panel-nav-link @if(request()->routeIs('admin.clients.*')) is-active @endif" href="{{ route('admin.clients.index') }}" title="Clients">
@@ -139,7 +147,7 @@
 
           @auth
           <div class="panel-actions">
-            <div class="panel-notify" data-panel-notify>
+            <div class="panel-notify" data-panel-notify data-feed-url="{{ route('notifications.feed') }}" data-read-all-url="{{ route('notifications.read-all-ajax') }}" data-read-url-template="{{ url('/notifications/__ID__/read-ajax') }}" data-csrf="{{ csrf_token() }}">
               <button class="panel-notify-btn" type="button" aria-expanded="false" data-panel-notify-toggle title="Notifications">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a5 5 0 0 0-5 5v2.3c0 .8-.3 1.57-.84 2.14L5 13.73V15h14v-1.27l-1.16-1.3A3 3 0 0 1 17 10.3V8a5 5 0 0 0-5-5zm0 18a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 21z" fill="currentColor"/></svg>
                 @if(($panelUnreadNotifications ?? 0) > 0)
@@ -149,12 +157,7 @@
               <div class="panel-notify-menu" data-panel-notify-menu hidden>
                 <div class="panel-notify-head">
                   <strong>Notifications</strong>
-                  @if(($panelUnreadNotifications ?? 0) > 0)
-                  <form method="post" action="{{ route('notifications.read-all') }}">
-                    @csrf
-                    <button class="panel-link" type="submit">Mark all read</button>
-                  </form>
-                  @endif
+                  <button class="panel-link" type="button" data-notify-mark-all @if(($panelUnreadNotifications ?? 0) === 0) hidden @endif>Mark all read</button>
                 </div>
                 <div class="panel-notify-filters">
                   <button class="panel-notify-filter is-active" type="button" data-notify-filter="all">All</button>
@@ -186,12 +189,6 @@
                       <p class="panel-notify-time">{{ $notification->created_at?->diffForHumans() }}</p>
                     </div>
                     <div class="panel-notify-actions">
-                      @if(!$notification->read_at)
-                      <form method="post" action="{{ route('notifications.read', $notification) }}">
-                        @csrf
-                        <button class="panel-link" type="submit">Read</button>
-                      </form>
-                      @endif
                       @if($notification->action_url)
                       <a class="panel-link" href="{{ $notification->action_url }}">Open</a>
                       @endif
@@ -296,24 +293,266 @@
       const notifyMenu = document.querySelector('[data-panel-notify-menu]');
       if (notifyWrap && notifyToggle && notifyMenu) {
         const filterButtons = notifyMenu.querySelectorAll('[data-notify-filter]');
-        const items = notifyMenu.querySelectorAll('[data-notify-category]');
         const filteredEmpty = notifyMenu.querySelector('[data-notify-empty]');
+        const listEl = notifyMenu.querySelector('.panel-notify-list');
+        const markAllBtn = notifyMenu.querySelector('[data-notify-mark-all]');
+        const feedUrl = notifyWrap.getAttribute('data-feed-url') || '';
+        const readAllUrl = notifyWrap.getAttribute('data-read-all-url') || '';
+        const readUrlTemplate = notifyWrap.getAttribute('data-read-url-template') || '';
+        const csrfToken = notifyWrap.getAttribute('data-csrf') || '';
+        const categoryMap = {
+          new_quote_submission: 'quotes',
+          quote_status_updated: 'quotes',
+          quote_revision_requested: 'quotes',
+          invoice_created: 'invoices',
+          invoice_status_updated: 'invoices',
+          new_admin_message: 'messages',
+          new_service_request: 'messages',
+          service_request_status_updated: 'messages',
+          project_status_updated: 'messages'
+        };
+
+        let currentFilter = 'all';
+        let notifications = [];
+        let isFetching = false;
+
+        const escapeHtml = function (value) {
+          return String(value || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+        };
+
+        const updateUnreadBadge = function (count) {
+          let badge = notifyToggle.querySelector('.panel-notify-count');
+          if (count > 0) {
+            if (!badge) {
+              badge = document.createElement('span');
+              badge.className = 'panel-notify-count';
+              notifyToggle.appendChild(badge);
+            }
+            badge.textContent = String(count);
+          } else if (badge) {
+            badge.remove();
+          }
+
+          if (markAllBtn) {
+            markAllBtn.hidden = count <= 0;
+          }
+        };
+
+        const buildNotificationItem = function (item) {
+          const isUnread = Boolean(item && item.is_unread);
+          const category = categoryMap[String(item.type || '')] || 'other';
+          const actionUrl = String(item.action_url || '');
+          const title = escapeHtml(item.title || 'Notification');
+          const body = escapeHtml(item.body || '');
+          const time = escapeHtml(item.created_human || '');
+
+          const wrapper = document.createElement('div');
+          wrapper.className = 'panel-notify-item' + (isUnread ? ' is-unread' : '');
+          wrapper.setAttribute('data-notify-category', category);
+          wrapper.setAttribute('data-notify-id', String(item.id || ''));
+
+          let actionsHtml = '';
+          if (actionUrl !== '') {
+            actionsHtml = '<div class="panel-notify-actions"><a class="panel-link" href="' + escapeHtml(actionUrl) + '" data-notify-open="1">Open</a></div>';
+          }
+
+          wrapper.innerHTML = '' +
+            '<div class="panel-notify-copy">' +
+              '<p class="panel-notify-title">' + title + '</p>' +
+              (body !== '' ? '<p class="panel-notify-body">' + body + '</p>' : '') +
+              (time !== '' ? '<p class="panel-notify-time">' + time + '</p>' : '') +
+            '</div>' +
+            actionsHtml;
+
+          return wrapper;
+        };
+
+        const renderNotifications = function () {
+          if (!listEl) return;
+
+          const staticEmpty = listEl.querySelector('[data-notify-empty]');
+          listEl.querySelectorAll('[data-notify-category], .panel-muted:not([data-notify-empty])').forEach(function (el) {
+            el.remove();
+          });
+
+          if (!notifications.length) {
+            const empty = document.createElement('p');
+            empty.className = 'panel-muted';
+            empty.textContent = 'No notifications yet.';
+            listEl.insertBefore(empty, staticEmpty || null);
+          } else {
+            notifications.forEach(function (item) {
+              const row = buildNotificationItem(item);
+              listEl.insertBefore(row, staticEmpty || null);
+            });
+          }
+
+          applyNotifyFilter(currentFilter);
+        };
+
         const applyNotifyFilter = function (filterKey) {
+          const items = notifyMenu.querySelectorAll('[data-notify-category]');
           let visible = 0;
           items.forEach(function (item) {
             const category = item.getAttribute('data-notify-category') || 'other';
             const show = filterKey === 'all' || category === filterKey;
-            item.hidden = !show;
+            item.classList.toggle('is-hidden', !show);
             if (show) visible += 1;
           });
           if (filteredEmpty) {
-            filteredEmpty.hidden = visible !== 0;
+            filteredEmpty.classList.toggle('is-hidden', visible !== 0);
           }
           filterButtons.forEach(function (button) {
             const active = button.getAttribute('data-notify-filter') === filterKey;
             button.classList.toggle('is-active', active);
           });
+          currentFilter = filterKey;
         };
+
+        const fetchFeed = function () {
+          if (!feedUrl || isFetching) {
+            return;
+          }
+
+          isFetching = true;
+          fetch(feedUrl, {
+            method: 'GET',
+            headers: {
+              'Accept': 'application/json',
+              'X-Requested-With': 'XMLHttpRequest'
+            },
+            credentials: 'same-origin'
+          })
+            .then(function (response) {
+              if (!response.ok) {
+                throw new Error('Feed request failed');
+              }
+              return response.json();
+            })
+            .then(function (data) {
+              notifications = Array.isArray(data && data.notifications) ? data.notifications : [];
+              renderNotifications();
+              updateUnreadBadge(Number(data && data.unread_count ? data.unread_count : 0));
+            })
+            .catch(function () {
+            })
+            .finally(function () {
+              isFetching = false;
+            });
+        };
+
+        const markRead = function (notificationId, onDone) {
+          const id = String(notificationId || '').trim();
+          if (id === '' || !readUrlTemplate || !csrfToken) {
+            if (typeof onDone === 'function') onDone();
+            return;
+          }
+
+          const url = readUrlTemplate.replace('__ID__', encodeURIComponent(id));
+          fetch(url, {
+            method: 'POST',
+            headers: {
+              'Accept': 'application/json',
+              'Content-Type': 'application/json',
+              'X-CSRF-TOKEN': csrfToken,
+              'X-Requested-With': 'XMLHttpRequest'
+            },
+            credentials: 'same-origin',
+            body: JSON.stringify({})
+          })
+            .then(function (response) {
+              if (!response.ok) {
+                throw new Error('Read request failed');
+              }
+              return response.json();
+            })
+            .then(function (data) {
+              const index = notifications.findIndex(function (row) { return String(row.id) === id; });
+              if (index >= 0) {
+                notifications[index].is_unread = false;
+              }
+              renderNotifications();
+              updateUnreadBadge(Number(data && data.unread_count ? data.unread_count : 0));
+            })
+            .catch(function () {
+            })
+            .finally(function () {
+              if (typeof onDone === 'function') onDone();
+            });
+        };
+
+        if (markAllBtn) {
+          markAllBtn.addEventListener('click', function () {
+            if (!readAllUrl || !csrfToken) {
+              return;
+            }
+
+            fetch(readAllUrl, {
+              method: 'POST',
+              headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': csrfToken,
+                'X-Requested-With': 'XMLHttpRequest'
+              },
+              credentials: 'same-origin',
+              body: JSON.stringify({})
+            })
+              .then(function (response) {
+                if (!response.ok) {
+                  throw new Error('Read all request failed');
+                }
+                return response.json();
+              })
+              .then(function () {
+                notifications = notifications.map(function (row) {
+                  row.is_unread = false;
+                  return row;
+                });
+                renderNotifications();
+                updateUnreadBadge(0);
+              })
+              .catch(function () {
+              });
+          });
+        }
+
+        notifyMenu.addEventListener('click', function (event) {
+          const openLink = event.target.closest('[data-notify-open]');
+          if (openLink) {
+            const row = openLink.closest('[data-notify-id]');
+            const notifyId = row ? row.getAttribute('data-notify-id') : '';
+            if (notifyId) {
+              event.preventDefault();
+              const href = openLink.getAttribute('href') || '';
+              markRead(notifyId, function () {
+                if (href !== '') {
+                  window.location.href = href;
+                }
+              });
+            }
+            return;
+          }
+
+          const row = event.target.closest('[data-notify-id]');
+          if (!row) {
+            return;
+          }
+
+          if (event.target.closest('a,button,form')) {
+            return;
+          }
+
+          const notifyId = row.getAttribute('data-notify-id') || '';
+          if (notifyId && row.classList.contains('is-unread')) {
+            markRead(notifyId);
+          }
+        });
 
         filterButtons.forEach(function (button) {
           button.addEventListener('click', function () {
@@ -326,7 +565,8 @@
           notifyMenu.hidden = !open;
           notifyToggle.setAttribute('aria-expanded', String(open));
           if (open) {
-            applyNotifyFilter('all');
+            fetchFeed();
+            applyNotifyFilter(currentFilter || 'all');
           }
         });
         document.addEventListener('click', function (event) {
@@ -335,6 +575,9 @@
             notifyToggle.setAttribute('aria-expanded', 'false');
           }
         });
+
+        fetchFeed();
+        window.setInterval(fetchFeed, 15000);
       }
     })();
   </script>

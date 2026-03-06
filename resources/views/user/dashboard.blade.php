@@ -86,6 +86,101 @@
 </section>
 
 <section class="panel-card">
+  <h2 class="panel-section-title">Project Gallery & Delivery</h2>
+  <div class="panel-stack">
+    @forelse($client->projects as $project)
+      @php
+        $galleryItems = $project->media->whereIn('type', ['image', 'video'])->values();
+        $finalZipItems = $project->media->where('type', 'final_zip')->values();
+        $isPaid = $project->invoices->contains(fn($invoice) => $invoice->status === 'paid');
+        $projectGalleryPayload = $galleryPayloadByProject[$project->id] ?? [];
+      @endphp
+      <article class="panel-card">
+        <x-project-media-summary
+          :project="$project"
+          :gallery-count="$galleryItems->count()"
+          :zip-count="$finalZipItems->count()"
+          :is-paid="$isPaid"
+        />
+
+        @if($galleryItems->isEmpty() && $finalZipItems->isEmpty())
+          <p class="panel-muted">No delivery files yet.</p>
+        @endif
+
+        @if($galleryItems->isNotEmpty())
+          <div class="panel-form-row" style="margin-bottom: 0.75rem;">
+            @if($isPaid)
+              <a class="panel-btn panel-btn-primary" href="{{ route('user.projects.media.download-zip', $project) }}">Download Gallery ZIP</a>
+            @else
+              <button class="panel-btn panel-btn-primary" type="button" disabled>Download Gallery ZIP (Locked until paid)</button>
+            @endif
+            <button
+              class="panel-btn panel-btn-primary"
+              type="button"
+              data-gallery-open
+              data-project-id="{{ $project->id }}"
+              data-gallery-items='@json($projectGalleryPayload)'
+            >
+              Open Gallery Viewer
+            </button>
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px;">
+            @foreach($galleryItems as $item)
+              @php
+                $previewUrl = route('user.projects.media.preview', ['project' => $project, 'media' => $item]);
+              @endphp
+              <div class="panel-card" style="position: relative;">
+                @if($item->type === 'image')
+                  <img src="{{ $previewUrl }}" alt="{{ $item->original_name }}" style="width: 100%; max-height: 180px; object-fit: cover; border-radius: 6px;">
+                @else
+                  <video controls style="width: 100%; max-height: 180px; border-radius: 6px;">
+                    <source src="{{ $previewUrl }}" type="{{ $item->mime_type ?: 'video/mp4' }}">
+                  </video>
+                @endif
+
+                @if(!$isPaid)
+                  <div class="panel-badge" style="position: absolute; top: 8px; left: 8px; z-index: 10;">WATERMARK PREVIEW</div>
+                @endif
+
+                <div class="panel-form-row" style="margin-top: 0.5rem; justify-content: space-between;">
+                  <span class="panel-muted" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 65%;">{{ $item->original_name }}</span>
+                  @if($isPaid)
+                    <a class="panel-link" href="{{ route('user.projects.media.download', ['project' => $project, 'media' => $item]) }}">Download</a>
+                  @else
+                    <span class="panel-muted">Locked</span>
+                  @endif
+                </div>
+              </div>
+            @endforeach
+          </div>
+        @endif
+
+        @if($finalZipItems->isNotEmpty())
+          <div class="panel-stack" style="margin-top: 0.75rem;">
+            <h4 class="panel-section-title">Final Delivery ZIP</h4>
+            @foreach($finalZipItems as $zipItem)
+              <div class="panel-form-row" style="justify-content: space-between;">
+                <span>{{ $zipItem->original_name }}</span>
+                @if($isPaid)
+                  <a class="panel-link" href="{{ route('user.projects.media.download', ['project' => $project, 'media' => $zipItem]) }}">Download ZIP</a>
+                @else
+                  <span class="panel-muted">Locked until paid</span>
+                @endif
+              </div>
+            @endforeach
+          </div>
+        @endif
+      </article>
+    @empty
+      <p class="panel-muted">No project gallery available.</p>
+    @endforelse
+  </div>
+</section>
+
+<x-panel-gallery-viewer modal-id="client-media-gallery-viewer" open-selector="[data-gallery-open]" title-default="Gallery Viewer" />
+
+<section class="panel-card">
   <h2 class="panel-section-title">Your Invoices</h2>
   <div class="panel-table-wrap">
     <table class="panel-table">

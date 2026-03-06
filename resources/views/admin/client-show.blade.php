@@ -55,7 +55,58 @@
           </tbody>
         </table>
       </div>
+
+      <div class="panel-stack" style="margin-top: 1rem;">
+        <h3 class="panel-section-title">Project Media Delivery</h3>
+        @forelse($client->projects as $project)
+          @php
+            $galleryCount = $project->media->whereIn('type', ['image', 'video'])->count();
+            $deliveryZipCount = $project->media->where('type', 'final_zip')->count();
+            $isPaid = $project->invoices->contains(fn($invoice) => $invoice->status === 'paid');
+          @endphp
+          <article class="panel-card">
+            <h4 class="panel-section-title">{{ $project->title }}</h4>
+            <p class="panel-muted">Gallery: {{ $galleryCount }} file(s) | Final ZIP: {{ $deliveryZipCount }} | Payment: {{ $isPaid ? 'Paid' : 'Unpaid' }}</p>
+
+            <form method="post" action="{{ route('admin.projects.media.store', $project) }}" class="panel-stack" enctype="multipart/form-data">
+              @csrf
+              <label class="panel-muted">Upload Gallery Images/Videos (multiple)</label>
+              <input class="panel-input" type="file" name="media_files[]" accept="image/*,video/*" multiple required>
+              <button class="panel-btn panel-btn-primary" type="submit">Upload to Gallery</button>
+            </form>
+
+            <form method="post" action="{{ route('admin.projects.delivery-zip.store', $project) }}" class="panel-stack" enctype="multipart/form-data">
+              @csrf
+              <label class="panel-muted">Upload Final Delivery ZIP</label>
+              <input class="panel-input" type="file" name="delivery_zip" accept=".zip,application/zip" required>
+              <button class="panel-btn" type="submit">Upload Final ZIP</button>
+            </form>
+
+            <div class="panel-stack" style="margin-top: 0.75rem;">
+              <h5 class="panel-section-title">Uploaded Files</h5>
+              @forelse($project->media as $mediaItem)
+                <div class="panel-form-row" style="justify-content: space-between;">
+                  <span><strong>{{ strtoupper($mediaItem->type) }}</strong> — {{ $mediaItem->original_name }}</span>
+                  <div class="panel-form-row" style="margin-bottom: 0;">
+                    <a class="panel-link" href="{{ route('admin.projects.media.view', ['project' => $project, 'media' => $mediaItem]) }}" target="_blank" rel="noopener">View file</a>
+                    <form method="post" action="{{ route('admin.projects.media.delete', ['project' => $project, 'media' => $mediaItem]) }}" data-delete-form data-delete-name="{{ $mediaItem->original_name }}">
+                      @csrf
+                      <button class="panel-btn" type="button" data-delete-trigger>Delete</button>
+                    </form>
+                  </div>
+                </div>
+              @empty
+                <p class="panel-muted">No uploaded media yet.</p>
+              @endforelse
+            </div>
+          </article>
+        @empty
+          <p class="panel-muted">Create a project first to upload gallery and delivery files.</p>
+        @endforelse
+      </div>
     </article>
+
+    <x-panel-delete-confirm-modal modal-id="client-media-delete-confirm-modal" trigger-selector="[data-delete-trigger]" title="Delete Media File" />
 
     <article class="panel-card">
       <h2 class="panel-section-title">Invoices</h2>
