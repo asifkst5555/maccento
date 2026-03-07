@@ -15,7 +15,7 @@
               <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
                 <tr>
                   <td align="left" style="vertical-align:middle;">
-                    <img src="{{ $brandLogoUrl }}" alt="{{ $brandName }}" style="height:25px; width:auto; display:block;" />
+                    <img src="{{ !empty($brandLogoCid) ? 'cid:' . $brandLogoCid : $brandLogoUrl }}" alt="{{ $brandName }}" style="height:25px; width:auto; display:block;" />
                   </td>
                 </tr>
               </table>

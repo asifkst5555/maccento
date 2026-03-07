@@ -6,6 +6,7 @@ use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
 use Illuminate\Queue\SerializesModels;
 use Symfony\Component\Mime\Email;
+use Symfony\Component\Mime\Part\DataPart;
 
 class BrandedNotificationMail extends Mailable
 {
@@ -31,6 +32,9 @@ class BrandedNotificationMail extends Mailable
 
     public function build(): self
     {
+        $logoPublicPath = public_path('assets/media/logo-footer.png');
+        $logoCid = file_exists($logoPublicPath) ? 'maccento-logo-footer' : null;
+
         $mail = $this
             ->subject($this->subjectLine)
             ->view('emails.branded-notification')
@@ -44,6 +48,7 @@ class BrandedNotificationMail extends Mailable
                 'ctaUrl' => $this->ctaUrl,
                 'footerNote' => $this->footerNote,
                 'brandName' => (string) config('app.name', 'Maccento'),
+                'brandLogoCid' => $logoCid,
                 'brandLogoUrl' => rtrim((string) config('app.url', ''), '/') . '/assets/media/logo-footer.png',
             ]);
 
@@ -51,8 +56,15 @@ class BrandedNotificationMail extends Mailable
             $mail->replyTo($this->replyToAddress);
         }
 
-        if ($this->emailLogId !== null || $this->threadProjectId !== null) {
-            $mail->withSymfonyMessage(function (Email $message): void {
+        $mail->withSymfonyMessage(function (Email $message) use ($logoPublicPath, $logoCid): void {
+            if ($logoCid !== null && file_exists($logoPublicPath)) {
+                $logoPart = DataPart::fromPath($logoPublicPath);
+                $logoPart->asInline();
+                $logoPart->setContentId($logoCid);
+                $message->addPart($logoPart);
+            }
+
+            if ($this->emailLogId !== null || $this->threadProjectId !== null) {
                 $smtpApiPayload = [
                     'unique_args' => array_filter([
                         'email_log_id' => $this->emailLogId !== null ? (string) $this->emailLogId : null,
@@ -62,8 +74,8 @@ class BrandedNotificationMail extends Mailable
                 ];
 
                 $message->getHeaders()->addTextHeader('X-SMTPAPI', (string) json_encode($smtpApiPayload, JSON_UNESCAPED_SLASHES));
-            });
-        }
+            }
+        });
 
         return $mail;
     }
