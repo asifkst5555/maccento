@@ -51,6 +51,8 @@ Route::middleware('auth')->group(function (): void {
         Route::get('/admin/leads-packages', [DashboardController::class, 'adminPackageLeadsIndex'])->name('admin.leads.packages.index');
         Route::get('/admin/quotes', [DashboardController::class, 'adminQuotesIndex'])->name('admin.quotes.index');
         Route::get('/admin/invoices', [DashboardController::class, 'adminInvoicesIndex'])->name('admin.invoices.index');
+        Route::get('/admin/emails', [DashboardController::class, 'adminEmailsIndex'])->name('admin.emails.index');
+        Route::post('/admin/emails/send', [DashboardController::class, 'adminEmailSend'])->name('admin.emails.send');
         Route::post('/admin/quotes/manual', [DashboardController::class, 'adminQuoteManualStore'])->name('admin.quotes.manual-store');
         Route::get('/admin/exports/leads.csv', [DashboardController::class, 'adminExportLeadsCsv'])->name('admin.exports.leads');
         Route::get('/admin/exports/quotes.csv', [DashboardController::class, 'adminExportQuotesCsv'])->name('admin.exports.quotes');

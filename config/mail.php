@@ -112,6 +112,8 @@ return [
         'name' => env('MAIL_FROM_NAME', 'Example'),
     ],
 
+    'lead_alert_address' => env('LEAD_ALERT_EMAIL', env('MAIL_FROM_ADDRESS', 'hello@example.com')),
+
     /*
     |--------------------------------------------------------------------------
     | Markdown Mail Settings

@@ -28,7 +28,7 @@ class SendLeadNotificationJob implements ShouldQueue
             return;
         }
 
-        $recipient = (string) config('mail.from.address');
+        $recipient = (string) config('mail.lead_alert_address');
         if ($recipient === '') {
             return;
         }

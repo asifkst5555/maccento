@@ -80,6 +80,10 @@
             <span class="panel-nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h9l5 5v13a1 1 0 0 1-1 1H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zm8 1.5V9h4.5M8 13h8m-8 3h8m-8-6h5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
             <span class="panel-nav-text">Invoices</span>
           </a>
+          <a class="panel-nav-link @if(request()->routeIs('admin.emails.*')) is-active @endif" href="{{ route('admin.emails.index') }}" title="Email Center">
+            <span class="panel-nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6zm2 .5V8l7 4.7L19 8V6.5l-7 4.6-7-4.6z" fill="currentColor"/></svg></span>
+            <span class="panel-nav-text">Email Center</span>
+          </a>
           @endif
 
           <p class="panel-nav-group-title">Delivery</p>

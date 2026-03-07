@@ -9,12 +9,14 @@ use App\Models\ClientMessage;
 use App\Models\ClientProject;
 use App\Models\ClientProjectMedia;
 use App\Models\ClientServiceRequest;
+use App\Models\EmailLog;
 use App\Models\FollowUp;
 use App\Models\LeadEvent;
 use App\Models\LeadProfile;
 use App\Models\PanelNotification;
 use App\Models\QuoteEvent;
 use App\Models\QuoteBuild;
+use App\Models\SendgridWebhookEvent;
 use App\Models\User;
 use App\Models\WatermarkSetting;
 use App\Models\WebsiteFormSubmission;
@@ -27,6 +29,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -950,6 +953,232 @@ class DashboardController extends Controller
                 'invoice_project_title' => $projectFilterTitle,
             ],
         ]);
+    }
+
+    public function adminEmailsIndex(Request $request): View
+    {
+        $this->ensurePipelineWriteAccess($request);
+
+        $defaultRecipient = (string) env('QUOTE_ADMIN_EMAIL', (string) config('mail.lead_alert_address', (string) config('mail.from.address')));
+
+        $quickTemplates = [
+            [
+                'key' => 'delivery_test',
+                'title' => 'Delivery Test',
+                'description' => 'Confirm SendGrid delivery and inbox routing in one click.',
+            ],
+            [
+                'key' => 'pipeline_snapshot',
+                'title' => 'Pipeline Snapshot',
+                'description' => 'Send a compact summary of leads, quotes, and invoices.',
+            ],
+            [
+                'key' => 'followup_digest',
+                'title' => 'Follow-up Digest',
+                'description' => 'Send an operational reminder focused on pending pipeline actions.',
+            ],
+        ];
+
+        $pipelineSummary = [
+            'leads_new' => LeadProfile::query()->where('status', 'new')->count(),
+            'leads_qualified' => LeadProfile::query()->where('status', 'qualified')->count(),
+            'quotes_new' => QuoteBuild::query()->where('status', 'new')->count(),
+            'quotes_booked' => QuoteBuild::query()->where('status', 'booked')->count(),
+            'invoices_overdue' => ClientInvoice::query()
+                ->where('status', '!=', 'paid')
+                ->whereNotNull('due_date')
+                ->whereDate('due_date', '<', now()->toDateString())
+                ->count(),
+        ];
+
+        try {
+            $emailLogs = EmailLog::query()
+                ->with('creator:id,name,email')
+                ->latest('id')
+                ->paginate(15)
+                ->withQueryString();
+
+            $timelineMap = collect();
+            $emailLogIds = $emailLogs->getCollection()->pluck('id')->values()->all();
+            if (count($emailLogIds) > 0) {
+                $timelineMap = SendgridWebhookEvent::query()
+                    ->whereIn('email_log_id', $emailLogIds)
+                    ->orderByDesc('occurred_at')
+                    ->orderByDesc('id')
+                    ->get()
+                    ->groupBy('email_log_id')
+                    ->map(static fn ($items) => $items->take(8)->values());
+            }
+        } catch (Throwable $exception) {
+            report($exception);
+            $emailLogs = new LengthAwarePaginator([], 0, 15, 1, [
+                'path' => $request->url(),
+                'query' => $request->query(),
+            ]);
+            $timelineMap = collect();
+        }
+
+        return view('admin.emails-index', [
+            'defaultRecipient' => $defaultRecipient,
+            'quickTemplates' => $quickTemplates,
+            'pipelineSummary' => $pipelineSummary,
+            'emailLogs' => $emailLogs,
+            'emailEventTimeline' => $timelineMap,
+        ]);
+    }
+
+    public function adminEmailSend(Request $request): RedirectResponse
+    {
+        $this->ensurePipelineWriteAccess($request);
+
+        $validated = $request->validate([
+            'mode' => ['required', 'in:template,custom'],
+            'recipient_email' => ['required', 'email', 'max:255'],
+            'reply_to' => ['nullable', 'email', 'max:255'],
+            'cc' => ['nullable', 'string', 'max:500'],
+            'bcc' => ['nullable', 'string', 'max:500'],
+            'template_key' => ['nullable', 'string', 'in:delivery_test,pipeline_snapshot,followup_digest'],
+            'subject' => ['nullable', 'string', 'max:180'],
+            'message' => ['nullable', 'string', 'max:10000'],
+        ]);
+
+        $recipient = trim((string) ($validated['recipient_email'] ?? ''));
+        $ccList = $this->parseEmailList((string) ($validated['cc'] ?? ''));
+        $bccList = $this->parseEmailList((string) ($validated['bcc'] ?? ''));
+
+        if (count($ccList['invalid']) > 0) {
+            return back()->withErrors(['cc' => 'Invalid CC email(s): ' . implode(', ', $ccList['invalid'])])->withInput();
+        }
+
+        if (count($bccList['invalid']) > 0) {
+            return back()->withErrors(['bcc' => 'Invalid BCC email(s): ' . implode(', ', $bccList['invalid'])])->withInput();
+        }
+
+        $subject = '';
+        $body = '';
+
+        if (($validated['mode'] ?? 'custom') === 'template') {
+            $template = $this->buildAdminEmailTemplate((string) ($validated['template_key'] ?? ''));
+            if ($template === null) {
+                return back()->withErrors(['template_key' => 'Please choose a valid quick-send template.'])->withInput();
+            }
+
+            $subject = $template['subject'];
+            $body = $template['body'];
+        } else {
+            $subject = trim((string) ($validated['subject'] ?? ''));
+            $body = trim((string) ($validated['message'] ?? ''));
+            if ($subject === '') {
+                return back()->withErrors(['subject' => 'Subject is required for custom emails.'])->withInput();
+            }
+            if ($body === '') {
+                return back()->withErrors(['message' => 'Message is required for custom emails.'])->withInput();
+            }
+        }
+
+        $emailLog = $this->createEmailLogEntry([
+            'created_by' => $request->user()?->id,
+            'mode' => (string) ($validated['mode'] ?? 'custom'),
+            'template_key' => (string) ($validated['template_key'] ?? ''),
+            'recipient_email' => $recipient,
+            'reply_to' => filled($validated['reply_to'] ?? null) ? (string) $validated['reply_to'] : null,
+            'cc' => count($ccList['valid']) > 0 ? implode(', ', $ccList['valid']) : null,
+            'bcc' => count($bccList['valid']) > 0 ? implode(', ', $bccList['valid']) : null,
+            'subject' => $subject,
+            'body_preview' => Str::limit($body, 700),
+            'status' => 'queued',
+            'error_message' => null,
+            'sent_at' => null,
+            'provider_status' => 'queued',
+        ]);
+
+        try {
+            Mail::raw($body, function ($message) use ($recipient, $subject, $validated, $ccList, $bccList, $emailLog): void {
+                $message->to($recipient)->subject($subject);
+
+                if (filled($validated['reply_to'] ?? null)) {
+                    $message->replyTo((string) $validated['reply_to']);
+                }
+
+                foreach ($ccList['valid'] as $ccEmail) {
+                    $message->cc($ccEmail);
+                }
+
+                foreach ($bccList['valid'] as $bccEmail) {
+                    $message->bcc($bccEmail);
+                }
+
+                if ($emailLog?->id) {
+                    $this->attachSendgridEmailLogHeader($message, (int) $emailLog->id);
+                }
+            });
+
+            $this->notificationService()->notifyInternal(
+                'admin_email_sent',
+                'CRM email sent',
+                "Email sent to {$recipient}: {$subject}",
+                route('admin.emails.index'),
+                ['recipient' => $recipient, 'subject' => $subject]
+            );
+
+            if ($emailLog !== null) {
+                $emailLog->forceFill([
+                    'status' => 'sent',
+                    'error_message' => null,
+                    'sent_at' => now(),
+                    'provider_status' => 'processed',
+                    'provider_last_event_at' => now(),
+                ])->save();
+            } else {
+                $this->createEmailLogEntry([
+                    'created_by' => $request->user()?->id,
+                    'mode' => (string) ($validated['mode'] ?? 'custom'),
+                    'template_key' => (string) ($validated['template_key'] ?? ''),
+                    'recipient_email' => $recipient,
+                    'reply_to' => filled($validated['reply_to'] ?? null) ? (string) $validated['reply_to'] : null,
+                    'cc' => count($ccList['valid']) > 0 ? implode(', ', $ccList['valid']) : null,
+                    'bcc' => count($bccList['valid']) > 0 ? implode(', ', $bccList['valid']) : null,
+                    'subject' => $subject,
+                    'body_preview' => Str::limit($body, 700),
+                    'status' => 'sent',
+                    'error_message' => null,
+                    'sent_at' => now(),
+                    'provider_status' => 'processed',
+                    'provider_last_event_at' => now(),
+                ]);
+            }
+        } catch (Throwable $exception) {
+            if ($emailLog !== null) {
+                $emailLog->forceFill([
+                    'status' => 'failed',
+                    'error_message' => Str::limit($exception->getMessage(), 500),
+                    'provider_status' => 'failed',
+                    'provider_last_event_at' => now(),
+                ])->save();
+            } else {
+                $this->createEmailLogEntry([
+                    'created_by' => $request->user()?->id,
+                    'mode' => (string) ($validated['mode'] ?? 'custom'),
+                    'template_key' => (string) ($validated['template_key'] ?? ''),
+                    'recipient_email' => $recipient,
+                    'reply_to' => filled($validated['reply_to'] ?? null) ? (string) $validated['reply_to'] : null,
+                    'cc' => count($ccList['valid']) > 0 ? implode(', ', $ccList['valid']) : null,
+                    'bcc' => count($bccList['valid']) > 0 ? implode(', ', $bccList['valid']) : null,
+                    'subject' => $subject,
+                    'body_preview' => Str::limit($body, 700),
+                    'status' => 'failed',
+                    'error_message' => Str::limit($exception->getMessage(), 500),
+                    'sent_at' => null,
+                    'provider_status' => 'failed',
+                    'provider_last_event_at' => now(),
+                ]);
+            }
+
+            report($exception);
+            return back()->withErrors(['recipient_email' => 'Email could not be sent. Please verify SendGrid and try again.'])->withInput();
+        }
+
+        return redirect()->route('admin.emails.index')->with('status', 'Email sent successfully.');
     }
 
     public function adminQuoteManualStore(Request $request): RedirectResponse
@@ -2571,6 +2800,162 @@ class DashboardController extends Controller
     private function notificationService(): PanelNotificationService
     {
         return app(PanelNotificationService::class);
+    }
+
+    /**
+     * @param array<string,mixed> $payload
+     */
+    private function createEmailLogEntry(array $payload): ?EmailLog
+    {
+        try {
+            return EmailLog::create([
+                'created_by' => $payload['created_by'] ?? null,
+                'mode' => (string) ($payload['mode'] ?? 'custom'),
+                'template_key' => blank($payload['template_key'] ?? null) ? null : (string) $payload['template_key'],
+                'recipient_email' => (string) ($payload['recipient_email'] ?? ''),
+                'reply_to' => blank($payload['reply_to'] ?? null) ? null : (string) $payload['reply_to'],
+                'cc' => blank($payload['cc'] ?? null) ? null : (string) $payload['cc'],
+                'bcc' => blank($payload['bcc'] ?? null) ? null : (string) $payload['bcc'],
+                'subject' => (string) ($payload['subject'] ?? ''),
+                'body_preview' => blank($payload['body_preview'] ?? null) ? null : (string) $payload['body_preview'],
+                'status' => (string) ($payload['status'] ?? 'sent'),
+                'error_message' => blank($payload['error_message'] ?? null) ? null : (string) $payload['error_message'],
+                'sent_at' => $payload['sent_at'] ?? null,
+                'provider_message_id' => blank($payload['provider_message_id'] ?? null) ? null : (string) $payload['provider_message_id'],
+                'provider_status' => blank($payload['provider_status'] ?? null) ? null : (string) $payload['provider_status'],
+                'provider_last_event_at' => $payload['provider_last_event_at'] ?? null,
+            ]);
+        } catch (Throwable $exception) {
+            report($exception);
+            return null;
+        }
+    }
+
+    private function attachSendgridEmailLogHeader($message, int $emailLogId): void
+    {
+        if (!method_exists($message, 'getSymfonyMessage')) {
+            return;
+        }
+
+        $symfonyMessage = $message->getSymfonyMessage();
+        if (!method_exists($symfonyMessage, 'getHeaders')) {
+            return;
+        }
+
+        $smtpApiPayload = [
+            'unique_args' => [
+                'email_log_id' => (string) $emailLogId,
+            ],
+            'category' => ['crm_email_center'],
+        ];
+
+        $symfonyMessage->getHeaders()->addTextHeader('X-SMTPAPI', (string) json_encode($smtpApiPayload, JSON_UNESCAPED_SLASHES));
+    }
+
+    /**
+     * @return array{subject:string,body:string}|null
+     */
+    private function buildAdminEmailTemplate(string $templateKey): ?array
+    {
+        $templateKey = strtolower(trim($templateKey));
+
+        if ($templateKey === 'delivery_test') {
+            return [
+                'subject' => 'Maccento CRM Delivery Test [' . now()->format('Y-m-d H:i') . ']',
+                'body' => implode("\n", [
+                    'This is a one-click delivery test from Maccento CRM.',
+                    '',
+                    'Mail transport is active and this inbox is receiving notifications.',
+                    'Environment: ' . config('app.env'),
+                    'Timestamp: ' . now()->toDateTimeString(),
+                ]),
+            ];
+        }
+
+        if ($templateKey === 'pipeline_snapshot') {
+            $newLeads = LeadProfile::query()->where('status', 'new')->count();
+            $qualifiedLeads = LeadProfile::query()->where('status', 'qualified')->count();
+            $newQuotes = QuoteBuild::query()->where('status', 'new')->count();
+            $bookedQuotes = QuoteBuild::query()->where('status', 'booked')->count();
+            $overdueInvoices = ClientInvoice::query()
+                ->where('status', '!=', 'paid')
+                ->whereNotNull('due_date')
+                ->whereDate('due_date', '<', now()->toDateString())
+                ->count();
+
+            return [
+                'subject' => 'Maccento Pipeline Snapshot - ' . now()->format('Y-m-d'),
+                'body' => implode("\n", [
+                    'Pipeline summary generated from CRM:',
+                    '',
+                    "New leads: {$newLeads}",
+                    "Qualified leads: {$qualifiedLeads}",
+                    "New quotes: {$newQuotes}",
+                    "Booked quotes: {$bookedQuotes}",
+                    "Overdue invoices: {$overdueInvoices}",
+                    '',
+                    'Review the CRM dashboard for detailed records and action items.',
+                ]),
+            ];
+        }
+
+        if ($templateKey === 'followup_digest') {
+            $dueFollowUps = FollowUp::query()
+                ->where('status', 'pending')
+                ->whereDate('due_at', '<=', now()->toDateString())
+                ->count();
+            $reviewedQuotes = QuoteBuild::query()->where('status', 'reviewed')->count();
+            $contactedQuotes = QuoteBuild::query()->where('status', 'contacted')->count();
+
+            return [
+                'subject' => 'Maccento Follow-up Digest - ' . now()->format('Y-m-d'),
+                'body' => implode("\n", [
+                    'Operational follow-up digest:',
+                    '',
+                    "Pending follow-ups due: {$dueFollowUps}",
+                    "Quotes in reviewed stage: {$reviewedQuotes}",
+                    "Quotes in contacted stage: {$contactedQuotes}",
+                    '',
+                    'Please prioritize overdue follow-ups first, then reviewed quotes.',
+                ]),
+            ];
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array{valid:array<int,string>,invalid:array<int,string>}
+     */
+    private function parseEmailList(string $value): array
+    {
+        $value = trim($value);
+        if ($value === '') {
+            return ['valid' => [], 'invalid' => []];
+        }
+
+        $items = preg_split('/[,;\s]+/', $value) ?: [];
+        $valid = [];
+        $invalid = [];
+
+        foreach ($items as $item) {
+            $email = trim((string) $item);
+            if ($email === '') {
+                continue;
+            }
+
+            if (filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                $valid[] = $email;
+                continue;
+            }
+
+            $invalid[] = $email;
+        }
+
+        return [
+            'valid' => array_values(array_unique($valid)),
+            'invalid' => array_values(array_unique($invalid)),
+        ];
     }
 
     private function csvSafe(?string $value): string

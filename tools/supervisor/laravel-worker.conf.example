@@ -1,0 +1,12 @@
+[program:maccento-queue-worker]
+process_name=%(program_name)s_%(process_num)02d
+command=/usr/bin/php /var/www/maccento/artisan queue:work database --queue=default --sleep=2 --tries=3 --timeout=120 --max-time=3600
+autostart=true
+autorestart=true
+stopasgroup=true
+killasgroup=true
+user=www-data
+numprocs=1
+redirect_stderr=true
+stdout_logfile=/var/www/maccento/storage/logs/worker.log
+stopwaitsecs=3600
