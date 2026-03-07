@@ -77,10 +77,10 @@
           </td>
           <td>{{ $quote->submitted_at?->format('Y-m-d H:i') ?: '-' }}</td>
           <td>
-            <a class="panel-link" href="{{ route('admin.quotes.show', $quote) }}">Open</a>
+            <a class="panel-link panel-btn-icon" href="{{ route('admin.quotes.show', $quote) }}" title="Open quote" aria-label="Open quote"><span class="panel-icon" aria-hidden="true"><svg viewBox="0 0 20 20"><path d="M4 10h12M10 4l6 6-6 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span></a>
             <form method="post" action="{{ route('admin.quotes.delete', $quote) }}" style="display:inline-block; margin-left:8px;" onsubmit="return confirm('Delete this quote?');">
               @csrf
-              <button class="panel-btn panel-btn-danger" type="submit">Delete</button>
+              <button class="panel-btn panel-btn-danger panel-btn-icon" type="submit" title="Delete quote" aria-label="Delete quote"><span class="panel-icon-trash" aria-hidden="true"><svg viewBox="0 0 20 20"><path d="M5 6h10M8 6V4h4v2m-6 0l.5 9h7L14 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span></button>
             </form>
           </td>
         </tr>

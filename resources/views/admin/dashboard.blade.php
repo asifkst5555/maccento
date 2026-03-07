@@ -9,6 +9,14 @@
   $managerMode = (bool) ($widgetVisibility['is_manager'] ?? false);
 @endphp
 
+<section class="dashboard-v2 panel-stack dashboard-density-compact">
+
+<div class="dash-density-toggle" role="group" aria-label="Dashboard view density">
+  <span class="dash-density-label">View</span>
+  <button type="button" class="dash-density-btn" data-density="premium">Premium</button>
+  <button type="button" class="dash-density-btn is-active" data-density="compact">Compact</button>
+</div>
+
 @if($managerMode)
 <section class="panel-card panel-alert-strip">
   <span class="panel-badge">Manager Mode</span>
@@ -266,5 +274,335 @@
     </table>
   </div>
 </section>
+
+</section>
+
+<style>
+.dashboard-v2 {
+  --dash-line: #d6e1f0;
+  --dash-soft: #f5f9ff;
+  --dash-soft-2: #fbfdff;
+  --dash-ink: #102845;
+  --dash-muted: #607797;
+  gap: 16px;
+}
+
+.dashboard-v2.dashboard-density-premium {
+  gap: 18px;
+}
+
+.dashboard-v2.dashboard-density-compact {
+  gap: 12px;
+}
+
+.dashboard-v2 .dash-density-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px;
+  border: 1px solid #d7e3f2;
+  border-radius: 999px;
+  background: #ffffff;
+  box-shadow: 0 4px 14px rgba(16, 34, 62, .08);
+}
+
+.dashboard-v2 .dash-density-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--dash-muted);
+  padding: 0 8px;
+}
+
+.dashboard-v2 .dash-density-btn {
+  border: 0;
+  background: transparent;
+  border-radius: 999px;
+  padding: 6px 11px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #355074;
+  cursor: pointer;
+  transition: background-color .15s ease, color .15s ease;
+}
+
+.dashboard-v2 .dash-density-btn.is-active {
+  background: #eaf2ff;
+  color: #102845;
+}
+
+.dashboard-v2 .panel-grid {
+  gap: 14px;
+}
+
+.dashboard-v2.dashboard-density-premium .panel-grid {
+  gap: 16px;
+}
+
+.dashboard-v2.dashboard-density-compact .panel-grid {
+  gap: 10px;
+}
+
+.dashboard-v2 .panel-card {
+  border-color: var(--dash-line);
+  border-radius: 14px;
+  box-shadow: 0 12px 26px rgba(16, 34, 62, .06);
+  background: linear-gradient(180deg, #ffffff 0%, var(--dash-soft-2) 100%);
+}
+
+.dashboard-v2.dashboard-density-premium .panel-card {
+  border-radius: 15px;
+}
+
+.dashboard-v2.dashboard-density-compact .panel-card {
+  border-radius: 11px;
+  box-shadow: 0 8px 18px rgba(16, 34, 62, .05);
+}
+
+.dashboard-v2 .panel-grid-kpi {
+  align-items: stretch;
+  grid-template-columns: repeat(auto-fit, minmax(165px, 1fr));
+}
+
+.dashboard-v2 .panel-grid-kpi > .panel-card {
+  min-height: 112px;
+  padding: 11px 13px;
+  display: grid;
+  align-content: space-between;
+  gap: 9px;
+  border: 1px solid #d7e3f2;
+  background: linear-gradient(180deg, #ffffff 0%, #f6faff 100%);
+}
+
+.dashboard-v2.dashboard-density-premium .panel-grid-kpi > .panel-card {
+  min-height: 118px;
+  padding: 12px 14px;
+}
+
+.dashboard-v2.dashboard-density-compact .panel-grid-kpi > .panel-card {
+  min-height: 96px;
+  padding: 8px 10px;
+  gap: 6px;
+}
+
+.dashboard-v2 .panel-kpi-label {
+  margin: 0;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: .015em;
+  line-height: 1.25;
+  color: var(--dash-muted);
+}
+
+.dashboard-v2.dashboard-density-compact .panel-kpi-label {
+  font-size: 10.5px;
+  line-height: 1.2;
+}
+
+.dashboard-v2 .panel-kpi-value {
+  margin: 0;
+  font-size: 32px;
+  line-height: 1.05;
+  letter-spacing: -.01em;
+  color: var(--dash-ink);
+}
+
+.dashboard-v2.dashboard-density-premium .panel-kpi-value {
+  font-size: 34px;
+}
+
+.dashboard-v2.dashboard-density-compact .panel-kpi-value {
+  font-size: 27px;
+  line-height: 1;
+}
+
+.dashboard-v2 .panel-section-title {
+  margin-bottom: 10px;
+  font-size: 30px;
+  line-height: 1.15;
+  letter-spacing: -.015em;
+  color: var(--dash-ink);
+}
+
+.dashboard-v2.dashboard-density-premium .panel-section-title {
+  margin-bottom: 12px;
+}
+
+.dashboard-v2.dashboard-density-compact .panel-section-title {
+  font-size: 24px;
+  line-height: 1.1;
+  margin-bottom: 7px;
+}
+
+.dashboard-v2 .panel-alert-strip {
+  border-style: solid;
+  border-color: #d7e3f2;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+}
+
+.dashboard-v2 .panel-form-row {
+  margin-bottom: 10px;
+}
+
+.dashboard-v2 .panel-sticky-filters {
+  margin-bottom: 8px;
+}
+
+.dashboard-v2 .panel-table-wrap {
+  border: 1px solid #dbe5f2;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.dashboard-v2 .panel-table th,
+.dashboard-v2 .panel-table td {
+  padding-top: 9px;
+  padding-bottom: 9px;
+}
+
+.dashboard-v2.dashboard-density-compact .panel-table th,
+.dashboard-v2.dashboard-density-compact .panel-table td {
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+
+.dashboard-v2 .panel-table th {
+  font-size: 11px;
+  letter-spacing: .055em;
+}
+
+.dashboard-v2 .panel-table td {
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.dashboard-v2.dashboard-density-compact .panel-table td {
+  font-size: 12px;
+  line-height: 1.25;
+}
+
+.dashboard-v2 .panel-chart-grid {
+  gap: 12px;
+}
+
+.dashboard-v2 .panel-chart-grid > .panel-card {
+  min-height: 100%;
+}
+
+.dashboard-v2 .panel-line-chart {
+  border: 1px solid #dbe5f2;
+  border-radius: 12px;
+  padding: 10px;
+  background: #fff;
+}
+
+.dashboard-v2.dashboard-density-premium .panel-line-chart {
+  padding: 12px;
+}
+
+.dashboard-v2.dashboard-density-compact .panel-line-chart {
+  padding: 8px;
+}
+
+.dashboard-v2 .panel-chart-row {
+  grid-template-columns: 76px 1fr 46px;
+  gap: 9px;
+}
+
+.dashboard-v2.dashboard-density-compact .panel-chart-row {
+  grid-template-columns: 66px 1fr 38px;
+  gap: 6px;
+}
+
+.dashboard-v2 .panel-chart-label {
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.dashboard-v2.dashboard-density-compact .panel-chart-label {
+  font-size: 10px;
+}
+
+.dashboard-v2 .panel-chart-value {
+  font-weight: 700;
+}
+
+@media (max-width: 1200px) {
+  .dashboard-v2 .panel-chart-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 860px) {
+  .dashboard-v2 .panel-chart-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-v2 .panel-grid-kpi {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dashboard-v2 .panel-grid-kpi > .panel-card {
+    min-height: 98px;
+  }
+
+  .dashboard-v2 .panel-kpi-value {
+    font-size: 27px;
+  }
+}
+
+@media (max-width: 700px) {
+  .dashboard-v2 .dash-density-toggle {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .dashboard-v2 .dash-density-label {
+    padding-left: 6px;
+  }
+}
+
+@media (max-width: 560px) {
+  .dashboard-v2 .panel-grid-kpi {
+    grid-template-columns: 1fr;
+  }
+}
+</style>
+
+<script>
+(() => {
+  const root = document.querySelector('.dashboard-v2');
+  if (!root) {
+    return;
+  }
+
+  const buttons = root.querySelectorAll('.dash-density-btn[data-density]');
+  if (!buttons.length) {
+    return;
+  }
+
+  const applyDensity = (mode) => {
+    const resolved = mode === 'compact' ? 'compact' : 'premium';
+    root.classList.remove('dashboard-density-compact', 'dashboard-density-premium');
+    root.classList.add(`dashboard-density-${resolved}`);
+
+    buttons.forEach((btn) => {
+      const active = btn.dataset.density === resolved;
+      btn.classList.toggle('is-active', active);
+      btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+    });
+  };
+
+  applyDensity('compact');
+
+  buttons.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const next = btn.dataset.density === 'compact' ? 'compact' : 'premium';
+      applyDensity(next);
+    });
+  });
+})();
+</script>
 
 @endsection

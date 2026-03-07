@@ -115,7 +115,7 @@
         <h2 class="panel-section-title">Danger Zone</h2>
         <form method="post" action="{{ route('admin.leads.delete', $lead) }}" onsubmit="return confirm('Delete this lead permanently?');">
           @csrf
-          <button class="panel-btn panel-btn-danger" type="submit">Delete lead</button>
+          <button class="panel-btn panel-btn-danger panel-btn-icon" type="submit" title="Delete lead" aria-label="Delete lead"><span class="panel-icon-trash" aria-hidden="true"><svg viewBox="0 0 20 20"><path d="M5 6h10M8 6V4h4v2m-6 0l.5 9h7L14 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span></button>
         </form>
       </article>
       @endif

@@ -1269,6 +1269,24 @@ class DashboardController extends Controller
         return redirect()->route('admin.emails.drafts')->with('status', 'Draft deleted.');
     }
 
+    public function adminEmailInboxDelete(Request $request, InboundEmail $inbound): RedirectResponse
+    {
+        $this->ensurePipelineWriteAccess($request);
+
+        $inbound->delete();
+
+        return redirect()->route('admin.emails.inbox')->with('status', 'Inbox email deleted.');
+    }
+
+    public function adminEmailSentDelete(Request $request, EmailLog $emailLog): RedirectResponse
+    {
+        $this->ensurePipelineWriteAccess($request);
+
+        $emailLog->delete();
+
+        return redirect()->route('admin.emails.sent')->with('status', 'Sent email deleted.');
+    }
+
     public function adminEmailDraftSend(Request $request, EmailDraft $draft): RedirectResponse
     {
         $this->ensurePipelineWriteAccess($request);

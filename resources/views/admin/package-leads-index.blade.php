@@ -47,7 +47,7 @@
           <td><span class="panel-badge">{{ $lead->status }}</span></td>
           <td>{{ $lead->score }}</td>
           <td><span class="panel-badge">{{ $lead->conversation?->channel ?: 'package_builder' }}</span></td>
-          <td><a class="panel-link" href="{{ route('admin.leads.show', $lead) }}">Open</a></td>
+          <td><a class="panel-link panel-btn-icon" href="{{ route('admin.leads.show', $lead) }}" title="Open lead" aria-label="Open lead"><span class="panel-icon" aria-hidden="true"><svg viewBox="0 0 20 20"><path d="M4 10h12M10 4l6 6-6 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span></a></td>
         </tr>
         @empty
         <tr><td colspan="8" class="panel-muted">No package leads yet.</td></tr>

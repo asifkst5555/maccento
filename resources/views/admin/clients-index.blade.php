@@ -55,10 +55,10 @@
           <td>{{ $client->invoices_count }}</td>
           <td>{{ $client->service_requests_count }}</td>
           <td>
-            <a class="panel-link" href="{{ route('admin.clients.show', $client) }}">Open</a>
+            <a class="panel-link panel-btn-icon" href="{{ route('admin.clients.show', $client) }}" title="Open client" aria-label="Open client"><span class="panel-icon" aria-hidden="true"><svg viewBox="0 0 20 20"><path d="M4 10h12M10 4l6 6-6 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span></a>
             <form method="post" action="{{ route('admin.clients.delete', $client) }}" style="display:inline-block; margin-left:8px;" onsubmit="return confirm('Delete this client? This will remove related projects, invoices, messages, and requests.');">
               @csrf
-              <button class="panel-btn panel-btn-danger" type="submit">Delete</button>
+              <button class="panel-btn panel-btn-danger panel-btn-icon" type="submit" title="Delete client" aria-label="Delete client"><span class="panel-icon-trash" aria-hidden="true"><svg viewBox="0 0 20 20"><path d="M5 6h10M8 6V4h4v2m-6 0l.5 9h7L14 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span></button>
             </form>
           </td>
         </tr>

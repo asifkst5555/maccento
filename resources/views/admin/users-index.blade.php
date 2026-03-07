@@ -55,7 +55,7 @@
             @if((int) auth()->id() !== (int) $user->id)
             <form method="post" action="{{ route('admin.users.delete', $user) }}" onsubmit="return confirm('Delete this user account?');">
               @csrf
-              <button class="panel-btn panel-btn-danger" type="submit">Delete</button>
+              <button class="panel-btn panel-btn-danger panel-btn-icon" type="submit" title="Delete user account" aria-label="Delete user account"><span class="panel-icon-trash" aria-hidden="true"><svg viewBox="0 0 20 20"><path d="M5 6h10M8 6V4h4v2m-6 0l.5 9h7L14 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span></button>
             </form>
             @else
             <span class="panel-badge">Current user</span>

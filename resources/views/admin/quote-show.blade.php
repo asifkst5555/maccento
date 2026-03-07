@@ -76,7 +76,7 @@
     <hr class="panel-hr">
     <form method="post" action="{{ route('admin.quotes.delete', $quote) }}" onsubmit="return confirm('Delete this quote? This action cannot be undone.');">
       @csrf
-      <button class="panel-btn panel-btn-danger" type="submit">Delete quote</button>
+      <button class="panel-btn panel-btn-danger panel-btn-icon" type="submit" title="Delete quote" aria-label="Delete quote"><span class="panel-icon-trash" aria-hidden="true"><svg viewBox="0 0 20 20"><path d="M5 6h10M8 6V4h4v2m-6 0l.5 9h7L14 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span></button>
     </form>
     @else
     <p class="panel-muted">Read only access. Quote update actions are available for owner/admin/manager roles.</p>

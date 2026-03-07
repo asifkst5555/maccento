@@ -25,7 +25,7 @@
 
     <div class="panel-modal-foot" style="gap:10px;">
       <button class="panel-btn" type="button" data-delete-close>Cancel</button>
-      <button class="panel-btn panel-btn-primary" type="button" id="{{ $confirmId }}">Delete File</button>
+      <button class="panel-btn panel-btn-danger panel-btn-icon" type="button" id="{{ $confirmId }}" title="Confirm delete" aria-label="Confirm delete"><span class="panel-icon-trash" aria-hidden="true"><svg viewBox="0 0 20 20"><path d="M5 6h10M8 6V4h4v2m-6 0l.5 9h7L14 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span></button>
     </div>
   </div>
 </div>

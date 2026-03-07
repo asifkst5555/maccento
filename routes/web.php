@@ -63,6 +63,8 @@ Route::middleware('auth')->group(function (): void {
         Route::post('/admin/emails/drafts/save', [DashboardController::class, 'adminEmailDraftStore'])->name('admin.emails.drafts.save');
         Route::post('/admin/emails/drafts/{draft}/send', [DashboardController::class, 'adminEmailDraftSend'])->name('admin.emails.drafts.send');
         Route::post('/admin/emails/drafts/{draft}/delete', [DashboardController::class, 'adminEmailDraftDelete'])->name('admin.emails.drafts.delete');
+        Route::post('/admin/emails/inbox/{inbound}/delete', [DashboardController::class, 'adminEmailInboxDelete'])->name('admin.emails.inbox.delete');
+        Route::post('/admin/emails/sent/{emailLog}/delete', [DashboardController::class, 'adminEmailSentDelete'])->name('admin.emails.sent.delete');
         Route::post('/admin/quotes/manual', [DashboardController::class, 'adminQuoteManualStore'])->name('admin.quotes.manual-store');
         Route::get('/admin/exports/leads.csv', [DashboardController::class, 'adminExportLeadsCsv'])->name('admin.exports.leads');
         Route::get('/admin/exports/quotes.csv', [DashboardController::class, 'adminExportQuotesCsv'])->name('admin.exports.quotes');

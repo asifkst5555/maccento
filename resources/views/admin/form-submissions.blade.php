@@ -29,7 +29,7 @@
           <td>{{ $submission->service ?: '-' }}</td>
           <td>{{ $submission->region ?: '-' }}</td>
           <td><span class="panel-badge">{{ $submission->status }}</span></td>
-          <td><a class="panel-link" href="{{ route('admin.form-submissions.show', $submission) }}">Open</a></td>
+          <td><a class="panel-link panel-btn-icon" href="{{ route('admin.form-submissions.show', $submission) }}" title="Open submission" aria-label="Open submission"><span class="panel-icon" aria-hidden="true"><svg viewBox="0 0 20 20"><path d="M4 10h12M10 4l6 6-6 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span></a></td>
         </tr>
         @empty
         <tr><td colspan="8" class="panel-muted">No submissions.</td></tr>

@@ -46,17 +46,17 @@
           <td><span class="panel-badge">{{ $lead->status }}</span></td>
           <td>{{ $lead->score }}</td>
           <td>
-            <a class="panel-link" href="{{ route('admin.leads.show', $lead) }}">Open</a>
+            <a class="panel-link panel-btn-icon" href="{{ route('admin.leads.show', $lead) }}" title="Open lead" aria-label="Open lead"><span class="panel-icon" aria-hidden="true"><svg viewBox="0 0 20 20"><path d="M4 10h12M10 4l6 6-6 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span></a>
             @if(!blank($lead->email))
-            <a class="panel-link" style="margin-left:8px;" href="{{ route('admin.emails.inbox', ['compose_to' => $lead->email, 'compose_subject' => 'Follow-up from Maccento CRM', 'compose_message' => 'Hi ' . ($lead->name ?: 'there') . ",\n\nThanks for your interest in Maccento. We would love to help you move forward.\n\nBest regards,\n" . (auth()->user()->name ?? 'Maccento Team'), 'lead_id' => $lead->id, 'recipient_name' => $lead->name, 'compose_template' => 'cold_followup', 'compose_goal' => 'Send a short warm follow-up and ask for a 10-minute call this week.']) }}">Email</a>
+            <a class="panel-link panel-btn-icon" style="margin-left:8px;" href="{{ route('admin.emails.inbox', ['compose_to' => $lead->email, 'compose_subject' => 'Follow-up from Maccento CRM', 'compose_message' => 'Hi ' . ($lead->name ?: 'there') . ",\n\nThanks for your interest in Maccento. We would love to help you move forward.\n\nBest regards,\n" . (auth()->user()->name ?? 'Maccento Team'), 'lead_id' => $lead->id, 'recipient_name' => $lead->name, 'compose_template' => 'cold_followup', 'compose_goal' => 'Send a short warm follow-up and ask for a 10-minute call this week.']) }}" title="Email lead" aria-label="Email lead"><span class="panel-icon" aria-hidden="true"><svg viewBox="0 0 20 20"><path d="M3.5 5.5h13v9h-13v-9zm0 0L10 10l6.5-4.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span></a>
             <form method="post" action="{{ route('admin.leads.email.send', $lead) }}" style="display:inline-block; margin-left:8px;" onsubmit="return confirm('Send quick follow-up email to this lead?');">
               @csrf
-              <button class="panel-btn" type="submit">Quick Send</button>
+              <button class="panel-btn panel-btn-icon" type="submit" title="Quick send" aria-label="Quick send"><span class="panel-icon" aria-hidden="true"><svg viewBox="0 0 20 20"><path d="M3 10l13-6-3.4 12-3.1-4.1L6 14l-3-4z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></span></button>
             </form>
             @endif
             <form method="post" action="{{ route('admin.leads.delete', $lead) }}" style="display:inline-block; margin-left:8px;" onsubmit="return confirm('Delete this lead?');">
               @csrf
-              <button class="panel-btn panel-btn-danger" type="submit">Delete</button>
+              <button class="panel-btn panel-btn-danger panel-btn-icon" type="submit" title="Delete lead" aria-label="Delete lead"><span class="panel-icon-trash" aria-hidden="true"><svg viewBox="0 0 20 20"><path d="M5 6h10M8 6V4h4v2m-6 0l.5 9h7L14 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span></button>
             </form>
           </td>
         </tr>

@@ -54,21 +54,39 @@
 
           @if(in_array($panelRole, ['admin', 'owner', 'manager'], true))
           <p class="panel-nav-group-title">Lead Management</p>
+          @php
+            $leadNavCounts = cache()->remember('panel_lead_nav_counts', now()->addSeconds(30), static function (): array {
+              return [
+                'all' => \App\Models\LeadProfile::query()->count(),
+                'ai' => \App\Models\LeadProfile::query()->whereHas('conversation', function ($query): void {
+                  $query->where('channel', 'website_widget');
+                })->count(),
+                'packages' => \App\Models\LeadProfile::query()->whereHas('conversation', function ($query): void {
+                  $query->where('channel', 'package_builder');
+                })->count(),
+                'submissions' => \App\Models\WebsiteFormSubmission::query()->count(),
+              ];
+            });
+          @endphp
           <a class="panel-nav-link @if(request()->routeIs('admin.leads.*') && !request()->routeIs('admin.leads.ai.*') && !request()->routeIs('admin.leads.packages.*')) is-active @endif" href="{{ route('admin.leads.index') }}" title="All Leads">
             <span class="panel-nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5zm0 2c-4.42 0-8 2.24-8 5v1h16v-1c0-2.76-3.58-5-8-5z" fill="currentColor"/></svg></span>
             <span class="panel-nav-text">All Leads</span>
+            <span class="panel-nav-count">{{ number_format((int) ($leadNavCounts['all'] ?? 0)) }}</span>
           </a>
           <a class="panel-nav-link @if(request()->routeIs('admin.leads.ai.*')) is-active @endif" href="{{ route('admin.leads.ai.index') }}" title="Leads from AI Assistance">
             <span class="panel-nav-icon"><img src="{{ asset('assets/media/icon/ai_icon.png') }}" alt="" aria-hidden="true"></span>
             <span class="panel-nav-text">Leads from AI Assistance</span>
+            <span class="panel-nav-count">{{ number_format((int) ($leadNavCounts['ai'] ?? 0)) }}</span>
           </a>
           <a class="panel-nav-link @if(request()->routeIs('admin.leads.packages.*')) is-active @endif" href="{{ route('admin.leads.packages.index') }}" title="Leads from Packages">
             <span class="panel-nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7.5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2h-1v4a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2v-4H5a2 2 0 0 1-2-2v-3zm5 5v4h8v-4H8zm1-5a1 1 0 1 0 0 2h6a1 1 0 1 0 0-2H9z" fill="currentColor"/></svg></span>
             <span class="panel-nav-text">Leads from Packages</span>
+            <span class="panel-nav-count">{{ number_format((int) ($leadNavCounts['packages'] ?? 0)) }}</span>
           </a>
           <a class="panel-nav-link @if(request()->routeIs('admin.form-submissions*')) is-active @endif" href="{{ route('admin.form-submissions') }}" title="Website Submissions">
             <span class="panel-nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h14a2 2 0 0 1 2 2v14l-4-3-4 3-4-3-4 3V5a2 2 0 0 1 2-2z" fill="none" stroke="currentColor" stroke-width="2"/></svg></span>
             <span class="panel-nav-text">Website Submissions</span>
+            <span class="panel-nav-count">{{ number_format((int) ($leadNavCounts['submissions'] ?? 0)) }}</span>
           </a>
 
           <p class="panel-nav-group-title">Sales Operations</p>
@@ -83,12 +101,21 @@
           @php
             $composeActive = request()->routeIs('admin.emails.inbox') && (string) request()->query('compose') === '1';
             $automationActive = request()->routeIs('admin.emails.automation.*');
+            $emailNavCounts = cache()->remember('panel_email_nav_counts', now()->addSeconds(30), static function (): array {
+              return [
+                'inbox' => \App\Models\InboundEmail::query()->count(),
+                'sent' => \App\Models\EmailLog::query()->count(),
+                'drafts' => \App\Models\EmailDraft::query()->where('status', 'draft')->count(),
+              ];
+            });
+            $emailNavTotal = (int) (($emailNavCounts['inbox'] ?? 0) + ($emailNavCounts['sent'] ?? 0) + ($emailNavCounts['drafts'] ?? 0));
           @endphp
           <div class="panel-nav-link-group @if(request()->routeIs('admin.emails.*')) is-active @endif" data-subnav-group="emails">
             <div class="panel-nav-head">
               <a class="panel-nav-link @if(request()->routeIs('admin.emails.*')) is-active @endif" href="{{ route('admin.emails.inbox') }}" title="Email Center">
                 <span class="panel-nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6zm2 .5V8l7 4.7L19 8V6.5l-7 4.6-7-4.6z" fill="currentColor"/></svg></span>
                 <span class="panel-nav-text">Email Center</span>
+                <span class="panel-nav-count">{{ number_format($emailNavTotal) }}</span>
               </a>
               <button class="panel-subnav-toggle" type="button" aria-label="Toggle Email Center menu" aria-expanded="true" data-subnav-toggle="emails">
                 <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6 8l4 4 4-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -102,14 +129,17 @@
               <a class="panel-subnav-link @if(request()->routeIs('admin.emails.inbox') && !$composeActive) is-active @endif" href="{{ route('admin.emails.inbox') }}">
                 <span class="panel-subnav-icon"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 6a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6zm2 .5v1.2l5 3.2 5-3.2V6.5l-5 3.1-5-3.1z" fill="currentColor"/></svg></span>
                 <span>Inbox</span>
+                <span class="panel-subnav-count">{{ number_format((int) ($emailNavCounts['inbox'] ?? 0)) }}</span>
               </a>
               <a class="panel-subnav-link @if(request()->routeIs('admin.emails.sent')) is-active @endif" href="{{ route('admin.emails.sent') }}">
                 <span class="panel-subnav-icon"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 10l13-6-3.4 12-3.1-4.1L6 14l-3-4z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></span>
                 <span>Sent</span>
+                <span class="panel-subnav-count">{{ number_format((int) ($emailNavCounts['sent'] ?? 0)) }}</span>
               </a>
               <a class="panel-subnav-link @if(request()->routeIs('admin.emails.drafts')) is-active @endif" href="{{ route('admin.emails.drafts') }}">
                 <span class="panel-subnav-icon"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 14.8h2.4L14 7.2 11.8 5 4.2 12.6V15zM10.9 6l2.2 2.2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
                 <span>Drafts</span>
+                <span class="panel-subnav-count">{{ number_format((int) ($emailNavCounts['drafts'] ?? 0)) }}</span>
               </a>
               <a class="panel-subnav-link @if($automationActive) is-active @endif" href="{{ route('admin.emails.automation.index') }}">
                 <span class="panel-subnav-icon"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3.5l1.4 2.1 2.4.5-.9 2.3 1.6 1.8-1.9 1.6.3 2.5-2.4.7-1.1 2.2-2.2-1.1-2.2 1.1-1.1-2.2-2.4-.7.3-2.5-1.9-1.6 1.6-1.8-.9-2.3 2.4-.5L10 3.5zm0 4.2a2.3 2.3 0 1 0 0 4.6 2.3 2.3 0 0 0 0-4.6z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg></span>
@@ -161,7 +191,13 @@
 
       @auth
       <div class="panel-sidebar-foot">
-        <span class="panel-badge panel-role-badge">{{ $accessLabel }}</span>
+        <form action="{{ route('logout') }}" method="post" class="panel-sidebar-logout-form">
+          @csrf
+          <button class="panel-btn panel-btn-primary panel-sidebar-logout" type="submit" title="Log out">
+            <span class="panel-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M16 17l5-5-5-5M21 12H9M12 19H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+            <span>Log out</span>
+          </button>
+        </form>
       </div>
       @endauth
     </aside>
@@ -238,7 +274,6 @@
                 </div>
               </div>
             </div>
-            <span class="panel-badge panel-role-badge">{{ $accessLabel }}</span>
             <form action="{{ route('logout') }}" method="post">
               @csrf
               <button class="panel-btn panel-btn-primary" type="submit">Log out</button>
