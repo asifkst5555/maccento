@@ -1200,7 +1200,8 @@ class DashboardController extends Controller
                 $context !== '' ? $context : null,
                 '',
                 'Best regards,',
-                (string) ($request->user()?->name ?? 'Maccento Team'),
+                'Alessio Battista',
+                'Maccento Real Estate Media',
             ], static fn ($line): bool => $line !== null));
 
             return response()->json([
@@ -1351,7 +1352,8 @@ class DashboardController extends Controller
             'Please reply to this email with your availability and preferred next step.',
             '',
             'Best regards,',
-            (string) ($request->user()?->name ?? 'Maccento Team'),
+            'Alessio Battista',
+            'Maccento Real Estate Media',
         ]);
 
         $result = $this->dispatchCrmEmail([

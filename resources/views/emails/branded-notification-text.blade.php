@@ -12,4 +12,4 @@
 {{ $ctaLabel }}: {{ $ctaUrl }}
 
 @endif
-{{ $footerNote ?: 'This message was sent by Maccento CRM. For assistance, reply to this email or contact info@maccento.ca.' }}
+{{ $footerNote ?: "Best regards,\nAlessio Battista\nMaccento Real Estate Media" }}

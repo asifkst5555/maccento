@@ -15,10 +15,7 @@
               <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
                 <tr>
                   <td align="left" style="vertical-align:middle;">
-                    <img src="{{ $brandLogoUrl }}" alt="{{ $brandName }}" style="height:36px; width:auto; display:block;" />
-                  </td>
-                  <td align="right" style="vertical-align:middle; color:#cad7ec; font-size:12px; letter-spacing:0.06em; text-transform:uppercase;">
-                    {{ $brandName }}
+                    <img src="{{ $brandLogoUrl }}" alt="{{ $brandName }}" style="height:25px; width:auto; display:block;" />
                   </td>
                 </tr>
               </table>
@@ -52,7 +49,7 @@
           <tr>
             <td style="padding:16px 24px 22px; background:#f8fbff; border-top:1px solid #e0e9f6;">
               <p style="margin:0; font-size:12px; line-height:1.5; color:#56708f;">
-                {{ $footerNote ?: 'This message was sent by Maccento CRM. For assistance, reply to this email or contact info@maccento.ca.' }}
+                {!! nl2br(e($footerNote ?: "Best regards,\nAlessio Battista\nMaccento Real Estate Media")) !!}
               </p>
             </td>
           </tr>

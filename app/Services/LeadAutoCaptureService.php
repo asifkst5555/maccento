@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Mail\BrandedNotificationMail;
 use App\Models\Conversation;
+use App\Models\EmailLog;
 use App\Models\LeadAutoEmailSetting;
 use App\Models\LeadEvent;
 use App\Models\LeadProfile;
@@ -147,6 +148,8 @@ class LeadAutoCaptureService
         $message = $this->fallbackMessage($lead, $source, $attributes);
         $providerName = 'fallback';
         $modelName = 'n/a';
+        $replyTo = trim((string) env('SENDGRID_INBOUND_REPLY_TO', (string) config('mail.from.address')));
+        $emailLog = null;
 
         try {
             $requirements = $this->buildRequirementSummary($lead, $attributes);
@@ -204,6 +207,21 @@ class LeadAutoCaptureService
         }
 
         try {
+            $emailLog = EmailLog::query()->create([
+                'created_by' => null,
+                'mode' => 'auto_welcome',
+                'template_key' => 'lead_auto_' . Str::lower($source),
+                'recipient_email' => (string) $lead->email,
+                'reply_to' => $replyTo !== '' ? $replyTo : null,
+                'subject' => $subject,
+                'body_preview' => Str::limit($message, 700),
+                'status' => 'queued',
+                'error_message' => null,
+                'sent_at' => null,
+                'provider_status' => 'queued',
+                'provider_last_event_at' => now(),
+            ]);
+
             Mail::to((string) $lead->email)->send(new BrandedNotificationMail(
                 subjectLine: $subject,
                 heading: 'Welcome to Maccento',
@@ -212,7 +230,19 @@ class LeadAutoCaptureService
                 ctaLabel: 'Visit Maccento',
                 ctaUrl: url('/'),
                 footerNote: 'Reply to this email if you want to share more details before we contact you.',
+                emailLogId: $emailLog?->id,
+                replyToAddress: $replyTo !== '' ? $replyTo : null,
             ));
+
+            if ($emailLog) {
+                $emailLog->forceFill([
+                    'status' => 'sent',
+                    'error_message' => null,
+                    'sent_at' => now(),
+                    'provider_status' => 'processed',
+                    'provider_last_event_at' => now(),
+                ])->save();
+            }
 
             LeadEvent::create([
                 'lead_profile_id' => $lead->id,
@@ -227,6 +257,34 @@ class LeadAutoCaptureService
             ]);
         } catch (Throwable $exception) {
             report($exception);
+
+            if ($emailLog) {
+                $emailLog->forceFill([
+                    'status' => 'failed',
+                    'error_message' => Str::limit($exception->getMessage(), 500),
+                    'provider_status' => 'failed',
+                    'provider_last_event_at' => now(),
+                ])->save();
+            } else {
+                try {
+                    EmailLog::query()->create([
+                        'created_by' => null,
+                        'mode' => 'auto_welcome',
+                        'template_key' => 'lead_auto_' . Str::lower($source),
+                        'recipient_email' => (string) $lead->email,
+                        'reply_to' => $replyTo !== '' ? $replyTo : null,
+                        'subject' => $subject,
+                        'body_preview' => Str::limit($message, 700),
+                        'status' => 'failed',
+                        'error_message' => Str::limit($exception->getMessage(), 500),
+                        'sent_at' => null,
+                        'provider_status' => 'failed',
+                        'provider_last_event_at' => now(),
+                    ]);
+                } catch (Throwable $innerException) {
+                    report($innerException);
+                }
+            }
 
             LeadEvent::create([
                 'lead_profile_id' => $lead->id,
@@ -298,7 +356,8 @@ class LeadAutoCaptureService
         $lines[] = 'If you want to add more details, simply reply to this email.';
         $lines[] = '';
         $lines[] = 'Best regards,';
-        $lines[] = 'Maccento Team';
+        $lines[] = 'Alessio Battista';
+        $lines[] = 'Maccento Real Estate Media';
 
         return implode("\n", $lines);
     }

@@ -44,7 +44,7 @@ class BrandedNotificationMail extends Mailable
                 'ctaUrl' => $this->ctaUrl,
                 'footerNote' => $this->footerNote,
                 'brandName' => (string) config('app.name', 'Maccento'),
-                'brandLogoUrl' => rtrim((string) config('app.url', ''), '/') . '/assets/media/logo.png',
+                'brandLogoUrl' => rtrim((string) config('app.url', ''), '/') . '/assets/media/logo-footer.png',
             ]);
 
         if ($this->replyToAddress !== null && trim($this->replyToAddress) !== '') {
