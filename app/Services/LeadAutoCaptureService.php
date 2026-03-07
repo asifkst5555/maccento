@@ -302,14 +302,15 @@ class LeadAutoCaptureService
         }
     }
 
-    private function shouldSkipWelcomeEmail(int $leadId, string $source, ?int $conversationId): bool
+    private function shouldSkipWelcomeEmail(int $leadId, string $source, ?string $conversationId): bool
     {
         $query = LeadEvent::query()
             ->where('lead_profile_id', $leadId)
             ->where('event_type', 'welcome_email_sent')
             ->where('payload->source', $source);
 
-        if ($conversationId !== null) {
+        $conversationId = is_string($conversationId) ? trim($conversationId) : null;
+        if ($conversationId !== null && $conversationId !== '') {
             return (clone $query)
                 ->where('payload->conversation_id', $conversationId)
                 ->exists();
