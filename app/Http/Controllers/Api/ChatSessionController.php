@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Conversation;
+use App\Services\LeadAutoCaptureService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -30,12 +31,14 @@ class ChatSessionController extends Controller
             ],
         ]);
 
-        $conversation->leadProfile()->create([
-            'name' => $request->user()?->name,
-            'email' => $request->user()?->email,
-            'phone' => $request->user()?->phone,
-            'status' => 'new',
-        ]);
+        $userEmail = trim((string) ($request->user()?->email ?? ''));
+        if ($userEmail !== '' && filter_var($userEmail, FILTER_VALIDATE_EMAIL)) {
+            app(LeadAutoCaptureService::class)->captureAndWelcome([
+                'name' => (string) ($request->user()?->name ?? ''),
+                'email' => $userEmail,
+                'phone' => (string) ($request->user()?->phone ?? ''),
+            ], 'ai_chat_lead', $conversation);
+        }
 
         return response()->json([
             'conversation_id' => $conversation->id,

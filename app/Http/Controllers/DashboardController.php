@@ -10,8 +10,11 @@ use App\Models\ClientMessage;
 use App\Models\ClientProject;
 use App\Models\ClientProjectMedia;
 use App\Models\ClientServiceRequest;
+use App\Models\EmailDraft;
 use App\Models\EmailLog;
 use App\Models\FollowUp;
+use App\Models\InboundEmail;
+use App\Models\LeadAutoEmailSetting;
 use App\Models\LeadEvent;
 use App\Models\LeadProfile;
 use App\Models\PanelNotification;
@@ -23,6 +26,8 @@ use App\Models\WatermarkSetting;
 use App\Models\WebsiteFormSubmission;
 use App\Services\PanelNotificationService;
 use App\Services\QuoteNotificationService;
+use App\Services\LeadAutoCaptureService;
+use App\Services\AI\AiProviderManager;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Http\RedirectResponse;
@@ -958,112 +963,397 @@ class DashboardController extends Controller
 
     public function adminEmailsIndex(Request $request): View
     {
+        return $this->adminEmailsInbox($request);
+    }
+
+    public function adminEmailsInbox(Request $request): View
+    {
         $this->ensurePipelineWriteAccess($request);
 
-        $defaultRecipient = (string) env('QUOTE_ADMIN_EMAIL', (string) config('mail.lead_alert_address', (string) config('mail.from.address')));
+        return $this->renderAdminEmailMailbox($request, 'inbox');
+    }
 
-        $quickTemplates = [
-            [
-                'key' => 'delivery_test',
-                'title' => 'Delivery Test',
-                'description' => 'Confirm SendGrid delivery and inbox routing in one click.',
-            ],
-            [
-                'key' => 'pipeline_snapshot',
-                'title' => 'Pipeline Snapshot',
-                'description' => 'Send a compact summary of leads, quotes, and invoices.',
-            ],
-            [
-                'key' => 'followup_digest',
-                'title' => 'Follow-up Digest',
-                'description' => 'Send an operational reminder focused on pending pipeline actions.',
-            ],
-        ];
+    public function adminEmailsSent(Request $request): View
+    {
+        $this->ensurePipelineWriteAccess($request);
 
-        $quickTemplates = array_map(function (array $template): array {
-            $resolved = $this->buildAdminEmailTemplate((string) ($template['key'] ?? ''));
-            $template['subject_preview'] = (string) ($resolved['subject'] ?? '');
-            return $template;
-        }, $quickTemplates);
+        return $this->renderAdminEmailMailbox($request, 'sent');
+    }
 
-        $pipelineSummary = [
-            'leads_new' => LeadProfile::query()->where('status', 'new')->count(),
-            'leads_qualified' => LeadProfile::query()->where('status', 'qualified')->count(),
-            'quotes_new' => QuoteBuild::query()->where('status', 'new')->count(),
-            'quotes_booked' => QuoteBuild::query()->where('status', 'booked')->count(),
-            'invoices_overdue' => ClientInvoice::query()
-                ->where('status', '!=', 'paid')
-                ->whereNotNull('due_date')
-                ->whereDate('due_date', '<', now()->toDateString())
-                ->count(),
-        ];
+    public function adminEmailsDrafts(Request $request): View
+    {
+        $this->ensurePipelineWriteAccess($request);
 
-        $projectOptions = ClientProject::query()
-            ->with('client:id,name,email')
-            ->latest('id')
-            ->limit(300)
-            ->get(['id', 'client_id', 'title', 'service_type', 'status'])
-            ->map(static function (ClientProject $project): array {
-                $clientName = trim((string) ($project->client?->name ?? 'Unknown client'));
-                $clientEmail = trim((string) ($project->client?->email ?? ''));
-                $service = trim((string) ($project->service_type ?? ''));
-                $status = trim((string) ($project->status ?? ''));
+        return $this->renderAdminEmailMailbox($request, 'drafts');
+    }
 
-                $labelParts = ["#{$project->id}", $clientName, $project->title];
-                if ($service !== '') {
-                    $labelParts[] = $service;
-                }
-                if ($status !== '') {
-                    $labelParts[] = strtoupper($status);
-                }
-                if ($clientEmail !== '') {
-                    $labelParts[] = $clientEmail;
-                }
+    public function adminEmailAutomationSettingsIndex(Request $request): View
+    {
+        $this->ensureOwnerAdminAccess($request);
 
-                return [
-                    'id' => (int) $project->id,
-                    'label' => implode(' | ', array_filter($labelParts, static fn ($value): bool => trim((string) $value) !== '')),
-                    'client_email' => $clientEmail !== '' ? Str::lower($clientEmail) : null,
-                ];
-            })
-            ->values()
-            ->all();
+        $sourceMap = $this->leadAutoEmailSources();
+        $captureService = app(LeadAutoCaptureService::class);
+        $records = LeadAutoEmailSetting::query()
+            ->whereIn('source', array_keys($sourceMap))
+            ->get()
+            ->keyBy('source');
 
-        try {
-            $emailLogs = EmailLog::query()
-                ->with('creator:id,name,email')
-                ->latest('id')
-                ->paginate(15)
-                ->withQueryString();
+        $sourceSettings = collect($sourceMap)->map(function (array $meta, string $source) use ($records, $captureService): array {
+            $record = $records->get($source);
+            $defaults = $captureService->resolveSourceSettings($source);
 
-            $timelineMap = collect();
-            $emailLogIds = $emailLogs->getCollection()->pluck('id')->values()->all();
-            if (count($emailLogIds) > 0) {
-                $timelineMap = SendgridWebhookEvent::query()
-                    ->whereIn('email_log_id', $emailLogIds)
-                    ->orderByDesc('occurred_at')
-                    ->orderByDesc('id')
-                    ->get()
-                    ->groupBy('email_log_id')
-                    ->map(static fn ($items) => $items->take(8)->values());
-            }
-        } catch (Throwable $exception) {
-            report($exception);
-            $emailLogs = new LengthAwarePaginator([], 0, 15, 1, [
-                'path' => $request->url(),
-                'query' => $request->query(),
-            ]);
-            $timelineMap = collect();
+            return [
+                'source' => $source,
+                'label' => $meta['label'],
+                'description' => $meta['description'],
+                'enabled' => $record?->exists ? (bool) $record->enabled : (bool) ($defaults['enabled'] ?? true),
+                'tone' => $record?->exists ? (string) ($record->tone ?? 'professional') : (string) ($defaults['tone'] ?? 'professional'),
+                'template_prompt' => $record?->exists ? (string) ($record->template_prompt ?? '') : (string) ($defaults['template_prompt'] ?? ''),
+                'subject_prefix' => $record?->exists ? (string) ($record->subject_prefix ?? '') : (string) ($defaults['subject_prefix'] ?? ''),
+            ];
+        })->values();
+
+        return view('admin.emails-automation', [
+            'sourceSettings' => $sourceSettings,
+        ]);
+    }
+
+    public function adminEmailAutomationSettingsUpdate(Request $request): RedirectResponse
+    {
+        $this->ensureOwnerAdminAccess($request);
+
+        $sourceMap = $this->leadAutoEmailSources();
+        $allowedSources = array_keys($sourceMap);
+
+        $validated = $request->validate([
+            'enabled' => ['nullable', 'array'],
+            'enabled.*' => ['nullable', 'in:0,1'],
+            'tone' => ['nullable', 'array'],
+            'tone.*' => ['nullable', 'string', 'max:40'],
+            'template_prompt' => ['nullable', 'array'],
+            'template_prompt.*' => ['nullable', 'string', 'max:5000'],
+            'subject_prefix' => ['nullable', 'array'],
+            'subject_prefix.*' => ['nullable', 'string', 'max:120'],
+        ]);
+
+        foreach ($allowedSources as $source) {
+            $enabled = (string) data_get($validated, "enabled.{$source}", '0') === '1';
+            $tone = trim((string) data_get($validated, "tone.{$source}", 'professional'));
+            $templatePrompt = trim((string) data_get($validated, "template_prompt.{$source}", ''));
+            $subjectPrefix = trim((string) data_get($validated, "subject_prefix.{$source}", ''));
+
+            LeadAutoEmailSetting::query()->updateOrCreate(
+                ['source' => $source],
+                [
+                    'enabled' => $enabled,
+                    'tone' => $tone !== '' ? Str::limit($tone, 40, '') : 'professional',
+                    'template_prompt' => $templatePrompt !== '' ? Str::limit($templatePrompt, 5000, '') : null,
+                    'subject_prefix' => $subjectPrefix !== '' ? Str::limit($subjectPrefix, 120, '') : null,
+                ]
+            );
         }
 
-        return view('admin.emails-index', [
-            'defaultRecipient' => $defaultRecipient,
-            'quickTemplates' => $quickTemplates,
-            'pipelineSummary' => $pipelineSummary,
-            'projectOptions' => $projectOptions,
-            'emailLogs' => $emailLogs,
-            'emailEventTimeline' => $timelineMap,
+        return back()->with('status', 'Lead automation email settings updated.');
+    }
+
+    public function adminEmailAutomationBackfillRun(Request $request): RedirectResponse
+    {
+        $this->ensureOwnerAdminAccess($request);
+
+        $validated = $request->validate([
+            'mode' => ['required', 'in:dry-run,live'],
         ]);
+
+        $isDryRun = (string) ($validated['mode'] ?? 'dry-run') === 'dry-run';
+
+        try {
+            $exitCode = $isDryRun
+                ? Artisan::call('leads:backfill-welcome-emails', ['--dry-run' => true])
+                : Artisan::call('leads:backfill-welcome-emails');
+
+            $output = trim((string) Artisan::output());
+            $modeLabel = $isDryRun ? 'dry run' : 'live run';
+
+            if ($exitCode !== 0) {
+                return back()
+                    ->withErrors(['automation_backfill' => 'Backfill ' . $modeLabel . ' failed.'])
+                    ->with('automation_backfill_output', $output)
+                    ->with('automation_backfill_mode', $validated['mode']);
+            }
+
+            return back()
+                ->with('status', 'Lead welcome backfill ' . $modeLabel . ' completed successfully.')
+                ->with('automation_backfill_output', $output)
+                ->with('automation_backfill_mode', $validated['mode']);
+        } catch (Throwable $exception) {
+            report($exception);
+
+            return back()
+                ->withErrors(['automation_backfill' => 'Backfill command crashed: ' . Str::limit($exception->getMessage(), 240)])
+                ->with('automation_backfill_mode', $validated['mode']);
+        }
+    }
+
+    public function adminEmailAiWrite(Request $request): JsonResponse
+    {
+        $this->ensurePipelineWriteAccess($request);
+
+        $validated = $request->validate([
+            'goal' => ['nullable', 'string', 'max:500'],
+            'tone' => ['nullable', 'string', 'max:80'],
+            'template' => ['nullable', 'string', 'in:custom,cold_followup,quote_reminder,no_response_nudge'],
+            'recipient_name' => ['nullable', 'string', 'max:120'],
+            'context' => ['nullable', 'string', 'max:5000'],
+        ]);
+
+        $tone = trim((string) ($validated['tone'] ?? 'professional'));
+        $template = trim((string) ($validated['template'] ?? 'custom'));
+        $recipientName = trim((string) ($validated['recipient_name'] ?? ''));
+        $context = trim((string) ($validated['context'] ?? ''));
+        $goal = trim((string) ($validated['goal'] ?? ''));
+
+        $templateInstructions = [
+            'custom' => 'Use a general business outreach structure.',
+            'cold_followup' => 'Lead-specific cold follow-up: warm re-introduction, remind value, ask for a short call this week.',
+            'quote_reminder' => 'Lead-specific quote reminder: reference an existing quote/proposal and ask whether they have questions before decision.',
+            'no_response_nudge' => 'Lead-specific no-response nudge: polite check-in, reduce friction, offer two simple next-step choices.',
+        ];
+        $templateDefaultGoals = [
+            'custom' => 'Follow up with this lead and propose a next step.',
+            'cold_followup' => 'Send a short warm follow-up to restart conversation and ask for a 10-minute call.',
+            'quote_reminder' => 'Remind the lead about their quote and ask if they want any adjustments before confirming.',
+            'no_response_nudge' => 'Send a polite no-response nudge with two low-friction options to continue.',
+        ];
+
+        $resolvedTemplate = array_key_exists($template, $templateInstructions) ? $template : 'custom';
+        if ($goal === '') {
+            $goal = (string) ($templateDefaultGoals[$resolvedTemplate] ?? $templateDefaultGoals['custom']);
+        }
+
+        $prompt = implode("\n", [
+            'Write a concise business email for CRM outreach.',
+            'Return plain text only using this strict format:',
+            'Subject: <subject line>',
+            'Body:',
+            '<email body>',
+            '',
+            'Constraints:',
+            '- Keep the tone professional and clear.',
+            '- Include one clear call to action.',
+            '- Avoid placeholders and markdown formatting.',
+            '',
+            'Template: ' . $resolvedTemplate,
+            'Template instruction: ' . $templateInstructions[$resolvedTemplate],
+            'Tone: ' . ($tone !== '' ? $tone : 'professional'),
+            'Recipient name: ' . ($recipientName !== '' ? $recipientName : 'Not provided'),
+            'Goal: ' . $goal,
+            'Context: ' . ($context !== '' ? $context : 'No additional context'),
+        ]);
+
+        try {
+            $provider = app(AiProviderManager::class)->provider();
+            $usage = $provider->chat([
+                ['role' => 'system', 'content' => 'You are an expert CRM email copywriter.'],
+                ['role' => 'user', 'content' => $prompt],
+            ]);
+
+            $content = trim((string) ($usage['content'] ?? ''));
+            $subject = '';
+            $body = $content;
+
+            if (preg_match('/^Subject:\s*(.+)$/mi', $content, $subjectMatch) === 1) {
+                $subject = trim((string) ($subjectMatch[1] ?? ''));
+            }
+            if (preg_match('/^Body:\s*(.*)$/mis', $content, $bodyMatch) === 1) {
+                $body = trim((string) ($bodyMatch[1] ?? ''));
+            }
+
+            if ($subject === '') {
+                $subject = Str::limit($goal !== '' ? $goal : 'CRM follow up', 120, '');
+            }
+
+            return response()->json([
+                'ok' => true,
+                'subject' => $subject,
+                'message' => $body,
+                'provider' => $provider->name(),
+                'model' => (string) ($usage['model'] ?? ''),
+            ]);
+        } catch (Throwable $exception) {
+            report($exception);
+
+            $fallbackSubjectMap = [
+                'cold_followup' => 'Quick follow-up on your request',
+                'quote_reminder' => 'Friendly reminder about your quote',
+                'no_response_nudge' => 'Checking in on your next step',
+            ];
+
+            $fallbackSubject = Str::limit($goal !== '' ? $goal : (string) ($fallbackSubjectMap[$resolvedTemplate] ?? 'CRM follow up'), 120, '');
+            $fallbackBody = implode("\n", array_filter([
+                $recipientName !== '' ? "Hi {$recipientName}," : 'Hi there,',
+                '',
+                $goal,
+                $resolvedTemplate === 'cold_followup' ? 'I wanted to follow up and see if you are available this week for a quick call.' : null,
+                $resolvedTemplate === 'quote_reminder' ? 'Just checking whether you had a chance to review the quote and if any details need clarification.' : null,
+                $resolvedTemplate === 'no_response_nudge' ? 'I know schedules get busy, so I wanted to send a quick nudge and make next steps easy.' : null,
+                $context !== '' ? '' : null,
+                $context !== '' ? $context : null,
+                '',
+                'Best regards,',
+                (string) ($request->user()?->name ?? 'Maccento Team'),
+            ], static fn ($line): bool => $line !== null));
+
+            return response()->json([
+                'ok' => true,
+                'subject' => $fallbackSubject,
+                'message' => $fallbackBody,
+                'provider' => 'fallback',
+                'model' => 'n/a',
+            ]);
+        }
+    }
+
+    public function adminEmailDraftStore(Request $request): RedirectResponse|JsonResponse
+    {
+        $this->ensurePipelineWriteAccess($request);
+
+        $validated = $request->validate([
+            'draft_id' => ['nullable', 'integer'],
+            'recipient_email' => ['nullable', 'string', 'max:255'],
+            'reply_to' => ['nullable', 'string', 'max:255'],
+            'cc' => ['nullable', 'string', 'max:500'],
+            'bcc' => ['nullable', 'string', 'max:500'],
+            'client_project_id' => ['nullable', 'integer'],
+            'subject' => ['nullable', 'string', 'max:180'],
+            'message' => ['nullable', 'string', 'max:10000'],
+        ]);
+
+        $draft = null;
+        if (!blank($validated['draft_id'] ?? null)) {
+            $draft = EmailDraft::query()->find((int) $validated['draft_id']);
+        }
+
+        if ($draft === null) {
+            $draft = new EmailDraft();
+            $draft->created_by = $request->user()?->id;
+        }
+
+        $draft->recipient_email = filled($validated['recipient_email'] ?? null) ? (string) $validated['recipient_email'] : null;
+        $draft->reply_to = filled($validated['reply_to'] ?? null) ? (string) $validated['reply_to'] : null;
+        $draft->cc = filled($validated['cc'] ?? null) ? (string) $validated['cc'] : null;
+        $draft->bcc = filled($validated['bcc'] ?? null) ? (string) $validated['bcc'] : null;
+        $draft->client_project_id = !blank($validated['client_project_id'] ?? null) ? (int) $validated['client_project_id'] : null;
+        $draft->subject = filled($validated['subject'] ?? null) ? (string) $validated['subject'] : null;
+        $draft->message = filled($validated['message'] ?? null) ? (string) $validated['message'] : null;
+        $draft->status = 'draft';
+        $draft->last_opened_at = now();
+        $draft->save();
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'ok' => true,
+                'draft_id' => (int) $draft->id,
+                'updated_at' => optional($draft->updated_at)->toIso8601String(),
+            ]);
+        }
+
+        return redirect()->route('admin.emails.drafts', ['draft' => $draft->id])->with('status', 'Draft saved.');
+    }
+
+    public function adminEmailDraftDelete(Request $request, EmailDraft $draft): RedirectResponse
+    {
+        $this->ensurePipelineWriteAccess($request);
+
+        $draft->delete();
+
+        return redirect()->route('admin.emails.drafts')->with('status', 'Draft deleted.');
+    }
+
+    public function adminEmailDraftSend(Request $request, EmailDraft $draft): RedirectResponse
+    {
+        $this->ensurePipelineWriteAccess($request);
+
+        if (blank($draft->recipient_email) || blank($draft->subject) || blank($draft->message)) {
+            return back()->withErrors(['recipient_email' => 'Draft must include recipient, subject, and message before sending.']);
+        }
+
+        $ccList = $this->parseEmailList((string) ($draft->cc ?? ''));
+        $bccList = $this->parseEmailList((string) ($draft->bcc ?? ''));
+        if (count($ccList['invalid']) > 0 || count($bccList['invalid']) > 0) {
+            return back()->withErrors(['recipient_email' => 'Draft has invalid CC/BCC addresses. Please edit and try again.']);
+        }
+
+        $subject = trim((string) $draft->subject);
+        $threadProjectId = $this->resolveOutboundThreadProjectId((string) $draft->recipient_email, $draft->client_project_id ? (int) $draft->client_project_id : null);
+        if ($threadProjectId !== null) {
+            $subject = $this->appendProjectThreadTag($subject, $threadProjectId);
+        }
+
+        $result = $this->dispatchCrmEmail([
+            'created_by' => $request->user()?->id,
+            'mode' => 'draft',
+            'template_key' => null,
+            'recipient_email' => (string) $draft->recipient_email,
+            'reply_to' => $draft->reply_to,
+            'cc' => $ccList['valid'],
+            'bcc' => $bccList['valid'],
+            'subject' => $subject,
+            'message' => (string) $draft->message,
+            'thread_project_id' => $threadProjectId,
+        ]);
+
+        if (!$result['ok']) {
+            return back()->withErrors(['recipient_email' => (string) ($result['error'] ?? 'Email could not be sent from draft.')]);
+        }
+
+        $draft->status = 'sent';
+        $draft->last_opened_at = now();
+        $draft->save();
+
+        return redirect()->route('admin.emails.sent')->with('status', 'Draft sent successfully.');
+    }
+
+    public function adminLeadEmailSend(Request $request, LeadProfile $lead): RedirectResponse
+    {
+        $this->ensurePipelineWriteAccess($request);
+
+        if (blank($lead->email)) {
+            return back()->withErrors(['lead' => 'This lead does not have an email address.']);
+        }
+
+        $subject = 'Follow-up from Maccento CRM';
+        if (!blank($lead->service_type)) {
+            $subject = 'Follow-up for your ' . (string) $lead->service_type . ' request';
+        }
+
+        $message = implode("\n", [
+            'Hi ' . ($lead->name ?: 'there') . ',',
+            '',
+            'Thank you for your interest in Maccento. We are following up to help you move forward with your request.',
+            'Please reply to this email with your availability and preferred next step.',
+            '',
+            'Best regards,',
+            (string) ($request->user()?->name ?? 'Maccento Team'),
+        ]);
+
+        $result = $this->dispatchCrmEmail([
+            'created_by' => $request->user()?->id,
+            'mode' => 'lead_followup',
+            'template_key' => 'lead_followup',
+            'recipient_email' => (string) $lead->email,
+            'reply_to' => null,
+            'cc' => [],
+            'bcc' => [],
+            'subject' => $subject,
+            'message' => $message,
+            'thread_project_id' => null,
+        ]);
+
+        if (!$result['ok']) {
+            return back()->withErrors(['lead' => (string) ($result['error'] ?? 'Lead email could not be sent.')]);
+        }
+
+        return back()->with('status', 'Lead email sent to ' . (string) $lead->email . '.');
     }
 
     public function adminEmailSend(Request $request): RedirectResponse
@@ -1155,7 +1445,7 @@ class DashboardController extends Controller
                 bodyLines: $this->emailBodyToLines($body),
                 intro: 'This message was sent from your CRM Email Center.',
                 ctaLabel: 'Open Maccento CRM',
-                ctaUrl: route('admin.emails.index'),
+                ctaUrl: route('admin.emails.sent'),
                 footerNote: 'Need help? Reply to this email and our team will assist you.',
                 emailLogId: $emailLog?->id,
                 threadProjectId: $threadProjectId,
@@ -1166,7 +1456,7 @@ class DashboardController extends Controller
                 'admin_email_sent',
                 'CRM email sent',
                 "Email sent to {$recipient}: {$subject}",
-                route('admin.emails.index'),
+                route('admin.emails.sent'),
                 ['recipient' => $recipient, 'subject' => $subject]
             );
 
@@ -1227,7 +1517,7 @@ class DashboardController extends Controller
             return back()->withErrors(['recipient_email' => 'Email could not be sent. Please verify SendGrid and try again.'])->withInput();
         }
 
-        return redirect()->route('admin.emails.index')->with('status', 'Email sent successfully.');
+        return redirect()->route('admin.emails.sent')->with('status', 'Email sent successfully.');
     }
 
     public function adminQuoteManualStore(Request $request): RedirectResponse
@@ -2849,6 +3139,410 @@ class DashboardController extends Controller
     private function notificationService(): PanelNotificationService
     {
         return app(PanelNotificationService::class);
+    }
+
+    private function leadAutoEmailSources(): array
+    {
+        return [
+            'website_packages' => [
+                'label' => 'Website Packages',
+                'description' => 'Leads captured from the package builder checkout/contact steps.',
+            ],
+            'website_contact_form_submission' => [
+                'label' => 'Website Contact Form',
+                'description' => 'Leads captured from the public website contact form.',
+            ],
+            'ai_chat_lead' => [
+                'label' => 'AI Chat',
+                'description' => 'Leads captured from AI chat once an email is provided.',
+            ],
+        ];
+    }
+
+    private function renderAdminEmailMailbox(Request $request, string $folder): View
+    {
+        $defaultRecipient = (string) env('QUOTE_ADMIN_EMAIL', (string) config('mail.lead_alert_address', (string) config('mail.from.address')));
+        $defaultReplyTo = (string) env('SENDGRID_INBOUND_REPLY_TO', $defaultRecipient);
+
+        $quickTemplates = [
+            [
+                'key' => 'delivery_test',
+                'title' => 'Delivery Test',
+                'description' => 'Confirm SendGrid delivery and inbox routing in one click.',
+            ],
+            [
+                'key' => 'pipeline_snapshot',
+                'title' => 'Pipeline Snapshot',
+                'description' => 'Send a compact summary of leads, quotes, and invoices.',
+            ],
+            [
+                'key' => 'followup_digest',
+                'title' => 'Follow-up Digest',
+                'description' => 'Send an operational reminder focused on pending pipeline actions.',
+            ],
+        ];
+
+        $quickTemplates = array_map(function (array $template): array {
+            $resolved = $this->buildAdminEmailTemplate((string) ($template['key'] ?? ''));
+            $template['subject_preview'] = (string) ($resolved['subject'] ?? '');
+            return $template;
+        }, $quickTemplates);
+
+        $projectOptions = ClientProject::query()
+            ->with('client:id,name,email')
+            ->latest('id')
+            ->limit(300)
+            ->get(['id', 'client_id', 'title', 'service_type', 'status'])
+            ->map(static function (ClientProject $project): array {
+                $clientName = trim((string) ($project->client?->name ?? 'Unknown client'));
+                $clientEmail = trim((string) ($project->client?->email ?? ''));
+                $service = trim((string) ($project->service_type ?? ''));
+                $status = trim((string) ($project->status ?? ''));
+
+                $labelParts = ["#{$project->id}", $clientName, $project->title];
+                if ($service !== '') {
+                    $labelParts[] = $service;
+                }
+                if ($status !== '') {
+                    $labelParts[] = strtoupper($status);
+                }
+                if ($clientEmail !== '') {
+                    $labelParts[] = $clientEmail;
+                }
+
+                return [
+                    'id' => (int) $project->id,
+                    'label' => implode(' | ', array_filter($labelParts, static fn ($value): bool => trim((string) $value) !== '')),
+                    'client_email' => $clientEmail !== '' ? Str::lower($clientEmail) : null,
+                ];
+            })
+            ->values()
+            ->all();
+
+        $folderCounts = [
+            'inbox' => InboundEmail::query()->count(),
+            'sent' => EmailLog::query()->count(),
+            'drafts' => EmailDraft::query()->where('status', 'draft')->count(),
+        ];
+
+        $mailboxItems = new LengthAwarePaginator([], 0, 20, 1, [
+            'path' => $request->url(),
+            'query' => $request->query(),
+        ]);
+        $eventTimeline = collect();
+        $selectedTimeline = collect();
+        $selectedMessage = null;
+        $threadMessages = collect();
+
+        if ($folder === 'inbox') {
+            $mailboxItems = InboundEmail::query()
+                ->with(['client:id,name,email', 'project:id,title'])
+                ->latest('id')
+                ->paginate(20)
+                ->withQueryString();
+        } elseif ($folder === 'drafts') {
+            $mailboxItems = EmailDraft::query()
+                ->with(['creator:id,name,email', 'project:id,title'])
+                ->where('status', 'draft')
+                ->latest('id')
+                ->paginate(20)
+                ->withQueryString();
+        } else {
+            $mailboxItems = EmailLog::query()
+                ->with('creator:id,name,email')
+                ->latest('id')
+                ->paginate(20)
+                ->withQueryString();
+
+            $emailLogIds = $mailboxItems->getCollection()->pluck('id')->values()->all();
+            if (count($emailLogIds) > 0) {
+                $eventTimeline = SendgridWebhookEvent::query()
+                    ->whereIn('email_log_id', $emailLogIds)
+                    ->orderByDesc('occurred_at')
+                    ->orderByDesc('id')
+                    ->get()
+                    ->groupBy('email_log_id')
+                    ->map(static fn ($items) => $items->take(8)->values());
+            }
+        }
+
+        $openMessageId = $request->filled('open_id') ? max(0, (int) $request->query('open_id')) : 0;
+        if ($folder === 'inbox' && $openMessageId > 0) {
+            $selectedMessage = InboundEmail::query()
+                ->with(['client:id,name,email', 'project:id,title'])
+                ->find($openMessageId);
+
+            if ($selectedMessage) {
+                $threadQuery = InboundEmail::query();
+                if (!blank($selectedMessage->client_id)) {
+                    $threadQuery->where('client_id', (int) $selectedMessage->client_id);
+                } else {
+                    $threadQuery->whereRaw('LOWER(from_email) = ?', [Str::lower((string) $selectedMessage->from_email)]);
+                }
+
+                $threadMessages = $threadQuery
+                    ->latest('received_at')
+                    ->latest('id')
+                    ->limit(16)
+                    ->get()
+                    ->map(static function (InboundEmail $mail): array {
+                        $body = trim((string) ($mail->body_text ?? ''));
+                        if ($body === '') {
+                            $body = trim(strip_tags((string) ($mail->body_html ?? '')));
+                        }
+
+                        return [
+                            'id' => (int) $mail->id,
+                            'kind' => 'inbound',
+                            'direction' => 'inbound',
+                            'subject' => (string) ($mail->subject ?? '(No subject)'),
+                            'body' => $body,
+                            'snippet' => Str::limit($body !== '' ? $body : '(No message body)', 200),
+                            'from_label' => trim((string) ($mail->from_name ?: $mail->from_email)),
+                            'from_email' => (string) ($mail->from_email ?? ''),
+                            'to_email' => (string) ($mail->to_email ?? ''),
+                            'status' => (string) ($mail->status ?? 'received'),
+                            'display_at' => optional($mail->received_at ?? $mail->created_at)?->format('Y-m-d H:i') ?: '-',
+                            'sort_at' => optional($mail->received_at ?? $mail->created_at)?->timestamp ?? 0,
+                            'is_selected' => (int) $mail->id === (int) $openMessageId,
+                        ];
+                    })
+                    ->sortByDesc('sort_at')
+                    ->values();
+            }
+        }
+
+        if ($folder === 'sent' && $openMessageId > 0) {
+            $selectedMessage = EmailLog::query()
+                ->with('creator:id,name,email')
+                ->find($openMessageId);
+
+            if ($selectedMessage) {
+                $selectedTimeline = SendgridWebhookEvent::query()
+                    ->where('email_log_id', (int) $selectedMessage->id)
+                    ->orderByDesc('occurred_at')
+                    ->orderByDesc('id')
+                    ->limit(20)
+                    ->get();
+
+                $recipient = Str::lower(trim((string) ($selectedMessage->recipient_email ?? '')));
+                $outboundMessages = EmailLog::query()
+                    ->whereRaw('LOWER(recipient_email) = ?', [$recipient])
+                    ->latest('sent_at')
+                    ->latest('id')
+                    ->limit(12)
+                    ->get()
+                    ->map(static function (EmailLog $mail) use ($openMessageId): array {
+                        $body = trim((string) ($mail->body_preview ?? ''));
+
+                        return [
+                            'id' => (int) $mail->id,
+                            'kind' => 'sent',
+                            'direction' => 'outbound',
+                            'subject' => (string) ($mail->subject ?? '(No subject)'),
+                            'body' => $body,
+                            'snippet' => Str::limit($body !== '' ? $body : '(No preview stored)', 200),
+                            'from_label' => (string) ($mail->creator?->name ?? 'CRM user'),
+                            'from_email' => (string) ($mail->reply_to ?: config('mail.from.address', '')),
+                            'to_email' => (string) ($mail->recipient_email ?? ''),
+                            'status' => (string) ($mail->status ?? 'sent'),
+                            'display_at' => optional($mail->sent_at ?? $mail->created_at)?->format('Y-m-d H:i') ?: '-',
+                            'sort_at' => optional($mail->sent_at ?? $mail->created_at)?->timestamp ?? 0,
+                            'is_selected' => (int) $mail->id === (int) $openMessageId,
+                        ];
+                    });
+
+                $inboundReplies = InboundEmail::query()
+                    ->whereRaw('LOWER(from_email) = ?', [$recipient])
+                    ->latest('received_at')
+                    ->latest('id')
+                    ->limit(12)
+                    ->get()
+                    ->map(static function (InboundEmail $mail): array {
+                        $body = trim((string) ($mail->body_text ?? ''));
+                        if ($body === '') {
+                            $body = trim(strip_tags((string) ($mail->body_html ?? '')));
+                        }
+
+                        return [
+                            'id' => (int) $mail->id,
+                            'kind' => 'inbound',
+                            'direction' => 'inbound',
+                            'subject' => (string) ($mail->subject ?? '(No subject)'),
+                            'body' => $body,
+                            'snippet' => Str::limit($body !== '' ? $body : '(No message body)', 200),
+                            'from_label' => trim((string) ($mail->from_name ?: $mail->from_email)),
+                            'from_email' => (string) ($mail->from_email ?? ''),
+                            'to_email' => (string) ($mail->to_email ?? ''),
+                            'status' => (string) ($mail->status ?? 'received'),
+                            'display_at' => optional($mail->received_at ?? $mail->created_at)?->format('Y-m-d H:i') ?: '-',
+                            'sort_at' => optional($mail->received_at ?? $mail->created_at)?->timestamp ?? 0,
+                            'is_selected' => false,
+                        ];
+                    });
+
+                $threadMessages = $outboundMessages
+                    ->concat($inboundReplies)
+                    ->sortByDesc('sort_at')
+                    ->take(24)
+                    ->values();
+            }
+        }
+
+        $draftId = $request->filled('draft') ? (int) $request->query('draft') : null;
+        if ($folder === 'drafts' && $openMessageId > 0) {
+            $draftId = $openMessageId;
+        }
+        $selectedDraft = null;
+        if ($draftId !== null && $draftId > 0) {
+            $selectedDraft = EmailDraft::query()->find($draftId);
+            if ($selectedDraft) {
+                $selectedDraft->last_opened_at = now();
+                $selectedDraft->save();
+            }
+        }
+
+        if ($folder === 'drafts' && $selectedDraft) {
+            $selectedMessage = $selectedDraft;
+            $threadMessages = collect([
+                [
+                    'id' => (int) $selectedDraft->id,
+                    'kind' => 'draft',
+                    'direction' => 'draft',
+                    'subject' => (string) ($selectedDraft->subject ?: '(No subject)'),
+                    'body' => (string) ($selectedDraft->message ?? ''),
+                    'snippet' => Str::limit((string) ($selectedDraft->message ?? '(No draft body)'), 200),
+                    'from_label' => (string) ($request->user()?->name ?? 'CRM user'),
+                    'from_email' => (string) config('mail.from.address', ''),
+                    'to_email' => (string) ($selectedDraft->recipient_email ?? ''),
+                    'status' => 'draft',
+                    'display_at' => optional($selectedDraft->updated_at ?? $selectedDraft->created_at)?->format('Y-m-d H:i') ?: '-',
+                    'sort_at' => optional($selectedDraft->updated_at ?? $selectedDraft->created_at)?->timestamp ?? 0,
+                    'is_selected' => true,
+                ],
+            ]);
+        }
+
+        $compose = [
+            'draft_id' => old('draft_id', $selectedDraft?->id),
+            'recipient_email' => old('recipient_email', (string) ($request->query('compose_to') ?? $selectedDraft?->recipient_email ?? '')),
+            'reply_to' => old('reply_to', (string) ($selectedDraft?->reply_to ?? $defaultReplyTo)),
+            'cc' => old('cc', (string) ($selectedDraft?->cc ?? '')),
+            'bcc' => old('bcc', (string) ($selectedDraft?->bcc ?? '')),
+            'client_project_id' => old('client_project_id', (string) ($request->query('compose_project_id') ?? $selectedDraft?->client_project_id ?? '')),
+            'subject' => old('subject', (string) ($request->query('compose_subject') ?? $selectedDraft?->subject ?? '')),
+            'message' => old('message', (string) ($request->query('compose_message') ?? $selectedDraft?->message ?? '')),
+            'lead_id' => old('lead_id', (string) ($request->query('lead_id') ?? '')),
+            'recipient_name' => old('recipient_name', (string) ($request->query('recipient_name') ?? '')),
+            'ai_template' => old('ai_template', (string) ($request->query('compose_template') ?? 'custom')),
+            'ai_goal' => old('ai_goal', (string) ($request->query('compose_goal') ?? '')),
+        ];
+
+        return view('admin.emails-mailbox', [
+            'activeFolder' => $folder,
+            'defaultRecipient' => $defaultRecipient,
+            'defaultReplyTo' => $defaultReplyTo,
+            'quickTemplates' => $quickTemplates,
+            'projectOptions' => $projectOptions,
+            'folderCounts' => $folderCounts,
+            'mailboxItems' => $mailboxItems,
+            'emailEventTimeline' => $eventTimeline,
+            'selectedEmailEventTimeline' => $selectedTimeline,
+            'selectedMessage' => $selectedMessage,
+            'threadMessages' => $threadMessages,
+            'openMessageId' => $openMessageId,
+            'compose' => $compose,
+        ]);
+    }
+
+    /**
+     * @param array<string,mixed> $payload
+     * @return array{ok:bool,error?:string}
+     */
+    private function dispatchCrmEmail(array $payload): array
+    {
+        $recipient = trim((string) ($payload['recipient_email'] ?? ''));
+        $subject = trim((string) ($payload['subject'] ?? ''));
+        $message = trim((string) ($payload['message'] ?? ''));
+        $replyTo = filled($payload['reply_to'] ?? null) ? (string) $payload['reply_to'] : null;
+        $cc = is_array($payload['cc'] ?? null) ? (array) $payload['cc'] : [];
+        $bcc = is_array($payload['bcc'] ?? null) ? (array) $payload['bcc'] : [];
+        $threadProjectId = !blank($payload['thread_project_id'] ?? null) ? (int) $payload['thread_project_id'] : null;
+
+        $emailLog = $this->createEmailLogEntry([
+            'created_by' => $payload['created_by'] ?? null,
+            'mode' => (string) ($payload['mode'] ?? 'custom'),
+            'template_key' => blank($payload['template_key'] ?? null) ? null : (string) $payload['template_key'],
+            'recipient_email' => $recipient,
+            'reply_to' => $replyTo,
+            'cc' => count($cc) > 0 ? implode(', ', $cc) : null,
+            'bcc' => count($bcc) > 0 ? implode(', ', $bcc) : null,
+            'subject' => $subject,
+            'body_preview' => Str::limit($message, 700),
+            'status' => 'queued',
+            'error_message' => null,
+            'sent_at' => null,
+            'provider_status' => 'queued',
+        ]);
+
+        try {
+            $mailer = Mail::to($recipient);
+            if (count($cc) > 0) {
+                $mailer->cc($cc);
+            }
+            if (count($bcc) > 0) {
+                $mailer->bcc($bcc);
+            }
+
+            $mailer->send(new BrandedNotificationMail(
+                subjectLine: $subject,
+                heading: 'Message from Maccento CRM',
+                bodyLines: $this->emailBodyToLines($message),
+                intro: 'This message was sent from your CRM Email Center.',
+                ctaLabel: 'Open Email Center',
+                ctaUrl: route('admin.emails.sent'),
+                footerNote: 'Need help? Reply to this email and our team will assist you.',
+                emailLogId: $emailLog?->id,
+                threadProjectId: $threadProjectId,
+                replyToAddress: $replyTo,
+            ));
+
+            if ($emailLog) {
+                $emailLog->forceFill([
+                    'status' => 'sent',
+                    'error_message' => null,
+                    'sent_at' => now(),
+                    'provider_status' => 'processed',
+                    'provider_last_event_at' => now(),
+                ])->save();
+            }
+
+            $this->notificationService()->notifyInternal(
+                'admin_email_sent',
+                'CRM email sent',
+                "Email sent to {$recipient}: {$subject}",
+                route('admin.emails.sent'),
+                ['recipient' => $recipient, 'subject' => $subject]
+            );
+
+            return ['ok' => true];
+        } catch (Throwable $exception) {
+            report($exception);
+
+            if ($emailLog) {
+                $emailLog->forceFill([
+                    'status' => 'failed',
+                    'error_message' => Str::limit($exception->getMessage(), 500),
+                    'provider_status' => 'failed',
+                    'provider_last_event_at' => now(),
+                ])->save();
+            }
+
+            return [
+                'ok' => false,
+                'error' => 'Email could not be sent. Please verify SendGrid and try again.',
+            ];
+        }
     }
 
     /**

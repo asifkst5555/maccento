@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\WebsiteFormSubmission;
+use App\Services\LeadAutoCaptureService;
 use App\Services\PanelNotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -12,6 +13,7 @@ class WebsiteFormSubmissionController extends Controller
 {
     public function __construct(
         private readonly PanelNotificationService $panelNotificationService,
+        private readonly LeadAutoCaptureService $leadAutoCaptureService,
     ) {
     }
 
@@ -53,6 +55,18 @@ class WebsiteFormSubmissionController extends Controller
             'submitted_at' => now(),
         ]);
 
+        $leadSource = (string) ($validated['source'] ?? 'website_contact_form_submission');
+        $capturedLead = $this->leadAutoCaptureService->captureAndWelcome([
+            'name' => (string) ($validated['name'] ?? ''),
+            'email' => (string) ($validated['email'] ?? ''),
+            'phone' => (string) ($validated['phone'] ?? ''),
+            'service_type' => (string) ($validated['service'] ?? ''),
+            'location' => (string) ($validated['region'] ?? ''),
+            'notes' => (string) ($validated['message'] ?? ''),
+            'score' => 40,
+            'status' => 'new',
+        ], $leadSource);
+
         $this->panelNotificationService->notifyInternal(
             'website_form_submitted',
             'New website form submission',
@@ -64,6 +78,7 @@ class WebsiteFormSubmissionController extends Controller
         return response()->json([
             'ok' => true,
             'message' => 'Form submitted successfully.',
+            'lead_captured' => $capturedLead !== null,
         ]);
     }
 }

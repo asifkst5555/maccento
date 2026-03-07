@@ -18,6 +18,7 @@ class ChatOrchestrator
         private readonly AiProviderManager $aiProviderManager,
         private readonly MaccentoKnowledgeService $knowledgeService,
         private readonly PackageBuilderPricingService $pricingService,
+        private readonly LeadAutoCaptureService $leadAutoCaptureService,
     ) {
     }
 
@@ -38,7 +39,11 @@ class ChatOrchestrator
         $conversation->metadata = $metadata;
         $conversation->save();
 
-        $lead = $conversation->leadProfile()->firstOrCreate([]);
+        $lead = $conversation->leadProfile()->first() ?: new LeadProfile([
+            'conversation_id' => $conversation->id,
+            'status' => 'new',
+            'score' => 0,
+        ]);
         $extracted = $this->leadExtractionService->extract($content);
         $this->mergeLeadData($lead, $extracted);
 
@@ -65,6 +70,21 @@ class ChatOrchestrator
 
         $lead->score = $this->scoreLead($lead);
 
+        if (filled($lead->email)) {
+            $lead = $this->leadAutoCaptureService->captureAndWelcome([
+                'name' => $lead->name,
+                'email' => $lead->email,
+                'phone' => $lead->phone,
+                'service_type' => $lead->service_type,
+                'property_type' => $lead->property_type,
+                'location' => $lead->location,
+                'timeline' => $lead->timeline,
+                'notes' => $lead->notes,
+                'score' => $lead->score,
+                'status' => $lead->status,
+            ], 'ai_chat_lead', $conversation) ?? $lead;
+        }
+
         $lastAssistant = $conversation->messages()
             ->where('role', 'assistant')
             ->latest('id')
@@ -77,15 +97,21 @@ class ChatOrchestrator
         if ($awaitingConfirmation && $userConfirmed && $missingFields === []) {
             $lead->status = 'qualified';
             $lead->qualified_at = now();
-            $lead->save();
+            if ($lead->exists) {
+                $lead->save();
+            }
 
-            LeadEvent::create([
-                'lead_profile_id' => $lead->id,
-                'event_type' => 'lead_qualified',
-                'payload' => ['source' => 'chat_orchestrator'],
-            ]);
+            if ($lead->exists) {
+                LeadEvent::create([
+                    'lead_profile_id' => $lead->id,
+                    'event_type' => 'lead_qualified',
+                    'payload' => ['source' => 'chat_orchestrator'],
+                ]);
+            }
 
-            SendLeadNotificationJob::dispatch($lead->id);
+            if ($lead->exists) {
+                SendLeadNotificationJob::dispatch($lead->id);
+            }
 
             $assistantText = $assistantLanguage === 'fr'
                 ? 'Parfait. Votre demande est soumise et qualifiee. Notre equipe vous contactera rapidement.'
@@ -98,7 +124,7 @@ class ChatOrchestrator
 
             return [
                 'assistant_message' => $assistantMessage,
-                'lead' => $lead->fresh(),
+                'lead' => $lead->exists ? $lead->fresh() : $lead,
                 'completed' => true,
                 'missing_fields' => [],
             ];
@@ -174,11 +200,13 @@ class ChatOrchestrator
             'metadata' => $assistantMetadata,
         ]);
 
-        $lead->save();
+        if ($lead->exists) {
+            $lead->save();
+        }
 
         return [
             'assistant_message' => $assistantMessage,
-            'lead' => $lead->fresh(),
+            'lead' => $lead->exists ? $lead->fresh() : $lead,
             'completed' => false,
             'missing_fields' => $missingFields,
         ];
@@ -212,8 +240,8 @@ class ChatOrchestrator
         if (blank($lead->name)) {
             $missing[] = 'name';
         }
-        if (blank($lead->email) && blank($lead->phone)) {
-            $missing[] = 'contact';
+        if (blank($lead->email)) {
+            $missing[] = 'email';
         }
         if (blank($lead->service_type)) {
             $missing[] = 'service_type';
@@ -254,7 +282,7 @@ class ChatOrchestrator
     {
         $fr = [
             'name' => 'Puis-je avoir votre nom complet pour preparer votre demande?',
-            'contact' => 'Quel est le meilleur contact pour vous, email ou telephone?',
+            'email' => 'Pouvez-vous partager votre email pour que nous puissions vous envoyer la confirmation?',
             'service_type' => 'De quel service avez-vous besoin: photo, drone, home staging virtuel, ou video walkthrough?',
             'location' => 'Quelle est l\'adresse ou la zone de la propriete?',
             'timeline' => 'Quand en avez-vous besoin (ASAP, cette semaine, semaine prochaine)?',
@@ -263,7 +291,7 @@ class ChatOrchestrator
 
         $en = [
             'name' => 'Can I have your full name so I can prepare your request?',
-            'contact' => 'What is the best contact detail for you, email or phone?',
+            'email' => 'Could you share your email so we can send your confirmation and next steps?',
             'service_type' => 'Which service do you need: photography, drone, virtual staging, or video walkthrough?',
             'location' => 'What is the property location?',
             'timeline' => 'When do you need this done (for example ASAP, this week, or next week)?',
@@ -273,7 +301,7 @@ class ChatOrchestrator
         $map = $language === 'fr' ? $fr : $en;
         return match ($field) {
             'name' => $map['name'],
-            'contact' => $map['contact'],
+            'email' => $map['email'],
             'service_type' => $map['service_type'],
             'location' => $map['location'],
             'timeline' => $map['timeline'],

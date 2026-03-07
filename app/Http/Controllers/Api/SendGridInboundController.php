@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\ClientMessage;
 use App\Models\ClientProject;
+use App\Models\InboundEmail;
 use App\Services\PanelNotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -24,11 +25,32 @@ class SendGridInboundController extends Controller
             return response()->json(['ok' => false, 'message' => 'Missing sender address.'], 422);
         }
 
+        $subject = trim((string) $request->input('subject', ''));
+        $messageBody = $this->buildMessageBody($request);
+        $htmlBody = trim((string) $request->input('html', ''));
+
+        $inboundEmail = InboundEmail::create([
+            'provider' => 'sendgrid',
+            'from_email' => $fromAddress,
+            'from_name' => $this->extractDisplayName((string) $request->input('from', '')),
+            'to_email' => $this->extractEmailAddress((string) $request->input('to', '')),
+            'subject' => $subject !== '' ? $subject : null,
+            'body_text' => $messageBody !== '' ? $messageBody : null,
+            'body_html' => $htmlBody !== '' ? $htmlBody : null,
+            'status' => 'received',
+            'raw_headers' => trim((string) $request->input('headers', '')) ?: null,
+            'raw_payload' => $request->all(),
+            'received_at' => now(),
+        ]);
+
         $client = Client::query()
             ->whereRaw('LOWER(email) = ?', [Str::lower($fromAddress)])
             ->first();
 
         if ($client === null) {
+            $inboundEmail->status = 'unmatched';
+            $inboundEmail->save();
+
             return response()->json([
                 'ok' => true,
                 'stored' => false,
@@ -36,13 +58,16 @@ class SendGridInboundController extends Controller
             ]);
         }
 
-        $subject = trim((string) $request->input('subject', ''));
-        $messageBody = $this->buildMessageBody($request);
         $clientProjectId = $this->resolveClientProjectId($request, $client, $subject);
 
         if ($messageBody === '') {
             return response()->json(['ok' => false, 'message' => 'Empty inbound message.'], 422);
         }
+
+        $inboundEmail->client_id = $client->id;
+        $inboundEmail->client_project_id = $clientProjectId;
+        $inboundEmail->status = 'linked';
+        $inboundEmail->save();
 
         $timelineMessage = $subject !== ''
             ? "Subject: {$subject}\n\n{$messageBody}"
@@ -179,6 +204,21 @@ class SendGridInboundController extends Controller
 
         $email = filter_var($raw, FILTER_VALIDATE_EMAIL);
         return $email !== false ? Str::lower((string) $email) : null;
+    }
+
+    private function extractDisplayName(string $raw): ?string
+    {
+        $raw = trim($raw);
+        if ($raw === '') {
+            return null;
+        }
+
+        if (preg_match('/^\s*([^<]+)\s*<[^>]+>\s*$/', $raw, $matches) === 1) {
+            $name = trim((string) ($matches[1] ?? ''), " \t\n\r\0\x0B\"'");
+            return $name !== '' ? $name : null;
+        }
+
+        return null;
     }
 
     private function buildMessageBody(Request $request): string

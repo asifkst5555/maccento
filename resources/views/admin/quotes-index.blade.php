@@ -23,7 +23,7 @@
     <input class="panel-input" type="number" name="estimated_total" min="0" placeholder="Estimated total" required>
     <input class="panel-input" type="text" name="currency" value="USD" placeholder="Currency">
     <button class="panel-btn panel-btn-primary" type="submit">Create Quote</button>
-    <textarea class="panel-textarea" name="notes" placeholder="Optional notes"></textarea>
+    <textarea class="panel-textarea" name="notes" placeholder="Optional notes" style="flex-basis:100%;"></textarea>
   </form>
 </section>
 

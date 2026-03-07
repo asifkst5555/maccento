@@ -5,12 +5,12 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Conversation;
 use App\Models\LeadEvent;
-use App\Models\LeadProfile;
 use App\Models\QuoteBuild;
 use App\Models\QuoteEvent;
 use App\Services\PackageBuilderPricingService;
 use App\Services\PanelNotificationService;
 use App\Services\QuoteNotificationService;
+use App\Services\LeadAutoCaptureService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -20,6 +20,7 @@ class PackageBuilderController extends Controller
         private readonly PackageBuilderPricingService $pricingService,
         private readonly QuoteNotificationService $quoteNotificationService,
         private readonly PanelNotificationService $panelNotificationService,
+        private readonly LeadAutoCaptureService $leadAutoCaptureService,
     ) {
     }
 
@@ -86,18 +87,16 @@ class PackageBuilderController extends Controller
                 ],
             ]);
 
-            $lead = LeadProfile::create([
-                'conversation_id' => $conversation->id,
+            $lead = $this->leadAutoCaptureService->captureAndWelcome([
                 'name' => $validated['contact_name'],
                 'email' => $validated['contact_email'] ?? null,
                 'phone' => $validated['contact_phone'] ?? null,
                 'service_type' => implode(',', $services),
                 'property_type' => $listingType,
-                'timeline' => null,
                 'notes' => $validated['message'] ?? null,
                 'score' => 55,
                 'status' => 'new',
-            ]);
+            ], 'website_packages', $conversation);
 
             $conversation->messages()->create([
                 'role' => 'user',
@@ -115,7 +114,7 @@ class PackageBuilderController extends Controller
                 'quote_id' => QuoteBuild::makeQuoteId(),
                 'user_id' => $request->user()?->id,
                 'conversation_id' => $conversation->id,
-                'lead_profile_id' => $lead->id,
+                'lead_profile_id' => $lead?->id,
                 'visitor_id' => $validated['visitor_id'] ?? null,
                 'status' => 'new',
                 'listing_type' => $listingType,
@@ -146,17 +145,19 @@ class PackageBuilderController extends Controller
                 'created_by' => $request->user()?->id,
             ]);
 
-            LeadEvent::create([
-                'lead_profile_id' => $lead->id,
-                'event_type' => 'package_builder_submitted',
-                'payload' => [
-                    'quote_id' => $quoteBuild->quote_id,
-                    'estimated_total' => $quoteBuild->estimated_total,
-                    'currency' => $quoteBuild->currency,
-                    'package_code' => $packageCode,
-                ],
-                'created_by' => $request->user()?->id,
-            ]);
+            if ($lead) {
+                LeadEvent::create([
+                    'lead_profile_id' => $lead->id,
+                    'event_type' => 'package_builder_submitted',
+                    'payload' => [
+                        'quote_id' => $quoteBuild->quote_id,
+                        'estimated_total' => $quoteBuild->estimated_total,
+                        'currency' => $quoteBuild->currency,
+                        'package_code' => $packageCode,
+                    ],
+                    'created_by' => $request->user()?->id,
+                ]);
+            }
 
             $this->quoteNotificationService->sendSubmissionEmails($quoteBuild);
             $this->panelNotificationService->notifyInternal(
@@ -216,18 +217,16 @@ class PackageBuilderController extends Controller
             ],
         ]);
 
-        $lead = LeadProfile::create([
-            'conversation_id' => $conversation->id,
+        $lead = $this->leadAutoCaptureService->captureAndWelcome([
             'name' => $validated['contact_name'],
             'email' => $validated['contact_email'] ?? null,
             'phone' => $validated['contact_phone'] ?? null,
             'service_type' => implode(',', $validated['services']),
             'property_type' => $validated['listing_type'],
-            'timeline' => null,
             'notes' => $validated['message'] ?? null,
             'score' => 55,
             'status' => 'new',
-        ]);
+        ], 'website_packages', $conversation);
 
         $conversation->messages()->create([
             'role' => 'user',
@@ -250,7 +249,7 @@ class PackageBuilderController extends Controller
             'quote_id' => QuoteBuild::makeQuoteId(),
             'user_id' => $request->user()?->id,
             'conversation_id' => $conversation->id,
-            'lead_profile_id' => $lead->id,
+            'lead_profile_id' => $lead?->id,
             'visitor_id' => $validated['visitor_id'] ?? null,
             'status' => 'new',
             'listing_type' => $validated['listing_type'],
@@ -280,16 +279,18 @@ class PackageBuilderController extends Controller
             'created_by' => $request->user()?->id,
         ]);
 
-        LeadEvent::create([
-            'lead_profile_id' => $lead->id,
-            'event_type' => 'package_builder_submitted',
-            'payload' => [
-                'quote_id' => $quoteBuild->quote_id,
-                'estimated_total' => $quoteBuild->estimated_total,
-                'currency' => $quoteBuild->currency,
-            ],
-            'created_by' => $request->user()?->id,
-        ]);
+        if ($lead) {
+            LeadEvent::create([
+                'lead_profile_id' => $lead->id,
+                'event_type' => 'package_builder_submitted',
+                'payload' => [
+                    'quote_id' => $quoteBuild->quote_id,
+                    'estimated_total' => $quoteBuild->estimated_total,
+                    'currency' => $quoteBuild->currency,
+                ],
+                'created_by' => $request->user()?->id,
+            ]);
+        }
 
         $this->quoteNotificationService->sendSubmissionEmails($quoteBuild);
         $this->panelNotificationService->notifyInternal(

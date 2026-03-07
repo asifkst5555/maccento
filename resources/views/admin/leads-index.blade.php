@@ -1,6 +1,6 @@
 @extends('layouts.panel', [
-  'title' => 'Lead Pipeline',
-  'heading' => 'Lead Pipeline',
+  'title' => 'All Leads',
+  'heading' => 'All Leads',
   'subheading' => 'Dedicated lead management workspace with focused filters and actions.',
 ])
 
@@ -47,6 +47,13 @@
           <td>{{ $lead->score }}</td>
           <td>
             <a class="panel-link" href="{{ route('admin.leads.show', $lead) }}">Open</a>
+            @if(!blank($lead->email))
+            <a class="panel-link" style="margin-left:8px;" href="{{ route('admin.emails.inbox', ['compose_to' => $lead->email, 'compose_subject' => 'Follow-up from Maccento CRM', 'compose_message' => 'Hi ' . ($lead->name ?: 'there') . ",\n\nThanks for your interest in Maccento. We would love to help you move forward.\n\nBest regards,\n" . (auth()->user()->name ?? 'Maccento Team'), 'lead_id' => $lead->id, 'recipient_name' => $lead->name, 'compose_template' => 'cold_followup', 'compose_goal' => 'Send a short warm follow-up and ask for a 10-minute call this week.']) }}">Email</a>
+            <form method="post" action="{{ route('admin.leads.email.send', $lead) }}" style="display:inline-block; margin-left:8px;" onsubmit="return confirm('Send quick follow-up email to this lead?');">
+              @csrf
+              <button class="panel-btn" type="submit">Quick Send</button>
+            </form>
+            @endif
             <form method="post" action="{{ route('admin.leads.delete', $lead) }}" style="display:inline-block; margin-left:8px;" onsubmit="return confirm('Delete this lead?');">
               @csrf
               <button class="panel-btn panel-btn-danger" type="submit">Delete</button>

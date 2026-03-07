@@ -54,21 +54,21 @@
 
           @if(in_array($panelRole, ['admin', 'owner', 'manager'], true))
           <p class="panel-nav-group-title">Lead Management</p>
-          <a class="panel-nav-link @if(request()->routeIs('admin.form-submissions*')) is-active @endif" href="{{ route('admin.form-submissions') }}" title="Website Submissions">
-            <span class="panel-nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h14a2 2 0 0 1 2 2v14l-4-3-4 3-4-3-4 3V5a2 2 0 0 1 2-2z" fill="none" stroke="currentColor" stroke-width="2"/></svg></span>
-            <span class="panel-nav-text">Website Submissions</span>
-          </a>
-          <a class="panel-nav-link @if(request()->routeIs('admin.leads.*') && !request()->routeIs('admin.leads.ai.*') && !request()->routeIs('admin.leads.packages.*')) is-active @endif" href="{{ route('admin.leads.index') }}" title="Lead Pipeline">
+          <a class="panel-nav-link @if(request()->routeIs('admin.leads.*') && !request()->routeIs('admin.leads.ai.*') && !request()->routeIs('admin.leads.packages.*')) is-active @endif" href="{{ route('admin.leads.index') }}" title="All Leads">
             <span class="panel-nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5zm0 2c-4.42 0-8 2.24-8 5v1h16v-1c0-2.76-3.58-5-8-5z" fill="currentColor"/></svg></span>
-            <span class="panel-nav-text">Lead Pipeline</span>
+            <span class="panel-nav-text">All Leads</span>
           </a>
-          <a class="panel-nav-link @if(request()->routeIs('admin.leads.ai.*')) is-active @endif" href="{{ route('admin.leads.ai.index') }}" title="Leads from AI Assistant">
+          <a class="panel-nav-link @if(request()->routeIs('admin.leads.ai.*')) is-active @endif" href="{{ route('admin.leads.ai.index') }}" title="Leads from AI Assistance">
             <span class="panel-nav-icon"><img src="{{ asset('assets/media/icon/ai_icon.png') }}" alt="" aria-hidden="true"></span>
-            <span class="panel-nav-text">Leads from AI Assistant</span>
+            <span class="panel-nav-text">Leads from AI Assistance</span>
           </a>
           <a class="panel-nav-link @if(request()->routeIs('admin.leads.packages.*')) is-active @endif" href="{{ route('admin.leads.packages.index') }}" title="Leads from Packages">
             <span class="panel-nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7.5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2h-1v4a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2v-4H5a2 2 0 0 1-2-2v-3zm5 5v4h8v-4H8zm1-5a1 1 0 1 0 0 2h6a1 1 0 1 0 0-2H9z" fill="currentColor"/></svg></span>
             <span class="panel-nav-text">Leads from Packages</span>
+          </a>
+          <a class="panel-nav-link @if(request()->routeIs('admin.form-submissions*')) is-active @endif" href="{{ route('admin.form-submissions') }}" title="Website Submissions">
+            <span class="panel-nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h14a2 2 0 0 1 2 2v14l-4-3-4 3-4-3-4 3V5a2 2 0 0 1 2-2z" fill="none" stroke="currentColor" stroke-width="2"/></svg></span>
+            <span class="panel-nav-text">Website Submissions</span>
           </a>
 
           <p class="panel-nav-group-title">Sales Operations</p>
@@ -80,10 +80,43 @@
             <span class="panel-nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h9l5 5v13a1 1 0 0 1-1 1H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zm8 1.5V9h4.5M8 13h8m-8 3h8m-8-6h5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
             <span class="panel-nav-text">Invoices</span>
           </a>
-          <a class="panel-nav-link @if(request()->routeIs('admin.emails.*')) is-active @endif" href="{{ route('admin.emails.index') }}" title="Email Center">
-            <span class="panel-nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6zm2 .5V8l7 4.7L19 8V6.5l-7 4.6-7-4.6z" fill="currentColor"/></svg></span>
-            <span class="panel-nav-text">Email Center</span>
-          </a>
+          @php
+            $composeActive = request()->routeIs('admin.emails.inbox') && (string) request()->query('compose') === '1';
+            $automationActive = request()->routeIs('admin.emails.automation.*');
+          @endphp
+          <div class="panel-nav-link-group @if(request()->routeIs('admin.emails.*')) is-active @endif" data-subnav-group="emails">
+            <div class="panel-nav-head">
+              <a class="panel-nav-link @if(request()->routeIs('admin.emails.*')) is-active @endif" href="{{ route('admin.emails.inbox') }}" title="Email Center">
+                <span class="panel-nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6zm2 .5V8l7 4.7L19 8V6.5l-7 4.6-7-4.6z" fill="currentColor"/></svg></span>
+                <span class="panel-nav-text">Email Center</span>
+              </a>
+              <button class="panel-subnav-toggle" type="button" aria-label="Toggle Email Center menu" aria-expanded="true" data-subnav-toggle="emails">
+                <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6 8l4 4 4-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </button>
+            </div>
+            <div class="panel-subnav" data-subnav="emails">
+              <a class="panel-subnav-link @if($composeActive) is-active @endif" href="{{ route('admin.emails.inbox', ['compose' => 1]) }}">
+                <span class="panel-subnav-icon"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4v12M4 10h12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>
+                <span>Compose</span>
+              </a>
+              <a class="panel-subnav-link @if(request()->routeIs('admin.emails.inbox') && !$composeActive) is-active @endif" href="{{ route('admin.emails.inbox') }}">
+                <span class="panel-subnav-icon"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 6a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6zm2 .5v1.2l5 3.2 5-3.2V6.5l-5 3.1-5-3.1z" fill="currentColor"/></svg></span>
+                <span>Inbox</span>
+              </a>
+              <a class="panel-subnav-link @if(request()->routeIs('admin.emails.sent')) is-active @endif" href="{{ route('admin.emails.sent') }}">
+                <span class="panel-subnav-icon"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 10l13-6-3.4 12-3.1-4.1L6 14l-3-4z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></span>
+                <span>Sent</span>
+              </a>
+              <a class="panel-subnav-link @if(request()->routeIs('admin.emails.drafts')) is-active @endif" href="{{ route('admin.emails.drafts') }}">
+                <span class="panel-subnav-icon"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 14.8h2.4L14 7.2 11.8 5 4.2 12.6V15zM10.9 6l2.2 2.2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                <span>Drafts</span>
+              </a>
+              <a class="panel-subnav-link @if($automationActive) is-active @endif" href="{{ route('admin.emails.automation.index') }}">
+                <span class="panel-subnav-icon"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3.5l1.4 2.1 2.4.5-.9 2.3 1.6 1.8-1.9 1.6.3 2.5-2.4.7-1.1 2.2-2.2-1.1-2.2 1.1-1.1-2.2-2.4-.7.3-2.5-1.9-1.6 1.6-1.8-.9-2.3 2.4-.5L10 3.5zm0 4.2a2.3 2.3 0 1 0 0 4.6 2.3 2.3 0 0 0 0-4.6z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg></span>
+                <span>Automation</span>
+              </a>
+            </div>
+          </div>
           @endif
 
           <p class="panel-nav-group-title">Delivery</p>
@@ -290,6 +323,100 @@
           mobileToggle.setAttribute('aria-expanded', 'false');
         }
         applyStoredState();
+      });
+
+      const nav = document.querySelector('.panel-nav');
+      if (nav) {
+        const groupTitles = Array.from(nav.querySelectorAll(':scope > .panel-nav-group-title'));
+        const slugify = function (value) {
+          return String(value || '')
+            .trim()
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/^-+|-+$/g, '') || 'group';
+        };
+
+        groupTitles.forEach(function (titleEl, index) {
+          const titleText = String(titleEl.textContent || '').trim();
+          const groupId = slugify(titleText) + '-' + String(index + 1);
+          const section = document.createElement('section');
+          section.className = 'panel-nav-group';
+          section.setAttribute('data-nav-section', groupId);
+
+          const toggle = document.createElement('button');
+          toggle.type = 'button';
+          toggle.className = 'panel-nav-group-toggle';
+          toggle.setAttribute('data-nav-section-toggle', groupId);
+          toggle.setAttribute('aria-expanded', 'true');
+          toggle.innerHTML = '' +
+            '<span class="panel-nav-group-toggle-text">' + titleText + '</span>' +
+            '<span class="panel-nav-group-toggle-arrow" aria-hidden="true">' +
+              '<svg viewBox="0 0 20 20"><path d="M6 8l4 4 4-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+            '</span>';
+
+          const body = document.createElement('div');
+          body.className = 'panel-nav-group-body';
+          body.setAttribute('data-nav-section-body', groupId);
+
+          nav.insertBefore(section, titleEl);
+          titleEl.remove();
+
+          section.appendChild(toggle);
+          section.appendChild(body);
+
+          let cursor = section.nextElementSibling;
+          while (cursor && !cursor.classList.contains('panel-nav-group-title')) {
+            const next = cursor.nextElementSibling;
+            body.appendChild(cursor);
+            cursor = next;
+          }
+
+          const storageKey = 'maccento_panel_nav_group_collapsed_' + groupId;
+          const hasActive = body.querySelector('.is-active') !== null;
+          const stored = localStorage.getItem(storageKey);
+          const collapsed = stored === null ? !hasActive : stored === '1';
+
+          const applyGroupState = function (isCollapsed) {
+            section.classList.toggle('is-collapsed', isCollapsed);
+            toggle.setAttribute('aria-expanded', isCollapsed ? 'false' : 'true');
+          };
+
+          applyGroupState(collapsed);
+
+          toggle.addEventListener('click', function () {
+            const nextState = !section.classList.contains('is-collapsed');
+            applyGroupState(nextState);
+            localStorage.setItem(storageKey, nextState ? '1' : '0');
+          });
+        });
+      }
+
+      const subnavGroups = Array.from(document.querySelectorAll('[data-subnav-group]'));
+      subnavGroups.forEach(function (group) {
+        const key = String(group.getAttribute('data-subnav-group') || '').trim();
+        if (key === '') return;
+
+        const toggle = group.querySelector('[data-subnav-toggle="' + key + '"]');
+        const submenu = group.querySelector('[data-subnav="' + key + '"]');
+        if (!toggle || !submenu) return;
+
+        const stateKey = 'maccento_panel_subnav_collapsed_' + key;
+        const apply = function (collapsed) {
+          group.classList.toggle('is-collapsed', collapsed);
+          toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+        };
+
+        const stored = localStorage.getItem(stateKey);
+        const defaultCollapsed = !group.classList.contains('is-active');
+        apply(stored === null ? defaultCollapsed : stored === '1');
+
+        toggle.addEventListener('click', function (event) {
+          event.preventDefault();
+          event.stopPropagation();
+          const collapsed = !group.classList.contains('is-collapsed');
+          apply(collapsed);
+          localStorage.setItem(stateKey, collapsed ? '1' : '0');
+        });
       });
 
       const notifyWrap = document.querySelector('[data-panel-notify]');

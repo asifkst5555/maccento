@@ -52,7 +52,17 @@ Route::middleware('auth')->group(function (): void {
         Route::get('/admin/quotes', [DashboardController::class, 'adminQuotesIndex'])->name('admin.quotes.index');
         Route::get('/admin/invoices', [DashboardController::class, 'adminInvoicesIndex'])->name('admin.invoices.index');
         Route::get('/admin/emails', [DashboardController::class, 'adminEmailsIndex'])->name('admin.emails.index');
+        Route::get('/admin/emails/inbox', [DashboardController::class, 'adminEmailsInbox'])->name('admin.emails.inbox');
+        Route::get('/admin/emails/sent', [DashboardController::class, 'adminEmailsSent'])->name('admin.emails.sent');
+        Route::get('/admin/emails/drafts', [DashboardController::class, 'adminEmailsDrafts'])->name('admin.emails.drafts');
+        Route::get('/admin/emails/automation', [DashboardController::class, 'adminEmailAutomationSettingsIndex'])->name('admin.emails.automation.index');
+        Route::post('/admin/emails/automation', [DashboardController::class, 'adminEmailAutomationSettingsUpdate'])->name('admin.emails.automation.update');
+        Route::post('/admin/emails/automation/backfill', [DashboardController::class, 'adminEmailAutomationBackfillRun'])->name('admin.emails.automation.backfill');
         Route::post('/admin/emails/send', [DashboardController::class, 'adminEmailSend'])->name('admin.emails.send');
+        Route::post('/admin/emails/ai-write', [DashboardController::class, 'adminEmailAiWrite'])->name('admin.emails.ai-write');
+        Route::post('/admin/emails/drafts/save', [DashboardController::class, 'adminEmailDraftStore'])->name('admin.emails.drafts.save');
+        Route::post('/admin/emails/drafts/{draft}/send', [DashboardController::class, 'adminEmailDraftSend'])->name('admin.emails.drafts.send');
+        Route::post('/admin/emails/drafts/{draft}/delete', [DashboardController::class, 'adminEmailDraftDelete'])->name('admin.emails.drafts.delete');
         Route::post('/admin/quotes/manual', [DashboardController::class, 'adminQuoteManualStore'])->name('admin.quotes.manual-store');
         Route::get('/admin/exports/leads.csv', [DashboardController::class, 'adminExportLeadsCsv'])->name('admin.exports.leads');
         Route::get('/admin/exports/quotes.csv', [DashboardController::class, 'adminExportQuotesCsv'])->name('admin.exports.quotes');
@@ -77,6 +87,7 @@ Route::middleware('auth')->group(function (): void {
         Route::get('/admin/leads/{lead}', [DashboardController::class, 'adminLeadShow'])->name('admin.leads.show');
         Route::get('/admin/leads/{lead}/conversation.pdf', [DashboardController::class, 'adminLeadConversationPdf'])->name('admin.leads.conversation-pdf');
         Route::post('/admin/leads/{lead}/status', [DashboardController::class, 'adminLeadStatusUpdate'])->name('admin.leads.status');
+        Route::post('/admin/leads/{lead}/email-send', [DashboardController::class, 'adminLeadEmailSend'])->name('admin.leads.email.send');
         Route::post('/admin/leads/{lead}/follow-up', [DashboardController::class, 'adminFollowUpStore'])->name('admin.leads.follow-up');
         Route::post('/admin/leads/{lead}/delete', [DashboardController::class, 'adminLeadDestroy'])->name('admin.leads.delete');
         Route::post('/admin/follow-ups/{followUp}/status', [DashboardController::class, 'adminFollowUpStatusUpdate'])->name('admin.follow-ups.status');

@@ -24,7 +24,7 @@
   <form method="post" action="{{ route('admin.media-delivery.watermark.update') }}" enctype="multipart/form-data" class="panel-stack" style="margin-top: 14px;">
     @csrf
 
-    <div class="panel-grid" style="grid-template-columns: repeat(2, minmax(280px, 1fr)); gap: 14px; align-items: start;">
+    <div class="panel-grid" style="grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; align-items: start;">
       <section class="panel-card" style="margin: 0;">
         <h3 class="panel-section-title">Watermark Logo (PNG)</h3>
         <div class="panel-stack" style="max-width: 100%;">
