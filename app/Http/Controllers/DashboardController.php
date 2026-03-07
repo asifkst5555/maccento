@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Mail\BrandedNotificationMail;
 use App\Models\AiUsageLog;
 use App\Models\Client;
 use App\Models\ClientInvoice;
@@ -979,6 +980,12 @@ class DashboardController extends Controller
             ],
         ];
 
+        $quickTemplates = array_map(function (array $template): array {
+            $resolved = $this->buildAdminEmailTemplate((string) ($template['key'] ?? ''));
+            $template['subject_preview'] = (string) ($resolved['subject'] ?? '');
+            return $template;
+        }, $quickTemplates);
+
         $pipelineSummary = [
             'leads_new' => LeadProfile::query()->where('status', 'new')->count(),
             'leads_qualified' => LeadProfile::query()->where('status', 'qualified')->count(),
@@ -990,6 +997,37 @@ class DashboardController extends Controller
                 ->whereDate('due_date', '<', now()->toDateString())
                 ->count(),
         ];
+
+        $projectOptions = ClientProject::query()
+            ->with('client:id,name,email')
+            ->latest('id')
+            ->limit(300)
+            ->get(['id', 'client_id', 'title', 'service_type', 'status'])
+            ->map(static function (ClientProject $project): array {
+                $clientName = trim((string) ($project->client?->name ?? 'Unknown client'));
+                $clientEmail = trim((string) ($project->client?->email ?? ''));
+                $service = trim((string) ($project->service_type ?? ''));
+                $status = trim((string) ($project->status ?? ''));
+
+                $labelParts = ["#{$project->id}", $clientName, $project->title];
+                if ($service !== '') {
+                    $labelParts[] = $service;
+                }
+                if ($status !== '') {
+                    $labelParts[] = strtoupper($status);
+                }
+                if ($clientEmail !== '') {
+                    $labelParts[] = $clientEmail;
+                }
+
+                return [
+                    'id' => (int) $project->id,
+                    'label' => implode(' | ', array_filter($labelParts, static fn ($value): bool => trim((string) $value) !== '')),
+                    'client_email' => $clientEmail !== '' ? Str::lower($clientEmail) : null,
+                ];
+            })
+            ->values()
+            ->all();
 
         try {
             $emailLogs = EmailLog::query()
@@ -1022,6 +1060,7 @@ class DashboardController extends Controller
             'defaultRecipient' => $defaultRecipient,
             'quickTemplates' => $quickTemplates,
             'pipelineSummary' => $pipelineSummary,
+            'projectOptions' => $projectOptions,
             'emailLogs' => $emailLogs,
             'emailEventTimeline' => $timelineMap,
         ]);
@@ -1034,6 +1073,7 @@ class DashboardController extends Controller
         $validated = $request->validate([
             'mode' => ['required', 'in:template,custom'],
             'recipient_email' => ['required', 'email', 'max:255'],
+            'client_project_id' => ['nullable', 'integer'],
             'reply_to' => ['nullable', 'email', 'max:255'],
             'cc' => ['nullable', 'string', 'max:500'],
             'bcc' => ['nullable', 'string', 'max:500'],
@@ -1076,6 +1116,14 @@ class DashboardController extends Controller
             }
         }
 
+        $threadProjectId = $this->resolveOutboundThreadProjectId(
+            recipientEmail: $recipient,
+            requestedProjectId: !blank($validated['client_project_id'] ?? null) ? (int) $validated['client_project_id'] : null,
+        );
+        if ($threadProjectId !== null) {
+            $subject = $this->appendProjectThreadTag($subject, $threadProjectId);
+        }
+
         $emailLog = $this->createEmailLogEntry([
             'created_by' => $request->user()?->id,
             'mode' => (string) ($validated['mode'] ?? 'custom'),
@@ -1093,25 +1141,26 @@ class DashboardController extends Controller
         ]);
 
         try {
-            Mail::raw($body, function ($message) use ($recipient, $subject, $validated, $ccList, $bccList, $emailLog): void {
-                $message->to($recipient)->subject($subject);
+            $mailer = Mail::to($recipient);
+            if (count($ccList['valid']) > 0) {
+                $mailer->cc($ccList['valid']);
+            }
+            if (count($bccList['valid']) > 0) {
+                $mailer->bcc($bccList['valid']);
+            }
 
-                if (filled($validated['reply_to'] ?? null)) {
-                    $message->replyTo((string) $validated['reply_to']);
-                }
-
-                foreach ($ccList['valid'] as $ccEmail) {
-                    $message->cc($ccEmail);
-                }
-
-                foreach ($bccList['valid'] as $bccEmail) {
-                    $message->bcc($bccEmail);
-                }
-
-                if ($emailLog?->id) {
-                    $this->attachSendgridEmailLogHeader($message, (int) $emailLog->id);
-                }
-            });
+            $mailer->send(new BrandedNotificationMail(
+                subjectLine: $subject,
+                heading: 'Message from Maccento CRM',
+                bodyLines: $this->emailBodyToLines($body),
+                intro: 'This message was sent from your CRM Email Center.',
+                ctaLabel: 'Open Maccento CRM',
+                ctaUrl: route('admin.emails.index'),
+                footerNote: 'Need help? Reply to this email and our team will assist you.',
+                emailLogId: $emailLog?->id,
+                threadProjectId: $threadProjectId,
+                replyToAddress: filled($validated['reply_to'] ?? null) ? (string) $validated['reply_to'] : null,
+            ));
 
             $this->notificationService()->notifyInternal(
                 'admin_email_sent',
@@ -2831,27 +2880,6 @@ class DashboardController extends Controller
         }
     }
 
-    private function attachSendgridEmailLogHeader($message, int $emailLogId): void
-    {
-        if (!method_exists($message, 'getSymfonyMessage')) {
-            return;
-        }
-
-        $symfonyMessage = $message->getSymfonyMessage();
-        if (!method_exists($symfonyMessage, 'getHeaders')) {
-            return;
-        }
-
-        $smtpApiPayload = [
-            'unique_args' => [
-                'email_log_id' => (string) $emailLogId,
-            ],
-            'category' => ['crm_email_center'],
-        ];
-
-        $symfonyMessage->getHeaders()->addTextHeader('X-SMTPAPI', (string) json_encode($smtpApiPayload, JSON_UNESCAPED_SLASHES));
-    }
-
     /**
      * @return array{subject:string,body:string}|null
      */
@@ -2956,6 +2984,67 @@ class DashboardController extends Controller
             'valid' => array_values(array_unique($valid)),
             'invalid' => array_values(array_unique($invalid)),
         ];
+    }
+
+    private function resolveOutboundThreadProjectId(string $recipientEmail, ?int $requestedProjectId = null): ?int
+    {
+        if ($requestedProjectId !== null && $requestedProjectId > 0) {
+            $projectId = ClientProject::query()->where('id', $requestedProjectId)->value('id');
+            return $projectId !== null ? (int) $projectId : null;
+        }
+
+        $normalizedEmail = Str::lower(trim($recipientEmail));
+        if ($normalizedEmail === '') {
+            return null;
+        }
+
+        $clientId = Client::query()
+            ->whereRaw('LOWER(email) = ?', [$normalizedEmail])
+            ->value('id');
+
+        if ($clientId === null) {
+            return null;
+        }
+
+        // Auto-map only when the client has a single project to avoid ambiguous threading.
+        $projectIds = ClientProject::query()
+            ->where('client_id', (int) $clientId)
+            ->orderByDesc('id')
+            ->limit(2)
+            ->pluck('id')
+            ->all();
+
+        if (count($projectIds) !== 1) {
+            return null;
+        }
+
+        return (int) $projectIds[0];
+    }
+
+    private function appendProjectThreadTag(string $subject, int $projectId): string
+    {
+        $trimmed = trim($subject);
+        if ($trimmed === '' || $projectId <= 0) {
+            return $trimmed;
+        }
+
+        if (preg_match('/\[(?:project|proj|p)\s*[-:#]?\s*\d+\]/i', $trimmed) === 1) {
+            return $trimmed;
+        }
+
+        return $trimmed . " [P#{$projectId}]";
+    }
+
+    /**
+     * @return array<int,string>
+     */
+    private function emailBodyToLines(string $body): array
+    {
+        return collect(preg_split('/\r\n|\r|\n/', $body) ?: [])
+            ->map(static fn (string $line): string => trim($line))
+            ->filter(static fn (string $line): bool => $line !== '')
+            ->values()
+            ->all();
     }
 
     private function csvSafe(?string $value): string

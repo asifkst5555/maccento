@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use App\Mail\BrandedNotificationMail;
+use App\Models\ClientProject;
 use App\Models\QuoteBuild;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
@@ -20,6 +22,9 @@ class QuoteNotificationService
         $clientEmail = (string) data_get($quoteBuild->options, 'contact_email', '');
         $clientName = (string) data_get($quoteBuild->options, 'contact_name', 'Client');
         $adminEmail = (string) env('QUOTE_ADMIN_EMAIL', (string) config('mail.from.address'));
+        $threadProjectId = ClientProject::query()->where('quote_build_id', $quoteBuild->id)->value('id');
+        $clientSubject = $this->appendProjectThreadTag("Maccento Quote {$quoteBuild->quote_id}", $threadProjectId ? (int) $threadProjectId : null);
+        $adminSubject = $this->appendProjectThreadTag("New Quote Submission {$quoteBuild->quote_id}", $threadProjectId ? (int) $threadProjectId : null);
 
         try {
             if ($clientEmail !== '') {
@@ -36,9 +41,16 @@ class QuoteNotificationService
                     'Our team will follow up shortly.',
                 ]);
 
-                Mail::raw($clientBody, static function ($message) use ($clientEmail, $quoteBuild): void {
-                    $message->to($clientEmail)->subject("Maccento Quote {$quoteBuild->quote_id}");
-                });
+                Mail::to($clientEmail)->send(new BrandedNotificationMail(
+                    subjectLine: $clientSubject,
+                    heading: 'Your Quote Request Was Received',
+                    bodyLines: $this->bodyToLines($clientBody),
+                    intro: 'Thank you for choosing Maccento. Your quote details are below.',
+                    ctaLabel: null,
+                    ctaUrl: null,
+                    footerNote: 'If you need updates, simply reply to this email and our team will help.',
+                    threadProjectId: $threadProjectId ? (int) $threadProjectId : null,
+                ));
             }
 
             if ($adminEmail !== '') {
@@ -56,9 +68,16 @@ class QuoteNotificationService
                     $lineItems !== '' ? $lineItems : '- N/A',
                 ]);
 
-                Mail::raw($adminBody, static function ($message) use ($adminEmail, $quoteBuild): void {
-                    $message->to($adminEmail)->subject("New Quote Submission {$quoteBuild->quote_id}");
-                });
+                Mail::to($adminEmail)->send(new BrandedNotificationMail(
+                    subjectLine: $adminSubject,
+                    heading: 'New Quote Submission',
+                    bodyLines: $this->bodyToLines($adminBody),
+                    intro: 'A new package builder submission has been received in CRM.',
+                    ctaLabel: 'Open Email Center',
+                    ctaUrl: route('admin.emails.index'),
+                    footerNote: 'This is an automated CRM notification.',
+                    threadProjectId: $threadProjectId ? (int) $threadProjectId : null,
+                ));
             }
         } catch (\Throwable $e) {
             Log::warning('Quote email notification failed', [
@@ -66,5 +85,31 @@ class QuoteNotificationService
                 'error' => $e->getMessage(),
             ]);
         }
+    }
+
+    /**
+     * @return array<int,string>
+     */
+    private function bodyToLines(string $body): array
+    {
+        return collect(preg_split('/\r\n|\r|\n/', $body) ?: [])
+            ->map(static fn (string $line): string => trim($line))
+            ->filter(static fn (string $line): bool => $line !== '')
+            ->values()
+            ->all();
+    }
+
+    private function appendProjectThreadTag(string $subject, ?int $projectId): string
+    {
+        $trimmed = trim($subject);
+        if ($trimmed === '' || $projectId === null || $projectId <= 0) {
+            return $trimmed;
+        }
+
+        if (preg_match('/\[(?:project|proj|p)\s*[-:#]?\s*\d+\]/i', $trimmed) === 1) {
+            return $trimmed;
+        }
+
+        return $trimmed . " [P#{$projectId}]";
     }
 }

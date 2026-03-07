@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\ChatHistoryController;
 use App\Http\Controllers\Api\ChatMessageController;
 use App\Http\Controllers\Api\ChatSessionController;
 use App\Http\Controllers\Api\PackageBuilderController;
+use App\Http\Controllers\Api\SendGridInboundController;
 use App\Http\Controllers\Api\SendGridWebhookController;
 use App\Http\Controllers\Api\WebsiteFormSubmissionController;
 use Illuminate\Http\Request;
@@ -33,6 +34,7 @@ Route::post('/package-builder/calculate', [PackageBuilderController::class, 'cal
 Route::post('/package-builder/submit', [PackageBuilderController::class, 'submit']);
 Route::post('/website-form/submit', [WebsiteFormSubmissionController::class, 'store']);
 Route::post('/webhooks/sendgrid/events', [SendGridWebhookController::class, 'events'])->middleware('throttle:sendgrid-webhook');
+Route::post('/webhooks/sendgrid/inbound', [SendGridInboundController::class, 'parse'])->middleware('throttle:sendgrid-webhook');
 
 Route::middleware(['auth:sanctum', 'role:admin,owner,manager'])->prefix('admin')->group(function (): void {
     Route::get('/leads', [AdminLeadController::class, 'index']);

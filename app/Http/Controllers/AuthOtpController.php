@@ -25,6 +25,12 @@ class AuthOtpController extends Controller
             'remember' => ['nullable', 'boolean'],
         ]);
 
+        if (User::query()->count() === 0) {
+            return redirect()
+                ->route('signup')
+                ->with('status', 'No user account exists yet. Create your first account to continue.');
+        }
+
         $email = Str::lower(trim($validated['email']));
         $user = User::where('email', $email)->first();
 

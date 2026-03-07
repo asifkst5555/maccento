@@ -36,7 +36,7 @@
 
   <div class="crm-email-quick-grid">
     @foreach($quickTemplates as $template)
-    <form method="post" action="{{ route('admin.emails.send') }}" class="crm-email-quick-card">
+    <form method="post" action="{{ route('admin.emails.send') }}" class="crm-email-quick-card js-quick-card" data-base-subject="{{ $template['subject_preview'] }}">
       @csrf
       <input type="hidden" name="mode" value="template">
       <input type="hidden" name="template_key" value="{{ $template['key'] }}">
@@ -48,13 +48,25 @@
 
       <label>
         <span>Recipient</span>
-        <input class="panel-input" type="email" name="recipient_email" value="{{ old('recipient_email', $defaultRecipient) }}" required>
+        <input class="panel-input js-quick-recipient" type="email" name="recipient_email" value="{{ old('recipient_email', $defaultRecipient) }}" required>
       </label>
 
       <label>
         <span>Reply-to (optional)</span>
         <input class="panel-input" type="email" name="reply_to" value="{{ old('reply_to', $defaultRecipient) }}">
       </label>
+
+      <label>
+        <span>Thread Project (optional)</span>
+        <select class="panel-input js-quick-project" name="client_project_id">
+          <option value="">Auto-detect from recipient</option>
+          @foreach($projectOptions as $projectOption)
+          <option value="{{ $projectOption['id'] }}" @selected((string) old('client_project_id') === (string) $projectOption['id'])>{{ $projectOption['label'] }}</option>
+          @endforeach
+        </select>
+      </label>
+
+      <small class="panel-muted crm-subject-preview">Final outgoing subject: <strong class="js-quick-subject-preview">{{ $template['subject_preview'] ?: '-' }}</strong></small>
 
       <button class="panel-btn panel-btn-primary" type="submit">Send Now</button>
     </form>
@@ -76,7 +88,7 @@
       <div class="panel-form-row">
         <label>
           <span>To</span>
-          <input class="panel-input" type="email" name="recipient_email" value="{{ old('recipient_email', $defaultRecipient) }}" required>
+          <input id="customRecipientEmail" class="panel-input" type="email" name="recipient_email" value="{{ old('recipient_email', $defaultRecipient) }}" required>
         </label>
         <label>
           <span>Reply-to</span>
@@ -96,8 +108,20 @@
       </div>
 
       <label>
+        <span>Thread Project (optional)</span>
+        <select id="customClientProjectId" class="panel-input" name="client_project_id">
+          <option value="">Auto-detect from recipient (only when exactly one project)</option>
+          @foreach($projectOptions as $projectOption)
+          <option value="{{ $projectOption['id'] }}" @selected((string) old('client_project_id') === (string) $projectOption['id'])>{{ $projectOption['label'] }}</option>
+          @endforeach
+        </select>
+        <small class="panel-muted">Selecting a project forces subject tagging as <strong>[P#id]</strong> for reliable reply threading.</small>
+      </label>
+
+      <label>
         <span>Subject</span>
-        <input class="panel-input" type="text" name="subject" value="{{ old('subject') }}" maxlength="180" required>
+        <input id="customSubjectInput" class="panel-input" type="text" name="subject" value="{{ old('subject') }}" maxlength="180" required>
+        <small id="customSubjectPreview" class="panel-muted crm-subject-preview">Final outgoing subject: <strong id="customSubjectPreviewValue">-</strong></small>
       </label>
 
       <label>
@@ -215,6 +239,90 @@
   <x-panel-pagination :paginator="$emailLogs" />
 </section>
 
+<script>
+  (function () {
+    const projectOptions = @json($projectOptions);
+    const projectTagPattern = /\[(?:project|proj|p)\s*[-:#]?\s*\d+\]/i;
+
+    const normalizeEmail = (value) => String(value || '').trim().toLowerCase();
+
+    const appendProjectTag = (subject, projectId) => {
+      const trimmedSubject = String(subject || '').trim();
+      if (trimmedSubject === '' || !projectId || Number(projectId) <= 0) {
+        return trimmedSubject;
+      }
+
+      if (projectTagPattern.test(trimmedSubject)) {
+        return trimmedSubject;
+      }
+
+      return `${trimmedSubject} [P#${projectId}]`;
+    };
+
+    const resolveProjectIdFor = (recipientValue, selectedValue) => {
+      const selectedId = Number(selectedValue || 0);
+      if (selectedId > 0) {
+        return selectedId;
+      }
+
+      const recipient = normalizeEmail(recipientValue);
+      if (recipient === '') {
+        return null;
+      }
+
+      const matchingProjectIds = projectOptions
+        .filter((item) => normalizeEmail(item.client_email) === recipient)
+        .map((item) => Number(item.id || 0))
+        .filter((id) => id > 0);
+
+      const unique = [...new Set(matchingProjectIds)];
+      return unique.length === 1 ? unique[0] : null;
+    };
+
+    document.querySelectorAll('.js-quick-card').forEach((formEl) => {
+      const recipientInput = formEl.querySelector('.js-quick-recipient');
+      const projectSelect = formEl.querySelector('.js-quick-project');
+      const previewValue = formEl.querySelector('.js-quick-subject-preview');
+      const baseSubject = String(formEl.dataset.baseSubject || '').trim();
+
+      if (!recipientInput || !projectSelect || !previewValue) {
+        return;
+      }
+
+      const updateQuickPreview = () => {
+        const projectId = resolveProjectIdFor(recipientInput.value, projectSelect.value);
+        const finalSubject = appendProjectTag(baseSubject, projectId);
+        previewValue.textContent = finalSubject === '' ? '-' : finalSubject;
+      };
+
+      recipientInput.addEventListener('input', updateQuickPreview);
+      projectSelect.addEventListener('change', updateQuickPreview);
+      updateQuickPreview();
+    });
+
+    const recipientInput = document.getElementById('customRecipientEmail');
+    const projectSelect = document.getElementById('customClientProjectId');
+    const subjectInput = document.getElementById('customSubjectInput');
+    const previewValue = document.getElementById('customSubjectPreviewValue');
+
+    if (!recipientInput || !projectSelect || !subjectInput || !previewValue) {
+      return;
+    }
+
+    const updateSubjectPreview = () => {
+      const forcedOrDetectedProjectId = resolveProjectIdFor(recipientInput.value, projectSelect.value);
+      const finalSubject = appendProjectTag(subjectInput.value, forcedOrDetectedProjectId);
+      previewValue.textContent = finalSubject === '' ? '-' : finalSubject;
+    };
+
+    recipientInput.addEventListener('input', updateSubjectPreview);
+    projectSelect.addEventListener('change', updateSubjectPreview);
+    subjectInput.addEventListener('input', updateSubjectPreview);
+
+    updateSubjectPreview();
+  })();
+</script>
+
 <style>
   .crm-email-hero {
     display: grid;
@@ -279,6 +387,11 @@
     align-items: baseline;
     font-size: 0.8rem;
     color: #1f3554;
+  }
+
+  .crm-subject-preview {
+    display: inline-block;
+    margin-top: 6px;
   }
 
   @media (max-width: 1100px) {
