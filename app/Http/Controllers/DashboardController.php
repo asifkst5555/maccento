@@ -3309,6 +3309,30 @@ class DashboardController extends Controller
                     })
                     ->sortByDesc('sort_at')
                     ->values();
+
+                // Guard against malformed legacy records that cannot be matched into a thread.
+                if ($threadMessages->isEmpty()) {
+                    $body = trim((string) ($selectedMessage->body_text ?? ''));
+                    if ($body === '') {
+                        $body = trim(strip_tags((string) ($selectedMessage->body_html ?? '')));
+                    }
+
+                    $threadMessages = collect([[
+                        'id' => (int) $selectedMessage->id,
+                        'kind' => 'inbound',
+                        'direction' => 'inbound',
+                        'subject' => (string) ($selectedMessage->subject ?? '(No subject)'),
+                        'body' => $body,
+                        'snippet' => Str::limit($body !== '' ? $body : '(No message body)', 200),
+                        'from_label' => trim((string) ($selectedMessage->from_name ?: $selectedMessage->from_email)),
+                        'from_email' => (string) ($selectedMessage->from_email ?? ''),
+                        'to_email' => (string) ($selectedMessage->to_email ?? ''),
+                        'status' => (string) ($selectedMessage->status ?? 'received'),
+                        'display_at' => optional($selectedMessage->received_at ?? $selectedMessage->created_at)?->format('Y-m-d H:i') ?: '-',
+                        'sort_at' => optional($selectedMessage->received_at ?? $selectedMessage->created_at)?->timestamp ?? 0,
+                        'is_selected' => true,
+                    ]]);
+                }
             }
         }
 

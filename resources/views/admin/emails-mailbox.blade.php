@@ -180,7 +180,7 @@
           <section class="crm-thread-pane">
             @if($selectedMessage)
             <div class="crm-thread-pane__header">
-              <h3>{{ $threadMessages->first()['subject'] ?? 'Message detail' }}</h3>
+              <h3>{{ data_get($threadMessages->first(), 'subject', 'Message detail') }}</h3>
               <p class="panel-muted">Full thread view</p>
             </div>
 
