@@ -11,6 +11,45 @@
   $displayTotal = (string) data_get($quote->options, 'display_total', '');
   $isFixedPackage = in_array($packageCode, ['essential', 'signature', 'prestige'], true);
   $canManagePipeline = in_array(strtolower((string) auth()->user()?->role), ['owner', 'admin', 'manager'], true);
+
+  $humanizeValue = static function ($value): string {
+    if (is_array($value)) {
+      $items = array_values(array_filter(array_map(static function ($item): string {
+        if (is_scalar($item) || $item === null) {
+          return trim((string) $item);
+        }
+
+        return json_encode($item, JSON_UNESCAPED_SLASHES) ?: '';
+      }, $value), static fn ($item): bool => $item !== ''));
+
+      return count($items) > 0 ? implode(', ', $items) : '-';
+    }
+
+    if (is_bool($value)) {
+      return $value ? 'yes' : 'no';
+    }
+
+    if (is_scalar($value) || $value === null) {
+      $text = trim((string) $value);
+      return $text !== '' ? $text : '-';
+    }
+
+    return json_encode($value, JSON_UNESCAPED_SLASHES) ?: '-';
+  };
+
+  $humanizePayload = static function ($payload) use ($humanizeValue): array {
+    if (!is_array($payload) || count($payload) === 0) {
+      return [];
+    }
+
+    $lines = [];
+    foreach ($payload as $key => $value) {
+      $label = \Illuminate\Support\Str::headline((string) $key);
+      $lines[] = $label . ': ' . $humanizeValue($value);
+    }
+
+    return $lines;
+  };
 @endphp
 <section class="panel-grid">
   <article class="panel-card panel-stack">
@@ -133,7 +172,16 @@
             <td>{{ $event->created_at?->format('Y-m-d H:i') }}</td>
             <td>{{ $event->event_type }}</td>
             <td>{{ $event->creator?->email ?: 'system' }}</td>
-            <td>{{ $event->payload ? json_encode($event->payload) : '-' }}</td>
+            <td>
+              @php($payloadLines = $humanizePayload($event->payload))
+              @if(count($payloadLines) > 0)
+                @foreach($payloadLines as $line)
+                <div class="panel-muted" style="margin:0 0 4px;">{{ $line }}</div>
+                @endforeach
+              @else
+              -
+              @endif
+            </td>
           </tr>
           @empty
           <tr><td colspan="4" class="panel-muted">No events.</td></tr>

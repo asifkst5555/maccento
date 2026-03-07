@@ -2618,7 +2618,8 @@
         en: {
           open: 'Build my package',
           title: 'Build my package',
-          subtitle: 'Get an instant estimate in 2-5 quick steps.',
+          subtitlePreset: 'Get an instant estimate in 1 quick step.',
+          subtitleCustom: 'Get an instant estimate in 4 quick steps.',
           step: 'Step',
           of: 'of',
           total: 'Estimated Total:',
@@ -2635,7 +2636,8 @@
         fr: {
           open: 'Creer mon forfait',
           title: 'Creer mon forfait',
-          subtitle: 'Obtenez une estimation instantanee en 2-5 etapes.',
+          subtitlePreset: 'Obtenez une estimation instantanee en 1 etape.',
+          subtitleCustom: 'Obtenez une estimation instantanee en 4 etapes.',
           step: 'Etape',
           of: 'sur',
           total: 'Total estime :',
@@ -2735,6 +2737,15 @@
 
       const t = (key) => labels[getLang()][key] || labels.en[key] || key;
       const isFixedPackage = () => fixedPackages.has(state.package_code);
+      const getActiveStepIndices = () => (isFixedPackage() ? [3] : [0, 1, 2, 3]);
+      const getLastStepIndex = () => {
+        const active = getActiveStepIndices();
+        return active[active.length - 1];
+      };
+      const clampStepForCurrentPackage = (step) => {
+        const active = getActiveStepIndices();
+        return active.includes(step) ? step : active[0];
+      };
 
       const visitorId = () => {
         let id = localStorage.getItem('maccento_pbx_visitor');
@@ -2749,7 +2760,9 @@
         const title = root.querySelector('.pbx-title');
         const subtitle = root.querySelector('.pbx-subtitle');
         if (title) title.textContent = t('title');
-        if (subtitle) subtitle.textContent = t('subtitle');
+        if (subtitle) {
+          subtitle.textContent = isFixedPackage() ? t('subtitlePreset') : t('subtitleCustom');
+        }
         if (openBtn) openBtn.textContent = t('open');
         prevBtn.textContent = t('previous');
         nextBtn.textContent = t('next');
@@ -2760,18 +2773,22 @@
 
       const applyPackageMode = () => {
         const fixed = isFixedPackage();
+        const activeSteps = getActiveStepIndices();
+        const position = Math.max(0, activeSteps.indexOf(currentStep));
+
         if (fixed) {
-          steps.forEach((step, index) => step.classList.toggle('is-active', index === 3));
-          stepLabel.textContent = 'Preset package selected';
+          stepLabel.textContent = `${t('step')} 1 ${t('of')} 1`;
           prevBtn.hidden = true;
           nextBtn.hidden = true;
           submitBtn.hidden = false;
+          prevBtn.disabled = true;
+          nextBtn.disabled = true;
           return;
         }
 
         prevBtn.hidden = false;
-        nextBtn.hidden = currentStep === steps.length - 1;
-        submitBtn.hidden = currentStep !== steps.length - 1;
+        nextBtn.hidden = position === activeSteps.length - 1;
+        submitBtn.hidden = position !== activeSteps.length - 1;
       };
 
       const updateStateFromForm = () => {
@@ -2852,10 +2869,19 @@
       };
 
       const renderStep = () => {
+        const activeSteps = getActiveStepIndices();
+        if (!activeSteps.includes(currentStep)) {
+          currentStep = activeSteps[0];
+        }
+
+        steps.forEach((step, index) => {
+          step.classList.toggle('is-active', activeSteps.includes(index) && index === currentStep);
+        });
+
         if (!isFixedPackage()) {
-          steps.forEach((step, index) => step.classList.toggle('is-active', index === currentStep));
-          stepLabel.textContent = `${t('step')} ${currentStep + 1} ${t('of')} ${steps.length}`;
-          prevBtn.disabled = currentStep === 0;
+          const position = Math.max(0, activeSteps.indexOf(currentStep));
+          stepLabel.textContent = `${t('step')} ${position + 1} ${t('of')} ${activeSteps.length}`;
+          prevBtn.disabled = position === 0;
         }
         applyPackageMode();
       };
@@ -2946,7 +2972,7 @@
           statusEl.textContent = t('errServices');
           return false;
         }
-        if (currentStep === 3 && (!state.contact_name || (!state.contact_email && !state.contact_phone))) {
+        if (currentStep === getLastStepIndex() && (!state.contact_name || (!state.contact_email && !state.contact_phone))) {
           statusEl.textContent = t('errContact');
           return false;
         }
@@ -2957,7 +2983,8 @@
         modal.hidden = false;
         if (openBtn) openBtn.setAttribute('aria-expanded', 'true');
         document.body.classList.add('pbx-lock');
-        currentStep = Math.min(Math.max(startStep, 0), steps.length - 1);
+        currentStep = clampStepForCurrentPackage(Math.min(Math.max(startStep, 0), steps.length - 1));
+        applyLabels();
         hideSuccess();
         setProcessing(false);
         renderStep();
@@ -3045,15 +3072,19 @@
       nextBtn.addEventListener('click', () => {
         updateStateFromForm();
         if (!validateStep()) return;
-        if (currentStep < steps.length - 1) {
-          currentStep += 1;
+        const activeSteps = getActiveStepIndices();
+        const position = activeSteps.indexOf(currentStep);
+        if (position > -1 && position < activeSteps.length - 1) {
+          currentStep = activeSteps[position + 1];
           renderStep();
         }
       });
 
       prevBtn.addEventListener('click', () => {
-        if (currentStep > 0) {
-          currentStep -= 1;
+        const activeSteps = getActiveStepIndices();
+        const position = activeSteps.indexOf(currentStep);
+        if (position > 0) {
+          currentStep = activeSteps[position - 1];
           renderStep();
           statusEl.textContent = '';
         }
