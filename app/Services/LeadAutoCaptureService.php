@@ -97,7 +97,7 @@ class LeadAutoCaptureService
             ]);
         }
 
-        $this->sendWelcomeEmailIfNeeded($lead, $source, $attributes);
+        $this->sendWelcomeEmailIfNeeded($lead, $source, $attributes, $conversation);
 
         return $lead->fresh();
     }
@@ -129,7 +129,7 @@ class LeadAutoCaptureService
     /**
      * @param array<string,mixed> $attributes
      */
-    private function sendWelcomeEmailIfNeeded(LeadProfile $lead, string $source, array $attributes): void
+    private function sendWelcomeEmailIfNeeded(LeadProfile $lead, string $source, array $attributes, ?Conversation $conversation = null): void
     {
         if (blank($lead->email)) {
             return;
@@ -140,7 +140,7 @@ class LeadAutoCaptureService
             return;
         }
 
-        if ($this->hasEvent((int) $lead->id, 'welcome_email_sent', $source)) {
+        if ($this->shouldSkipWelcomeEmail((int) $lead->id, $source, $conversation?->id)) {
             return;
         }
 
@@ -249,6 +249,8 @@ class LeadAutoCaptureService
                 'event_type' => 'welcome_email_sent',
                 'payload' => [
                     'source' => $source,
+                    'conversation_id' => $conversation?->id,
+                    'email_log_id' => $emailLog?->id,
                     'subject' => $subject,
                     'provider' => $providerName,
                     'model' => $modelName,
@@ -291,11 +293,32 @@ class LeadAutoCaptureService
                 'event_type' => 'welcome_email_failed',
                 'payload' => [
                     'source' => $source,
+                    'conversation_id' => $conversation?->id,
+                    'email_log_id' => $emailLog?->id,
                     'error' => Str::limit($exception->getMessage(), 350),
                 ],
                 'created_by' => null,
             ]);
         }
+    }
+
+    private function shouldSkipWelcomeEmail(int $leadId, string $source, ?int $conversationId): bool
+    {
+        $query = LeadEvent::query()
+            ->where('lead_profile_id', $leadId)
+            ->where('event_type', 'welcome_email_sent')
+            ->where('payload->source', $source);
+
+        if ($conversationId !== null) {
+            return (clone $query)
+                ->where('payload->conversation_id', $conversationId)
+                ->exists();
+        }
+
+        // Without conversation context, allow periodic re-sends while avoiding immediate duplicates.
+        return (clone $query)
+            ->where('created_at', '>=', now()->subHours(12))
+            ->exists();
     }
 
     /**
