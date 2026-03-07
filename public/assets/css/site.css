@@ -1982,13 +1982,12 @@ body.lightbox-open{
   display:grid;
   grid-template-columns:minmax(0, 1fr) minmax(220px, 300px);
   gap:28px;
-  align-items:stretch;
+  align-items:end;
 }
 .creative-main{
   min-width:0;
   display:grid;
   gap:18px;
-  align-content:center;
 }
 .creative-grid{
   display:grid;
@@ -1998,8 +1997,8 @@ body.lightbox-open{
 .creative-side-video{
   display:flex;
   justify-content:center;
-  align-items:center;
-  min-height:100%;
+  align-items:flex-end;
+  align-self:end;
 }
 .creative-side-video .phone-shell{
   width:min(300px, 100%);
@@ -3229,6 +3228,7 @@ textarea.input{min-height:116px;resize:vertical;border-radius:20px;margin-top:8p
   .creative-layout{
     grid-template-columns:1fr;
     gap:18px;
+    align-items:stretch;
   }
   .creative-head{
     margin:0 auto 18px;
@@ -3250,6 +3250,8 @@ textarea.input{min-height:116px;resize:vertical;border-radius:20px;margin-top:8p
   .creative-side-video{
     justify-content:center;
     margin-top:2px;
+    align-items:center;
+    align-self:auto;
   }
   .creative-side-video .phone-shell{margin-left:auto;margin-right:auto;}
   .creative-side-video .phone-shell{width:min(256px, 100%);}
