@@ -283,7 +283,7 @@
       </div>
       </section>
 
-      <form id="composeForm" method="post" action="{{ route('admin.emails.send') }}" class="panel-stack crm-compose-form">
+      <form id="composeForm" method="post" action="{{ route('admin.emails.send') }}" enctype="multipart/form-data" class="panel-stack crm-compose-form">
         @csrf
         <input type="hidden" name="mode" value="custom">
         <input id="composeDraftId" type="hidden" name="draft_id" value="{{ $compose['draft_id'] }}">
@@ -340,6 +340,13 @@
           <textarea id="composeMessage" class="panel-textarea" name="message" rows="10" required>{{ $compose['message'] }}</textarea>
         </label>
 
+        <label class="crm-compose-attachments">
+          <span>Attachments <small class="panel-muted">(optional)</small></span>
+          <input id="composeAttachments" class="panel-input crm-compose-file-input" type="file" name="attachments[]" multiple>
+          <small class="panel-muted">Attach up to 5 files, 10 MB each. Attachments are included when sending and are not stored in drafts.</small>
+          <div id="composeAttachmentList" class="crm-compose-attachment-list" aria-live="polite"></div>
+        </label>
+
         <div class="panel-form-row" style="justify-content:space-between; align-items:center;">
           <div class="crm-compose-actions">
             <button id="manualSaveDraftBtn" class="panel-btn crm-btn-icon" formaction="{{ route('admin.emails.drafts.save') }}" formmethod="post" type="submit"><span class="crm-ui-icon"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 4h10l2 2v10H4V4zm2 0v4h8V5.2L12.8 4H6zm1 9h6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></span>Save Draft</button>
@@ -384,6 +391,8 @@
   const composeSubjectPreview = document.getElementById('composeSubjectPreview');
   const composeForm = document.getElementById('composeForm');
   const composeDraftId = document.getElementById('composeDraftId');
+  const composeAttachments = document.getElementById('composeAttachments');
+  const composeAttachmentList = document.getElementById('composeAttachmentList');
   const manualSaveDraftBtn = document.getElementById('manualSaveDraftBtn');
   const sendEmailBtn = composeForm ? composeForm.querySelector('button.panel-btn.panel-btn-primary[type="submit"]') : null;
   const aiWriteBtn = document.getElementById('aiWriteBtn');
@@ -640,6 +649,49 @@
   let autosaveBusy = false;
   let userDirty = false;
 
+  const formatAttachmentSize = (bytes) => {
+    const size = Number(bytes || 0);
+    if (!Number.isFinite(size) || size <= 0) {
+      return '';
+    }
+
+    if (size >= 1024 * 1024) {
+      return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+    }
+
+    if (size >= 1024) {
+      return `${Math.round(size / 1024)} KB`;
+    }
+
+    return `${size} B`;
+  };
+
+  const escapeHtml = (value) => String(value || '').replace(/[&<>"]/g, (char) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+  }[char] || char));
+
+  const renderAttachmentList = () => {
+    if (!composeAttachmentList) {
+      return;
+    }
+
+    const files = Array.from(composeAttachments?.files || []);
+    if (files.length === 0) {
+      composeAttachmentList.innerHTML = '<div class="crm-compose-attachment-empty">No files selected.</div>';
+      return;
+    }
+
+    composeAttachmentList.innerHTML = files.map((file) => `
+      <div class="crm-compose-attachment-item">
+        <strong>${escapeHtml(file.name)}</strong>
+        <span>${formatAttachmentSize(file.size)}</span>
+      </div>
+    `).join('');
+  };
+
   const updateAutosaveStatus = (text) => {
     if (!autosaveStatus) {
       return;
@@ -693,6 +745,8 @@
 
     try {
       const payload = new FormData(composeForm);
+      payload.delete('attachments');
+      payload.delete('attachments[]');
       const response = await fetch('{{ route('admin.emails.drafts.save') }}', {
         method: 'POST',
         headers: {
@@ -738,6 +792,10 @@
     }
     const evtName = field.tagName === 'SELECT' ? 'change' : 'input';
     field.addEventListener(evtName, recalculateDirty);
+  });
+
+  composeAttachments?.addEventListener('change', () => {
+    renderAttachmentList();
   });
 
   composeForm?.addEventListener('submit', (event) => {
@@ -789,6 +847,7 @@
   lastAutosaveFingerprint = lastSavedFingerprint;
   updateAutosaveBadge('Autosave active');
   updateDirtyBadge(false);
+  renderAttachmentList();
 
   setInterval(autosaveDraft, 20000);
 
@@ -976,15 +1035,15 @@
   color: #123a68;
 }
 .crm-ui-icon {
-  width: 15px;
-  height: 15px;
+  width: 18px;
+  height: 18px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
 }
 .crm-ui-icon svg {
-  width: 15px;
-  height: 15px;
+  width: 18px;
+  height: 18px;
 }
 .crm-btn-icon {
   display: inline-flex;
@@ -1084,12 +1143,12 @@
 }
 .crm-mail-actions {
   white-space: nowrap;
-  width: 118px;
+  width: 166px;
   text-align: right;
   display: inline-flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 8px;
+  gap: 10px;
   overflow: visible !important;
   text-overflow: clip !important;
 }
@@ -1099,16 +1158,43 @@
 }
 .crm-mail-actions--draft {
   width: auto;
-  min-width: 260px;
+  min-width: 340px;
 }
 .crm-mail-actions .panel-btn,
 .crm-mail-actions .panel-link {
-  min-width: 29px;
-  width: 29px;
-  height: 29px;
+  min-width: 40px;
+  width: 40px;
+  height: 40px;
   padding: 0;
   justify-content: center;
-  border-radius: 10px;
+  border-radius: 11px;
+}
+.crm-mail-actions .panel-btn .crm-ui-icon,
+.crm-mail-actions .panel-link .crm-ui-icon {
+  width: 20px;
+  height: 20px;
+}
+.crm-mail-actions .panel-btn .crm-ui-icon svg,
+.crm-mail-actions .panel-link .crm-ui-icon svg {
+  width: 20px;
+  height: 20px;
+}
+.crm-mail-actions .panel-btn[title*="Send"] .crm-ui-icon svg path,
+.crm-mail-actions .panel-btn[aria-label*="Send"] .crm-ui-icon svg path {
+  stroke-width: 2.35 !important;
+}
+.crm-mail-actions .panel-btn-danger .crm-ui-icon {
+  width: 22px;
+  height: 22px;
+  color: #ffffff !important;
+}
+.crm-mail-actions .panel-btn-danger .crm-ui-icon svg {
+  width: 22px;
+  height: 22px;
+}
+.crm-mail-actions .panel-btn-danger .crm-ui-icon svg path {
+  stroke: #ffffff !important;
+  stroke-width: 2.35 !important;
 }
 .crm-mailbox-split {
   display: grid;
@@ -1329,6 +1415,45 @@
 }
 .crm-compose-form .panel-textarea {
   min-height: 180px;
+}
+.crm-compose-attachments {
+  border: 1px dashed #c9d9ed;
+  border-radius: 12px;
+  padding: 12px;
+  background: linear-gradient(180deg, #fbfdff 0%, #f5f9ff 100%);
+}
+.crm-compose-file-input {
+  padding: 10px 12px;
+  background: #ffffff;
+}
+.crm-compose-attachment-list {
+  display: grid;
+  gap: 8px;
+}
+.crm-compose-attachment-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 11px;
+  border: 1px solid #d8e4f1;
+  border-radius: 10px;
+  background: #ffffff;
+  font-size: .83rem;
+  color: #274262;
+}
+.crm-compose-attachment-item strong {
+  font-weight: 700;
+  color: #173a67;
+}
+.crm-compose-attachment-item span {
+  color: #5d7594;
+  white-space: nowrap;
+}
+.crm-compose-attachment-empty {
+  padding: 8px 0 0;
+  font-size: .82rem;
+  color: #6a819f;
 }
 .crm-compose-form label > small.panel-muted {
   display: block;

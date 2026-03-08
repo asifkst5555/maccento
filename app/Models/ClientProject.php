@@ -65,6 +65,11 @@ class ClientProject extends Model
         return $this->hasMany(ClientProjectMedia::class);
     }
 
+    public function serviceRequests(): HasMany
+    {
+        return $this->hasMany(ClientServiceRequest::class);
+    }
+
     public function isFullyPaid(): bool
     {
         return $this->invoices()->where('status', 'paid')->exists();

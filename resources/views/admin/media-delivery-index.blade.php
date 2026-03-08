@@ -5,13 +5,125 @@
 ])
 
 @section('content')
+<style>
+  .media-delivery-upload-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    margin-top: 12px;
+  }
+
+  .media-delivery-upload-card {
+    border: 1px solid #d8e1ec;
+    border-radius: 12px;
+    background: #f9fbff;
+    padding: 12px;
+  }
+
+  .media-delivery-upload-card .panel-section-title {
+    margin-bottom: 8px;
+    font-size: 1rem;
+  }
+
+  .media-delivery-upload-card .panel-stack {
+    margin-bottom: 0;
+  }
+
+  .media-delivery-files-grid {
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    margin-top: 12px;
+    gap: 12px;
+  }
+
+  .media-file-list-card {
+    margin: 0;
+    border: 1px solid #d8e2ef;
+    background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  }
+
+  .media-file-list {
+    display: grid;
+    gap: 10px;
+  }
+
+  .media-file-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 10px 12px;
+    border: 1px solid #e1e9f4;
+    border-radius: 10px;
+    background: #fff;
+  }
+
+  .media-file-meta {
+    min-width: 0;
+    display: grid;
+    gap: 4px;
+  }
+
+  .media-file-kind {
+    display: inline-flex;
+    align-items: center;
+    width: fit-content;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: #28415f;
+    background: #eef4fb;
+    border: 1px solid #d0dced;
+  }
+
+  .media-file-name {
+    color: #1e3450;
+    font-weight: 600;
+    word-break: break-word;
+  }
+
+  .media-file-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: nowrap;
+  }
+
+  .media-file-list-cta {
+    margin-top: 4px;
+    justify-content: flex-end;
+  }
+
+  .media-file-list-cta-group {
+    justify-content: flex-end;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .media-file-row.is-hidden-by-default {
+    display: none;
+  }
+
+  @media (max-width: 960px) {
+    .media-delivery-upload-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
 <section class="panel-card">
+  @php
+    $canOpenWatermarkSettings = in_array(strtolower(trim((string) auth()->user()?->role)), ['owner', 'admin', 'manager'], true);
+  @endphp
   <div class="panel-sticky-filters">
     <form method="get" class="panel-form-row">
       <input class="panel-input" type="text" name="media_search" value="{{ $filters['media_search'] }}" placeholder="Search project/client/service/address">
       <button class="panel-btn panel-btn-primary" type="submit">Search</button>
       <a class="panel-link" href="{{ route('admin.media-delivery.index') }}">Clear</a>
+      @if($canOpenWatermarkSettings)
       <a class="panel-link" href="{{ route('admin.media-delivery.watermark.index') }}">Watermark Settings</a>
+      @endif
     </form>
   </div>
 
@@ -19,6 +131,7 @@
     @forelse($projects as $project)
     @php
       $galleryItems = $project->media->whereIn('type', ['image', 'video'])->values();
+      $galleryPreviewItems = $galleryItems->take(2);
       $zipItems = $project->media->where('type', 'final_zip')->values();
       $isPaid = $project->invoices->contains(fn($invoice) => $invoice->status === 'paid');
       $projectGalleryPayload = $galleryPayloadByProject[$project->id] ?? [];
@@ -33,13 +146,9 @@
           :show-client="true"
         />
         <div class="panel-form-row" style="margin-bottom: 0;">
-          <button class="panel-btn media-project-toggle" type="button" data-project-toggle aria-expanded="true" aria-label="Toggle project details">
-            <svg class="media-project-toggle-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 10l4 4 4-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <button class="panel-btn panel-btn-primary media-project-toggle" type="button" data-project-toggle aria-expanded="true" aria-label="Toggle project details" style="color: #fff; border-color: #a8162a;">
+            <svg class="media-project-toggle-icon" viewBox="0 0 24 24" aria-hidden="true" style="width: 32px; height: 32px; color: #fff;"><path d="M8 10l4 4 4-4" fill="none" stroke="#ffffff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </button>
-          <a class="panel-link" href="{{ route('admin.clients.show', $project->client_id) }}">Open Client</a>
-          @if($canViewInvoices ?? false)
-          <a class="panel-link" href="{{ route('admin.invoices.index', ['invoice_project' => $project->id]) }}">Project Invoice</a>
-          @endif
           @if($galleryItems->isNotEmpty())
           <button
             class="panel-btn panel-btn-primary"
@@ -48,8 +157,15 @@
             data-project-id="{{ $project->id }}"
             data-gallery-items='@json($projectGalleryPayload)'
           >
-            Open Gallery Viewer
+            View Media
           </button>
+          @else
+          <button class="panel-btn panel-btn-primary" type="button" disabled>View Media</button>
+          @endif
+          <a class="panel-link" href="{{ route('admin.clients.show', ['client' => $project->client_id, 'project_id' => $project->id]) }}">Open Project</a>
+          <a class="panel-link" href="{{ route('admin.clients.show', $project->client_id) }}">Open Client</a>
+          @if($canViewInvoices ?? false)
+          <a class="panel-link" href="{{ route('admin.invoices.index', ['invoice_project' => $project->id]) }}">Project Invoice</a>
           @endif
         </div>
       </div>
@@ -57,31 +173,49 @@
       <div class="media-project-details" data-project-details>
 
       @if($canManageMedia)
-      <div class="panel-form-row" style="align-items: flex-end; margin-top: 12px;">
-        <form method="post" action="{{ route('admin.projects.media.store', $project) }}" class="panel-stack" enctype="multipart/form-data" style="flex: 1; min-width: 260px;">
-          @csrf
-          <label class="panel-muted">Upload Gallery Images/Videos</label>
-          <input class="panel-input" type="file" name="media_files[]" accept="image/*,video/*" multiple required>
-          <button class="panel-btn panel-btn-primary" type="submit">Upload Gallery</button>
-        </form>
+      <div class="media-delivery-upload-grid">
+        <article class="media-delivery-upload-card">
+          <h4 class="panel-section-title">Gallery Upload</h4>
+          <form method="post" action="{{ route('admin.projects.media.store', $project) }}" class="panel-stack" enctype="multipart/form-data">
+            @csrf
+            <label class="panel-muted">Upload Gallery Images/Videos</label>
+            <input class="panel-input" type="file" name="media_files[]" accept="image/*,video/*" multiple required>
+            <button class="panel-btn panel-btn-primary" type="submit">Upload Gallery</button>
+          </form>
+        </article>
 
-        <form method="post" action="{{ route('admin.projects.delivery-zip.store', $project) }}" class="panel-stack" enctype="multipart/form-data" style="flex: 1; min-width: 260px;">
-          @csrf
-          <label class="panel-muted">Upload Final Delivery ZIP</label>
-          <input class="panel-input" type="file" name="delivery_zip" accept=".zip,application/zip" required>
-          <button class="panel-btn" type="submit">Upload Final ZIP</button>
-        </form>
+        <article class="media-delivery-upload-card">
+          <h4 class="panel-section-title">Final ZIP Upload</h4>
+          <form method="post" action="{{ route('admin.projects.delivery-zip.store', $project) }}" class="panel-stack" enctype="multipart/form-data">
+            @csrf
+            <label class="panel-muted">Upload Final Delivery ZIP</label>
+            <input class="panel-input" type="file" name="delivery_zip" accept=".zip,application/zip" required>
+            <button class="panel-btn" type="submit">Upload Final ZIP</button>
+          </form>
+        </article>
       </div>
       @endif
 
-      <div class="panel-grid" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); margin-top: 12px; gap: 12px;">
-        <section class="panel-card" style="margin: 0;">
+      <div class="panel-grid media-delivery-files-grid">
+        <section class="panel-card media-file-list-card">
           <h4 class="panel-section-title">Gallery Files</h4>
-          <div class="panel-stack">
-            @forelse($galleryItems as $mediaItem)
-            <div class="panel-form-row" style="justify-content: space-between; margin-bottom: 0;">
-              <span><strong>{{ strtoupper($mediaItem->type) }}</strong> — {{ $mediaItem->original_name }}</span>
-              <div class="panel-form-row" style="margin-bottom: 0;">
+          <div class="media-file-list">
+            @forelse($galleryItems as $index => $mediaItem)
+            @php
+              $mediaName = $mediaItem->original_name;
+              if (preg_match('/Ã.|Â|â€|â€“|â€”/u', (string) $mediaName)) {
+                $decodedName = @iconv('Windows-1252', 'UTF-8//IGNORE', (string) $mediaName);
+                if (is_string($decodedName) && $decodedName !== '') {
+                  $mediaName = $decodedName;
+                }
+              }
+            @endphp
+            <article class="media-file-row @if($index >= 2) is-hidden-by-default @endif" data-gallery-row>
+              <div class="media-file-meta">
+                <span class="media-file-kind">{{ strtoupper($mediaItem->type) }}</span>
+                <span class="media-file-name">{{ $mediaName }}</span>
+              </div>
+              <div class="media-file-actions">
                 <a class="panel-link" href="{{ route('admin.projects.media.view', ['project' => $project, 'media' => $mediaItem]) }}" target="_blank" rel="noopener">View</a>
                 @if($canManageMedia)
                 <form method="post" action="{{ route('admin.projects.media.delete', ['project' => $project, 'media' => $mediaItem]) }}" data-delete-form data-delete-name="{{ $mediaItem->original_name }}">
@@ -90,20 +224,53 @@
                 </form>
                 @endif
               </div>
-            </div>
+            </article>
             @empty
             <p class="panel-muted">No gallery files yet.</p>
             @endforelse
+            @if($galleryItems->count() > 2)
+            <div class="panel-form-row media-file-list-cta media-file-list-cta-group">
+              <button
+                class="panel-btn"
+                type="button"
+                data-gallery-list-toggle
+                aria-expanded="false"
+              >
+                Show All Media List ({{ $galleryItems->count() }})
+              </button>
+              <button
+                class="panel-btn panel-btn-primary"
+                type="button"
+                data-gallery-open
+                data-project-id="{{ $project->id }}"
+                data-gallery-items='@json($projectGalleryPayload)'
+              >
+                View All Gallery Files ({{ $galleryItems->count() }})
+              </button>
+            </div>
+            @endif
           </div>
         </section>
 
-        <section class="panel-card" style="margin: 0;">
+        <section class="panel-card media-file-list-card">
           <h4 class="panel-section-title">Final Delivery ZIP</h4>
-          <div class="panel-stack">
+          <div class="media-file-list">
             @forelse($zipItems as $zipItem)
-            <div class="panel-form-row" style="justify-content: space-between; margin-bottom: 0;">
-              <span>{{ $zipItem->original_name }}</span>
-              <div class="panel-form-row" style="margin-bottom: 0;">
+            @php
+              $zipName = $zipItem->original_name;
+              if (preg_match('/Ã.|Â|â€|â€“|â€”/u', (string) $zipName)) {
+                $decodedZipName = @iconv('Windows-1252', 'UTF-8//IGNORE', (string) $zipName);
+                if (is_string($decodedZipName) && $decodedZipName !== '') {
+                  $zipName = $decodedZipName;
+                }
+              }
+            @endphp
+            <article class="media-file-row">
+              <div class="media-file-meta">
+                <span class="media-file-kind">ZIP</span>
+                <span class="media-file-name">{{ $zipName }}</span>
+              </div>
+              <div class="media-file-actions">
                 <a class="panel-link" href="{{ route('admin.projects.media.view', ['project' => $project, 'media' => $zipItem]) }}" target="_blank" rel="noopener">View ZIP</a>
                 @if($canManageMedia)
                 <form method="post" action="{{ route('admin.projects.media.delete', ['project' => $project, 'media' => $zipItem]) }}" data-delete-form data-delete-name="{{ $zipItem->original_name }}">
@@ -112,7 +279,7 @@
                 </form>
                 @endif
               </div>
-            </div>
+            </article>
             @empty
             <p class="panel-muted">No final ZIP uploaded yet.</p>
             @endforelse
@@ -181,10 +348,34 @@
         applyState(willCollapse);
         persist();
       });
+
+      const listToggle = card.querySelector('[data-gallery-list-toggle]');
+      const galleryRows = card.querySelectorAll('[data-gallery-row]');
+      if (listToggle && galleryRows.length > 2) {
+        listToggle.addEventListener('click', function () {
+          const expand = listToggle.getAttribute('aria-expanded') !== 'true';
+          listToggle.setAttribute('aria-expanded', String(expand));
+          listToggle.textContent = expand
+            ? 'Show Less Media List'
+            : 'Show All Media List (' + galleryRows.length + ')';
+
+          galleryRows.forEach(function (row, index) {
+            if (index < 2) return;
+            row.classList.toggle('is-hidden-by-default', !expand);
+          });
+        });
+      }
     });
   })();
 </script>
 
-<x-panel-gallery-viewer modal-id="media-delivery-viewer" open-selector="[data-gallery-open]" title-default="Gallery Viewer" />
+<x-panel-gallery-viewer
+  modal-id="media-delivery-viewer"
+  open-selector="[data-gallery-open]"
+  title-default="Gallery Viewer"
+  :delete-enabled="true"
+  delete-url-template="{{ url('/admin/projects/__PROJECT__/media/__MEDIA__/delete') }}"
+  csrf-token="{{ csrf_token() }}"
+/>
 <x-panel-delete-confirm-modal modal-id="media-delete-confirm-modal" trigger-selector="[data-delete-trigger]" title="Delete Media File" />
 @endsection

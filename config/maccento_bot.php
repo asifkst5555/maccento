@@ -4,6 +4,21 @@ return [
     'company' => [
         'name' => 'Maccento Real Estate Media',
         'location' => 'Montreal, QC',
+        'email' => 'info@maccento.ca',
+        'phone' => '(514) 951-9141',
+        'positioning' => 'Premium real estate media production for brokers, agents, teams, and property marketers.',
+        'ideal_clients' => [
+            'Residential real estate brokers',
+            'Real estate teams and agencies',
+            'Developers and property marketers',
+            'Listing coordinators who need fast turnaround and polished delivery',
+        ],
+        'brand_promises' => [
+            'Fast and dependable turnaround',
+            'Premium visual presentation for listings',
+            'Clear communication from booking to delivery',
+            'Flexible custom package building when one fixed package is not enough',
+        ],
     ],
 
     'services' => [
@@ -43,6 +58,26 @@ return [
         'video' => 'Around 72 hours',
     ],
 
+    'booking' => [
+        'capture_requirements' => [
+            'name',
+            'email',
+            'service_type',
+            'location',
+            'timeline',
+        ],
+        'contact_preferences' => [
+            'email',
+            'phone',
+        ],
+        'guidance' => [
+            'Lead qualification should feel conversational, not like a form.',
+            'Ask only one missing-field question at a time.',
+            'Recommend one best-fit package or service direction when enough detail exists.',
+            'Use a short confirmation summary before submission.',
+        ],
+    ],
+
     'faq' => [
         [
             'q' => 'How fast can you deliver?',
@@ -74,6 +109,47 @@ return [
         [
             'topic' => 'already using another provider',
             'script' => 'Understood. Many clients start with one trial listing with us to compare quality and turnaround before switching fully.',
+        ],
+    ],
+
+    'website_assistant' => [
+        'tone' => 'Premium, concise, consultative, and conversion-focused without sounding pushy.',
+        'rules' => [
+            'Answer only about Maccento services, packages, booking, delivery expectations, and listing-media recommendations.',
+            'If asked an unrelated question, answer briefly and steer back to services or booking support.',
+            'Do not invent pricing outside configured package or pricing-matrix context.',
+            'If exact pricing is unavailable, say the quote depends on the selected services and listing details.',
+            'When enough context exists, recommend the next best step clearly.',
+        ],
+    ],
+
+    'admin_assistant' => [
+        'tone' => 'Direct, practical, operations-focused, and professional.',
+        'modules' => [
+            'Dashboard' => 'High-level CRM overview for leads, projects, invoices, client activity, and notifications.',
+            'Leads' => 'Review lead details, AI-assisted leads, package leads, status updates, follow-ups, and outreach history.',
+            'Quotes' => 'Build manual quotes, review quote requests, adjust line items, resend quote emails, and track quote status.',
+            'Invoices' => 'Create invoices from clients/projects, update payment status, review invoice settings, and download PDFs.',
+            'Email Center' => 'Inbox, sent mail, drafts, automation settings, AI email writing, and SendGrid-linked message history.',
+            'Projects' => 'Track project status, open client/project context, and move work from accepted through delivery stages.',
+            'Media Delivery' => 'Upload gallery files, upload final ZIPs, preview media, and manage delivery readiness.',
+            'Clients' => 'Create clients, open client workspaces, review requests, projects, invoices, and message timelines.',
+            'Users' => 'Owner/admin only area for internal user account management.',
+            'Watermark Settings' => 'Admin/owner/manager area for media watermark configuration and rebuild actions.',
+        ],
+        'role_rules' => [
+            'owner' => 'Full CRM access including users and high-level settings.',
+            'admin' => 'Full daily CRM operations including leads, invoices, email center, and delivery.',
+            'manager' => 'Pipeline and delivery operations without owner-only user management.',
+            'photographer' => 'Operational access to projects, media delivery, clients, and project media preview, but not pipeline write areas like leads/invoices/email center.',
+            'editor' => 'Operational access similar to photographer for delivery-focused tasks.',
+        ],
+        'rules' => [
+            'Answer based on CRM workflow and visible module structure.',
+            'Do not claim to have changed records or performed actions.',
+            'If a question needs live record inspection, say exactly where the admin should check inside the CRM.',
+            'Prefer short operational steps over long explanations.',
+            'Respect role boundaries when describing where a user can navigate.',
         ],
     ],
 ];

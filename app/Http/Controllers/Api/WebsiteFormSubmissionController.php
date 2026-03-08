@@ -25,11 +25,30 @@ class WebsiteFormSubmissionController extends Controller
             'phone' => ['nullable', 'string', 'max:30'],
             'email' => ['nullable', 'email', 'max:255'],
             'service' => ['nullable', 'string', 'max:80'],
+            'services' => ['nullable', 'array'],
+            'services.*' => ['nullable', 'string', 'max:80'],
             'region' => ['nullable', 'string', 'max:80'],
             'message' => ['nullable', 'string', 'max:3000'],
             'page_url' => ['nullable', 'url', 'max:500'],
             'source' => ['nullable', 'string', 'max:60'],
         ]);
+
+        $normalizedServices = collect($validated['services'] ?? [])
+            ->map(static fn ($value): string => trim((string) $value))
+            ->filter(static fn (string $value): bool => $value !== '')
+            ->unique()
+            ->values();
+
+        $serviceValue = trim((string) ($validated['service'] ?? ''));
+        if ($normalizedServices->isEmpty() && $serviceValue !== '') {
+            $normalizedServices = collect(explode(',', $serviceValue))
+                ->map(static fn ($value): string => trim((string) $value))
+                ->filter(static fn (string $value): bool => $value !== '')
+                ->unique()
+                ->values();
+        }
+
+        $normalizedServiceString = $normalizedServices->implode(',');
 
         if (blank($validated['email'] ?? null) && blank($validated['phone'] ?? null)) {
             return response()->json([
@@ -45,7 +64,7 @@ class WebsiteFormSubmissionController extends Controller
             'company' => $validated['company'] ?? null,
             'phone' => $validated['phone'] ?? null,
             'email' => $validated['email'] ?? null,
-            'service' => $validated['service'] ?? null,
+            'service' => $normalizedServiceString !== '' ? $normalizedServiceString : null,
             'region' => $validated['region'] ?? null,
             'message' => $validated['message'] ?? null,
             'status' => 'new',
@@ -60,7 +79,7 @@ class WebsiteFormSubmissionController extends Controller
             'name' => (string) ($validated['name'] ?? ''),
             'email' => (string) ($validated['email'] ?? ''),
             'phone' => (string) ($validated['phone'] ?? ''),
-            'service_type' => (string) ($validated['service'] ?? ''),
+            'service_type' => $normalizedServiceString,
             'location' => (string) ($validated['region'] ?? ''),
             'notes' => (string) ($validated['message'] ?? ''),
             'score' => 40,

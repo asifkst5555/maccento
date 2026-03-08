@@ -8,6 +8,10 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (Schema::hasTable('inbound_emails')) {
+            return;
+        }
+
         Schema::create('inbound_emails', function (Blueprint $table): void {
             $table->id();
             $table->string('provider', 40)->default('sendgrid')->index();

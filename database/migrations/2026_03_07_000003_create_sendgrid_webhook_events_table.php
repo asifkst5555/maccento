@@ -8,6 +8,10 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (Schema::hasTable('sendgrid_webhook_events')) {
+            return;
+        }
+
         Schema::create('sendgrid_webhook_events', function (Blueprint $table): void {
             $table->id();
             $table->string('event_type', 64)->index();

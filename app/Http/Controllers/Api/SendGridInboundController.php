@@ -29,6 +29,10 @@ class SendGridInboundController extends Controller
         $messageBody = $this->buildMessageBody($request);
         $htmlBody = trim((string) $request->input('html', ''));
 
+        if ($messageBody === '') {
+            return response()->json(['ok' => false, 'message' => 'Empty inbound message.'], 422);
+        }
+
         $inboundEmail = InboundEmail::create([
             'provider' => 'sendgrid',
             'from_email' => $fromAddress,
@@ -59,10 +63,6 @@ class SendGridInboundController extends Controller
         }
 
         $clientProjectId = $this->resolveClientProjectId($request, $client, $subject);
-
-        if ($messageBody === '') {
-            return response()->json(['ok' => false, 'message' => 'Empty inbound message.'], 422);
-        }
 
         $inboundEmail->client_id = $client->id;
         $inboundEmail->client_project_id = $clientProjectId;

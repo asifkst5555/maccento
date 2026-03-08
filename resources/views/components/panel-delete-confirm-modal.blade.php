@@ -14,7 +14,7 @@
   <div class="panel-modal-dialog" style="max-width: 560px;">
     <div class="panel-modal-head">
       <h3 class="panel-modal-title">{{ $title }}</h3>
-      <button class="panel-modal-close" type="button" data-delete-close aria-label="Close delete confirmation">×</button>
+      <button class="panel-modal-close" type="button" data-delete-close aria-label="Close delete confirmation">ÃƒÆ’Ã¢â‚¬â€</button>
     </div>
 
     <div class="panel-modal-body">
@@ -25,7 +25,7 @@
 
     <div class="panel-modal-foot" style="gap:10px;">
       <button class="panel-btn" type="button" data-delete-close>Cancel</button>
-      <button class="panel-btn panel-btn-danger panel-btn-icon" type="button" id="{{ $confirmId }}" title="Confirm delete" aria-label="Confirm delete"><span class="panel-icon-trash" aria-hidden="true"><svg viewBox="0 0 20 20"><path d="M5 6h10M8 6V4h4v2m-6 0l.5 9h7L14 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span></button>
+      <button class="panel-btn panel-btn-danger panel-btn-icon" type="button" id="{{ $confirmId }}" title="Confirm delete" aria-label="Confirm delete"><span class="panel-icon-trash" aria-hidden="true"><x-panel-icon name="trash" /></span></button>
     </div>
   </div>
 </div>

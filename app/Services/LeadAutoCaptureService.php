@@ -48,12 +48,39 @@ class LeadAutoCaptureService
             $lead->status = 'new';
             $lead->score = 0;
             $lead->email = $email;
+
+            if (!$conversation) {
+                $conversation = Conversation::query()->create([
+                    'channel' => 'lead_auto_capture',
+                    'status' => 'active',
+                    'started_at' => now(),
+                    'last_message_at' => now(),
+                    'metadata' => [
+                        'source' => $source,
+                        'created_by' => 'lead_auto_capture_service',
+                    ],
+                ]);
+            }
+
+            $lead->conversation_id = $conversation->id;
         }
 
         $lead->email = $email;
 
         if ($conversation && blank($lead->conversation_id)) {
             $lead->conversation_id = $conversation->id;
+        } elseif (blank($lead->conversation_id)) {
+            $fallbackConversation = Conversation::query()->create([
+                'channel' => 'lead_auto_capture',
+                'status' => 'active',
+                'started_at' => now(),
+                'last_message_at' => now(),
+                'metadata' => [
+                    'source' => $source,
+                    'created_by' => 'lead_auto_capture_service',
+                ],
+            ]);
+            $lead->conversation_id = $fallbackConversation->id;
         }
 
         $this->mergeFieldIfEmpty($lead, 'name', $attributes['name'] ?? null);
@@ -164,6 +191,11 @@ class LeadAutoCaptureService
                 '- Keep it under 140 words.',
                 '- Reference the lead requirements briefly.',
                 '- Include one clear next step and reply CTA.',
+                '- End the email with this exact signature:',
+                '  Best regards,',
+                '  Alessio Battista',
+                '  Maccento Real Estate Media',
+                '  +1 (514) 951-9141',
                 '- No markdown.',
                 '',
                 'Lead source: ' . $source,
@@ -205,6 +237,8 @@ class LeadAutoCaptureService
         } catch (Throwable $exception) {
             report($exception);
         }
+
+        $message = $this->normalizeEmailSignature($message);
 
         try {
             $emailLog = EmailLog::query()->create([
@@ -382,8 +416,53 @@ class LeadAutoCaptureService
         $lines[] = 'Best regards,';
         $lines[] = 'Alessio Battista';
         $lines[] = 'Maccento Real Estate Media';
+        $lines[] = '+1 (514) 951-9141';
 
         return implode("\n", $lines);
+    }
+
+    private function normalizeEmailSignature(string $message): string
+    {
+        $normalized = str_replace(["\r\n", "\r"], "\n", trim($message));
+        $phoneLine = '+1 (514) 951-9141';
+
+        $normalized = str_ireplace([
+            '[Your Name]',
+            '[Your Company]',
+            '[Your Phone]',
+            '{Your Name}',
+            '{Your Company}',
+            '{Your Phone}',
+            '<Your Name>',
+            '<Your Company>',
+            '<Your Phone>',
+            'Your Name',
+            'Your Company',
+            'Your Phone',
+        ], [
+            'Alessio Battista',
+            'Maccento Real Estate Media',
+            $phoneLine,
+            'Alessio Battista',
+            'Maccento Real Estate Media',
+            $phoneLine,
+            'Alessio Battista',
+            'Maccento Real Estate Media',
+            $phoneLine,
+            'Alessio Battista',
+            'Maccento Real Estate Media',
+            $phoneLine,
+        ], $normalized);
+
+        if (!str_contains($normalized, $phoneLine)) {
+            if (preg_match('/Best regards,\s*\nAlessio Battista\s*\nMaccento Real Estate Media\s*$/i', $normalized) === 1) {
+                $normalized .= "\n" . $phoneLine;
+            } elseif (preg_match('/Maccento Real Estate Media\s*$/i', $normalized) === 1) {
+                $normalized .= "\n" . $phoneLine;
+            }
+        }
+
+        return $normalized;
     }
 
     /**

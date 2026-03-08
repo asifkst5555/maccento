@@ -6,9 +6,9 @@ use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
+use Throwable;
 
 class AuthOtpController extends Controller
 {
@@ -25,28 +25,42 @@ class AuthOtpController extends Controller
             'remember' => ['nullable', 'boolean'],
         ]);
 
-        if (User::query()->count() === 0) {
-            return redirect()
-                ->route('signup')
-                ->with('status', 'No user account exists yet. Create your first account to continue.');
-        }
-
         $email = Str::lower(trim($validated['email']));
-        $user = User::where('email', $email)->first();
+        $remember = (bool) ($validated['remember'] ?? false);
 
-        if (!$user || !Hash::check($validated['password'], $user->password)) {
+        try {
+            if (Auth::attempt(['email' => $email, 'password' => $validated['password']], $remember)) {
+                $request->session()->regenerate();
+                $user = Auth::user();
+
+                if ($user === null) {
+                    return back()
+                        ->withErrors(['email' => 'Invalid email or password.'])
+                        ->withInput($request->only('email'));
+                }
+
+                $normalizedRole = strtolower(trim((string) $user->role));
+                $internalRoles = ['admin', 'owner', 'manager', 'photographer', 'editor'];
+
+                return redirect()->route(in_array($normalizedRole, $internalRoles, true) ? 'admin.dashboard' : 'user.dashboard');
+            }
+
+            if (User::query()->doesntExist()) {
+                return redirect()
+                    ->route('signup')
+                    ->with('status', 'No user account exists yet. Create your first account to continue.');
+            }
+        } catch (Throwable $exception) {
+            report($exception);
+
             return back()
-                ->withErrors(['email' => 'Invalid email or password.'])
+                ->withErrors(['email' => 'Login is temporarily unavailable. Please try again in a moment.'])
                 ->withInput($request->only('email'));
         }
 
-        Auth::login($user, (bool) ($validated['remember'] ?? false));
-        $request->session()->regenerate();
-
-        $normalizedRole = strtolower(trim((string) $user->role));
-        $internalRoles = ['admin', 'owner', 'manager', 'photographer', 'editor'];
-
-        return redirect()->route(in_array($normalizedRole, $internalRoles, true) ? 'admin.dashboard' : 'user.dashboard');
+        return back()
+            ->withErrors(['email' => 'Invalid email or password.'])
+            ->withInput($request->only('email'));
     }
 
     public function showRegister(): View

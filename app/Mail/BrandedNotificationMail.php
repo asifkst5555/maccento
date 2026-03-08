@@ -6,7 +6,6 @@ use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
 use Illuminate\Queue\SerializesModels;
 use Symfony\Component\Mime\Email;
-use Symfony\Component\Mime\Part\DataPart;
 
 class BrandedNotificationMail extends Mailable
 {
@@ -27,14 +26,21 @@ class BrandedNotificationMail extends Mailable
         private readonly ?int $emailLogId = null,
         private readonly ?int $threadProjectId = null,
         private readonly ?string $replyToAddress = null,
+        /** @var array<int,array{path:string,name:string,mime:?string}> */
+        private readonly array $outboundAttachmentMeta = [],
     ) {
+    }
+
+    /**
+     * @return array<int,array{path:string,name:string,mime:?string}>
+     */
+    public function outboundAttachments(): array
+    {
+        return $this->outboundAttachmentMeta;
     }
 
     public function build(): self
     {
-        $logoPublicPath = public_path('assets/media/logo-footer.png');
-        $logoCid = file_exists($logoPublicPath) ? 'maccento-logo-footer' : null;
-
         $mail = $this
             ->subject($this->subjectLine)
             ->view('emails.branded-notification')
@@ -48,22 +54,32 @@ class BrandedNotificationMail extends Mailable
                 'ctaUrl' => $this->ctaUrl,
                 'footerNote' => $this->footerNote,
                 'brandName' => (string) config('app.name', 'Maccento'),
-                'brandLogoCid' => $logoCid,
-                'brandLogoUrl' => rtrim((string) config('app.url', ''), '/') . '/assets/media/logo-footer.png',
+                'brandLogoUrl' => asset('assets/media/logo-footer.png'),
             ]);
 
         if ($this->replyToAddress !== null && trim($this->replyToAddress) !== '') {
             $mail->replyTo($this->replyToAddress);
         }
 
-        $mail->withSymfonyMessage(function (Email $message) use ($logoPublicPath, $logoCid): void {
-            if ($logoCid !== null && file_exists($logoPublicPath)) {
-                $logoPart = DataPart::fromPath($logoPublicPath);
-                $logoPart->asInline();
-                $logoPart->setContentId($logoCid);
-                $message->addPart($logoPart);
+        foreach ($this->outboundAttachmentMeta as $attachment) {
+            $path = (string) ($attachment['path'] ?? '');
+            if ($path === '' || !is_file($path)) {
+                continue;
             }
 
+            $options = [
+                'as' => (string) ($attachment['name'] ?? basename($path)),
+            ];
+
+            $mime = isset($attachment['mime']) ? trim((string) $attachment['mime']) : '';
+            if ($mime !== '') {
+                $options['mime'] = $mime;
+            }
+
+            $mail->attach($path, $options);
+        }
+
+        $mail->withSymfonyMessage(function (Email $message): void {
             if ($this->emailLogId !== null || $this->threadProjectId !== null) {
                 $smtpApiPayload = [
                     'unique_args' => array_filter([

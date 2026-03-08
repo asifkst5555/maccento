@@ -14,6 +14,9 @@
     $showServices = in_array($page, ['home', 'services'], true);
     $showPortfolio = in_array($page, ['home', 'portfolio'], true);
     $showPlan = in_array($page, ['home', 'plan'], true);
+    $companyEmail = (string) config('maccento_bot.company.email', 'info@maccento.ca');
+    $companyPhone = (string) config('maccento_bot.company.phone', '(514) 951-9141');
+    $companyPhoneHref = preg_replace('/[^0-9+]/', '', $companyPhone) ?: '+15149519141';
   @endphp
   <header class="header">
     <div class="container nav">
@@ -906,10 +909,10 @@
             <input class="input" placeholder="Agency or Company?" type="text" name="company">
             <input class="input" placeholder="Phone" type="tel" name="phone">
             <input class="input" placeholder="E-mail" type="email" name="email">
-            <div class="custom-select" data-select>
+            <div class="custom-select" data-select data-multiple="true" data-placeholder="Services required?">
               <input type="hidden" name="service">
               <button class="input custom-select-trigger" type="button" aria-expanded="false">Services required?</button>
-              <ul class="custom-select-menu" role="listbox">
+              <ul class="custom-select-menu" role="listbox" aria-multiselectable="true">
                 <li class="custom-select-option" data-value="Photography">Photography</li>
                 <li class="custom-select-option" data-value="Videography">Videography</li>
                 <li class="custom-select-option" data-value="Drone">Drone</li>
@@ -960,23 +963,23 @@
       </div>
       <div class="footer-divider" aria-hidden="true"></div>
       <div class="footer-contact-line">
-        <a class="footer-contact-item" href="mailto:info@maccento.ca">
+        <a class="footer-contact-item" href="mailto:{{ $companyEmail }}">
           <span class="contact-icon">
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <rect x="2.5" y="5" width="19" height="14" rx="2.8" fill="none" stroke="currentColor" stroke-width="2.2"/>
               <path d="M3.8 7.2L12 13l8.2-5.8" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
           </span>
-          <span class="contact-text">info@maccento.ca</span>
+          <span class="contact-text">{{ $companyEmail }}</span>
         </a>
-        <span class="footer-contact-dot" aria-hidden="true">•</span>
-        <a class="footer-contact-item" href="tel:+15149519141">
+        <span class="footer-contact-dot" aria-hidden="true">&bull;</span>
+        <a class="footer-contact-item" href="tel:{{ $companyPhoneHref }}">
           <span class="contact-icon">
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="M6.4 3.1h3.6c.7 0 1.3.5 1.5 1.2l1 3.8c.2.7-.1 1.5-.7 1.9l-1.9 1.2a14.3 14.3 0 0 0 3 3 14.3 14.3 0 0 0 3 2l1.2-1.9c.4-.6 1.2-.9 1.9-.7l3.8 1c.7.2 1.2.8 1.2 1.5V19c0 1.1-.9 2-2 2C10.6 21 3 13.4 3 6.4c0-1.1.9-2 2-2z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
           </span>
-          <span class="contact-text">(514) 951-9141</span>
+          <span class="contact-text">{{ $companyPhone }}</span>
         </a>
       </div>
       <div class="footer-bottom">&copy; 2026 Maccento Real Estate Media</div>
@@ -2095,6 +2098,29 @@
         const hiddenInput = select.querySelector('input[type="hidden"]');
         const options = select.querySelectorAll('.custom-select-option');
         if (!trigger || !hiddenInput || options.length === 0) return;
+        const isMultiple = select.dataset.multiple === 'true';
+        const placeholder = String(select.dataset.placeholder || trigger.textContent || '').trim();
+
+        const syncMultipleLabel = () => {
+          const activeOptions = Array.from(options).filter((option) => option.classList.contains('active'));
+          const values = activeOptions
+            .map((option) => String(option.getAttribute('data-value') || '').trim())
+            .filter(Boolean);
+
+          hiddenInput.value = values.join(',');
+
+          if (values.length === 0) {
+            trigger.textContent = placeholder;
+            return;
+          }
+
+          if (values.length === 1) {
+            trigger.textContent = values[0];
+            return;
+          }
+
+          trigger.textContent = `${values.length} services selected`;
+        };
 
         const close = () => {
           select.classList.remove('open');
@@ -2116,6 +2142,12 @@
 
         options.forEach((option) => {
           option.addEventListener('click', () => {
+            if (isMultiple) {
+              option.classList.toggle('active');
+              syncMultipleLabel();
+              return;
+            }
+
             options.forEach((opt) => opt.classList.remove('active'));
             option.classList.add('active');
             trigger.textContent = option.textContent || '';
@@ -2127,6 +2159,10 @@
         document.addEventListener('click', (event) => {
           if (!select.contains(event.target)) close();
         });
+
+        if (isMultiple) {
+          syncMultipleLabel();
+        }
       });
 
       const frTranslations = {

@@ -68,7 +68,7 @@
   <h2 class="panel-section-title">Your Projects</h2>
   <div class="panel-table-wrap">
     <table class="panel-table">
-      <thead><tr><th>Title</th><th>Service</th><th>Schedule</th><th>Status</th></tr></thead>
+      <thead><tr><th>Title</th><th>Service</th><th>Schedule</th><th>Status</th><th>Action</th></tr></thead>
       <tbody>
         @forelse($client->projects as $project)
         <tr>
@@ -76,130 +76,233 @@
           <td>{{ $project->service_type ?: '-' }}</td>
           <td>{{ $project->scheduled_at?->format('Y-m-d H:i') ?: '-' }}</td>
           <td><span class="panel-badge">{{ $project->status }}</span></td>
+          <td>
+            <button class="panel-btn panel-btn-primary" type="button" data-project-popup-open data-project-popup-id="{{ $project->id }}">
+              Open Project
+            </button>
+          </td>
         </tr>
         @empty
-        <tr><td colspan="4" class="panel-muted">No projects yet.</td></tr>
+        <tr><td colspan="5" class="panel-muted">No projects yet.</td></tr>
         @endforelse
       </tbody>
     </table>
   </div>
+
+  <style>
+    .project-popup-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 31, 53, 0.68);
+      z-index: 900;
+      display: none;
+    }
+    .project-popup-backdrop.is-open {
+      display: block;
+    }
+    .project-popup {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: min(980px, calc(100vw - 2rem));
+      max-height: calc(100vh - 2rem);
+      overflow: auto;
+      z-index: 901;
+      display: none;
+      border: 1px solid rgba(31, 73, 119, 0.2);
+      box-shadow: 0 28px 60px rgba(11, 26, 44, 0.36);
+    }
+    .project-popup.is-open {
+      display: block;
+    }
+    .project-popup-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
+      align-items: flex-start;
+      margin-bottom: 0.75rem;
+    }
+    .project-popup-title {
+      margin: 0;
+      font-size: 1.15rem;
+      color: #183a63;
+    }
+    .project-popup-meta {
+      margin: 0.15rem 0 0;
+      color: #5b7396;
+      font-size: 0.92rem;
+    }
+  </style>
+
+  @foreach($client->projects as $project)
+    <div class="project-popup-backdrop" data-project-popup-backdrop="{{ $project->id }}"></div>
+    <article class="panel-card project-popup" data-project-popup="{{ $project->id }}" role="dialog" aria-modal="true" aria-label="Project {{ $project->title }} details">
+      <div class="project-popup-head">
+        <div>
+          <h3 class="project-popup-title">{{ $project->title }}</h3>
+          <p class="project-popup-meta">
+            {{ $project->service_type ?: 'Service not set' }}
+            @if(!blank($project->property_address))
+              | {{ $project->property_address }}
+            @endif
+          </p>
+        </div>
+        <button class="panel-btn" type="button" data-project-popup-close data-project-popup-id="{{ $project->id }}">Close</button>
+      </div>
+
+      <div class="panel-table-wrap" style="margin-bottom: 0.75rem;">
+        <table class="panel-table">
+          <tbody>
+            <tr>
+              <th style="width: 180px;">Status</th>
+              <td><span class="panel-badge">{{ $project->status }}</span></td>
+            </tr>
+            <tr>
+              <th>Schedule</th>
+              <td>{{ $project->scheduled_at?->format('Y-m-d H:i') ?: '-' }}</td>
+            </tr>
+            <tr>
+              <th>Project ID</th>
+              <td>#{{ $project->id }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h4 class="panel-section-title" style="margin-top: 0;">Invoices for this Project</h4>
+      <div class="panel-table-wrap">
+        <table class="panel-table">
+          <thead>
+            <tr><th>Invoice #</th><th>Amount</th><th>Status</th><th>Due Date</th><th>Email</th><th>Action</th></tr>
+          </thead>
+          <tbody>
+            @forelse($project->invoices as $invoice)
+              <tr>
+                <td>{{ $invoice->invoice_number }}</td>
+                <td>{{ number_format((float) $invoice->amount, 2) }} {{ $invoice->currency }}</td>
+                <td><span class="panel-badge">{{ $invoice->status }}</span></td>
+                <td>{{ $invoice->due_date?->format('Y-m-d') ?: '-' }}</td>
+                <td>{{ $invoice->client?->email ?: ($client->email ?: '-') }}</td>
+                <td><a class="panel-link" href="{{ route('user.invoices.download', $invoice) }}">Download PDF</a></td>
+              </tr>
+            @empty
+              <tr><td colspan="6" class="panel-muted">No invoices for this project yet.</td></tr>
+            @endforelse
+          </tbody>
+        </table>
+      </div>
+
+      <h4 class="panel-section-title" style="margin-top: 1rem;">Need an Extra Service?</h4>
+      <form method="post" action="{{ route('user.service-requests.store') }}" class="panel-stack" style="margin-bottom: 1rem;">
+        @csrf
+        <input type="hidden" name="client_project_id" value="{{ $project->id }}">
+        <div class="panel-form-row">
+          <input class="panel-input" type="text" name="requested_service" placeholder="Extra service (ex: twilight shoot, reels, floor plan)" required>
+          <input class="panel-input" type="date" name="preferred_date">
+        </div>
+        <input class="panel-input" type="text" name="subject" placeholder="Short subject (optional)">
+        <textarea class="panel-textarea" name="details" placeholder="Tell us what you need for this project"></textarea>
+        <button class="panel-btn panel-btn-primary" type="submit">Request Additional Service</button>
+      </form>
+
+      <h4 class="panel-section-title">Project Timeline</h4>
+      <div class="panel-table-wrap" style="margin-bottom: 0.75rem;">
+        <table class="panel-table">
+          <thead>
+            <tr><th>Service Request</th><th>Status</th><th>Preferred Date</th><th>Created</th></tr>
+          </thead>
+          <tbody>
+            @forelse($project->serviceRequests as $requestItem)
+              <tr>
+                <td>
+                  {{ $requestItem->requested_service }}
+                  @if(!blank($requestItem->subject))
+                    <div class="panel-muted">{{ $requestItem->subject }}</div>
+                  @endif
+                </td>
+                <td><span class="panel-badge">{{ $requestItem->status }}</span></td>
+                <td>{{ $requestItem->preferred_date?->format('Y-m-d') ?: '-' }}</td>
+                <td>{{ $requestItem->created_at?->format('Y-m-d H:i') ?: '-' }}</td>
+              </tr>
+            @empty
+              <tr><td colspan="4" class="panel-muted">No service request timeline yet.</td></tr>
+            @endforelse
+          </tbody>
+        </table>
+      </div>
+
+      <div class="panel-chat-list">
+        @forelse($project->messages as $message)
+          <div class="panel-chat-item {{ $message->sender_role === 'client' ? 'is-user' : 'is-assistant' }}">
+            <p class="panel-chat-role">{{ strtoupper($message->sender_role) }}</p>
+            <p class="panel-chat-text">{{ $message->message }}</p>
+            <p class="panel-muted">{{ $message->sent_at?->format('Y-m-d H:i') ?: $message->created_at?->format('Y-m-d H:i') }}</p>
+          </div>
+        @empty
+          <p class="panel-muted">No project messages yet.</p>
+        @endforelse
+      </div>
+    </article>
+  @endforeach
+
+  <script>
+    (function () {
+      var openButtons = document.querySelectorAll('[data-project-popup-open]');
+      var closeButtons = document.querySelectorAll('[data-project-popup-close]');
+
+      var setPopupState = function (projectId, shouldOpen) {
+        var popup = document.querySelector('[data-project-popup="' + projectId + '"]');
+        var backdrop = document.querySelector('[data-project-popup-backdrop="' + projectId + '"]');
+        if (!popup || !backdrop) return;
+
+        popup.classList.toggle('is-open', shouldOpen);
+        backdrop.classList.toggle('is-open', shouldOpen);
+        document.body.style.overflow = shouldOpen ? 'hidden' : '';
+      };
+
+      openButtons.forEach(function (button) {
+        button.addEventListener('click', function () {
+          var projectId = button.getAttribute('data-project-popup-id');
+          if (!projectId) return;
+          setPopupState(projectId, true);
+        });
+      });
+
+      closeButtons.forEach(function (button) {
+        button.addEventListener('click', function () {
+          var projectId = button.getAttribute('data-project-popup-id');
+          if (!projectId) return;
+          setPopupState(projectId, false);
+        });
+      });
+
+      document.querySelectorAll('[data-project-popup-backdrop]').forEach(function (backdrop) {
+        backdrop.addEventListener('click', function () {
+          var projectId = backdrop.getAttribute('data-project-popup-backdrop');
+          if (!projectId) return;
+          setPopupState(projectId, false);
+        });
+      });
+
+      document.addEventListener('keydown', function (event) {
+        if (event.key !== 'Escape') return;
+        document.querySelectorAll('.project-popup.is-open').forEach(function (popup) {
+          var projectId = popup.getAttribute('data-project-popup');
+          if (!projectId) return;
+          setPopupState(projectId, false);
+        });
+      });
+    })();
+  </script>
 </section>
 
 <section class="panel-card">
   <h2 class="panel-section-title">Project Gallery & Delivery</h2>
-  <div class="panel-stack">
-    @forelse($client->projects as $project)
-      @php
-        $galleryItems = $project->media->whereIn('type', ['image', 'video'])->values();
-        $finalZipItems = $project->media->where('type', 'final_zip')->values();
-        $isPaid = $project->invoices->contains(fn($invoice) => $invoice->status === 'paid');
-        $projectGalleryPayload = $galleryPayloadByProject[$project->id] ?? [];
-      @endphp
-      <article class="panel-card">
-        <x-project-media-summary
-          :project="$project"
-          :gallery-count="$galleryItems->count()"
-          :zip-count="$finalZipItems->count()"
-          :is-paid="$isPaid"
-        />
-
-        @if($galleryItems->isEmpty() && $finalZipItems->isEmpty())
-          <p class="panel-muted">No delivery files yet.</p>
-        @endif
-
-        @if($galleryItems->isNotEmpty())
-          <div class="panel-form-row" style="margin-bottom: 0.75rem;">
-            @if($isPaid)
-              <a class="panel-btn panel-btn-primary" href="{{ route('user.projects.media.download-zip', $project) }}">Download Gallery ZIP</a>
-            @else
-              <button class="panel-btn panel-btn-primary" type="button" disabled>Download Gallery ZIP (Locked until paid)</button>
-            @endif
-            <button
-              class="panel-btn panel-btn-primary"
-              type="button"
-              data-gallery-open
-              data-project-id="{{ $project->id }}"
-              data-gallery-items='@json($projectGalleryPayload)'
-            >
-              Open Gallery Viewer
-            </button>
-          </div>
-
-          <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px;">
-            @foreach($galleryItems as $item)
-              @php
-                $previewUrl = route('user.projects.media.preview', ['project' => $project, 'media' => $item]);
-              @endphp
-              <div class="panel-card" style="position: relative;">
-                @if($item->type === 'image')
-                  <img src="{{ $previewUrl }}" alt="{{ $item->original_name }}" style="width: 100%; max-height: 180px; object-fit: cover; border-radius: 6px;">
-                @else
-                  <video controls style="width: 100%; max-height: 180px; border-radius: 6px;">
-                    <source src="{{ $previewUrl }}" type="{{ $item->mime_type ?: 'video/mp4' }}">
-                  </video>
-                @endif
-
-                @if(!$isPaid)
-                  <div class="panel-badge" style="position: absolute; top: 8px; left: 8px; z-index: 10;">WATERMARK PREVIEW</div>
-                @endif
-
-                <div class="panel-form-row" style="margin-top: 0.5rem; justify-content: space-between;">
-                  <span class="panel-muted" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 65%;">{{ $item->original_name }}</span>
-                  @if($isPaid)
-                    <a class="panel-link" href="{{ route('user.projects.media.download', ['project' => $project, 'media' => $item]) }}">Download</a>
-                  @else
-                    <span class="panel-muted">Locked</span>
-                  @endif
-                </div>
-              </div>
-            @endforeach
-          </div>
-        @endif
-
-        @if($finalZipItems->isNotEmpty())
-          <div class="panel-stack" style="margin-top: 0.75rem;">
-            <h4 class="panel-section-title">Final Delivery ZIP</h4>
-            @foreach($finalZipItems as $zipItem)
-              <div class="panel-form-row" style="justify-content: space-between;">
-                <span>{{ $zipItem->original_name }}</span>
-                @if($isPaid)
-                  <a class="panel-link" href="{{ route('user.projects.media.download', ['project' => $project, 'media' => $zipItem]) }}">Download ZIP</a>
-                @else
-                  <span class="panel-muted">Locked until paid</span>
-                @endif
-              </div>
-            @endforeach
-          </div>
-        @endif
-      </article>
-    @empty
-      <p class="panel-muted">No project gallery available.</p>
-    @endforelse
-  </div>
+  // ...existing code...
 </section>
 
 <x-panel-gallery-viewer modal-id="client-media-gallery-viewer" open-selector="[data-gallery-open]" title-default="Gallery Viewer" />
-
-<section class="panel-card">
-  <h2 class="panel-section-title">Your Invoices</h2>
-  <div class="panel-table-wrap">
-    <table class="panel-table">
-      <thead><tr><th>Invoice #</th><th>Amount</th><th>Status</th><th>Due Date</th></tr></thead>
-      <tbody>
-        @forelse($client->invoices as $invoice)
-        <tr>
-          <td>{{ $invoice->invoice_number }}</td>
-          <td>{{ number_format((float) $invoice->amount, 2) }} {{ $invoice->currency }}</td>
-          <td><span class="panel-badge">{{ $invoice->status }}</span></td>
-          <td>{{ $invoice->due_date?->format('Y-m-d') ?: '-' }}</td>
-        </tr>
-        @empty
-        <tr><td colspan="4" class="panel-muted">No invoices yet.</td></tr>
-        @endforelse
-      </tbody>
-    </table>
-  </div>
-</section>
 
 <section class="panel-card">
   <h2 class="panel-section-title">Request History</h2>

@@ -8,6 +8,10 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (!Schema::hasTable('watermark_settings') || Schema::hasColumn('watermark_settings', 'opacity_percent')) {
+            return;
+        }
+
         Schema::table('watermark_settings', function (Blueprint $table): void {
             $table->unsignedTinyInteger('opacity_percent')->default(62)->after('size');
         });
@@ -15,6 +19,10 @@ return new class extends Migration
 
     public function down(): void
     {
+        if (!Schema::hasTable('watermark_settings') || !Schema::hasColumn('watermark_settings', 'opacity_percent')) {
+            return;
+        }
+
         Schema::table('watermark_settings', function (Blueprint $table): void {
             $table->dropColumn('opacity_percent');
         });

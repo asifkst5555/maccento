@@ -8,6 +8,10 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (Schema::hasTable('watermark_settings')) {
+            return;
+        }
+
         Schema::create('watermark_settings', function (Blueprint $table): void {
             $table->id();
             $table->string('logo_disk', 50)->nullable();

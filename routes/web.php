@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AuthOtpController;
+use App\Http\Controllers\AdminAssistantController;
 use App\Http\Controllers\DashboardController;
 use Illuminate\Support\Facades\Route;
 
@@ -37,10 +38,12 @@ Route::middleware('auth')->group(function (): void {
 
     Route::middleware('role:admin,owner,manager,photographer,editor')->group(function (): void {
         Route::get('/admin/dashboard', [DashboardController::class, 'adminDashboard'])->name('admin.dashboard');
+        Route::get('/admin/assistant/session', [AdminAssistantController::class, 'session'])->name('admin.assistant.session');
+        Route::post('/admin/assistant/message', [AdminAssistantController::class, 'message'])->name('admin.assistant.message');
         Route::get('/admin/projects', [DashboardController::class, 'adminProjectsIndex'])->name('admin.projects.index');
+        Route::post('/admin/projects', [DashboardController::class, 'adminProjectStore'])->name('admin.projects.store');
         Route::get('/admin/media-delivery', [DashboardController::class, 'adminMediaDeliveryIndex'])->name('admin.media-delivery.index');
-        Route::get('/admin/media-delivery/watermark', [DashboardController::class, 'adminMediaWatermarkSettingsIndex'])->name('admin.media-delivery.watermark.index');
-        Route::get('/admin/media-delivery/watermark/logo', [DashboardController::class, 'adminMediaWatermarkLogoView'])->name('admin.media-delivery.watermark.logo');
+        Route::get('/admin/projects/{project}/media/{media}/view', [DashboardController::class, 'adminProjectMediaView'])->name('admin.projects.media.view');
         Route::get('/admin/clients', [DashboardController::class, 'adminClientsIndex'])->name('admin.clients.index');
         Route::get('/admin/clients/{client}', [DashboardController::class, 'adminClientShow'])->name('admin.clients.show');
     });
@@ -76,15 +79,19 @@ Route::middleware('auth')->group(function (): void {
         Route::post('/admin/clients/{client}/projects', [DashboardController::class, 'adminClientProjectStore'])->name('admin.clients.projects.store');
         Route::post('/admin/projects/{project}/status', [DashboardController::class, 'adminClientProjectStatusUpdate'])->name('admin.projects.status');
         Route::post('/admin/projects/{project}/media', [DashboardController::class, 'adminProjectMediaStore'])->name('admin.projects.media.store');
-        Route::get('/admin/projects/{project}/media/{media}/view', [DashboardController::class, 'adminProjectMediaView'])->name('admin.projects.media.view');
         Route::post('/admin/projects/{project}/media/{media}/delete', [DashboardController::class, 'adminProjectMediaDestroy'])->name('admin.projects.media.delete');
         Route::post('/admin/projects/{project}/delivery-zip', [DashboardController::class, 'adminProjectDeliveryZipStore'])->name('admin.projects.delivery-zip.store');
+        Route::get('/admin/media-delivery/watermark', [DashboardController::class, 'adminMediaWatermarkSettingsIndex'])->name('admin.media-delivery.watermark.index');
+        Route::get('/admin/media-delivery/watermark/logo', [DashboardController::class, 'adminMediaWatermarkLogoView'])->name('admin.media-delivery.watermark.logo');
         Route::post('/admin/media-delivery/watermark', [DashboardController::class, 'adminMediaWatermarkSettingsUpdate'])->name('admin.media-delivery.watermark.update');
         Route::post('/admin/media-delivery/watermark/rebuild', [DashboardController::class, 'adminMediaWatermarkRebuild'])->name('admin.media-delivery.watermark.rebuild');
         Route::post('/admin/media-delivery/folders/migrate', [DashboardController::class, 'adminMediaFolderMigrationRun'])->name('admin.media-delivery.folders.migrate');
         Route::post('/admin/clients/{client}/invoices', [DashboardController::class, 'adminClientInvoiceStore'])->name('admin.clients.invoices.store');
         Route::post('/admin/clients/{client}/messages', [DashboardController::class, 'adminClientMessageStore'])->name('admin.clients.messages.store');
         Route::post('/admin/invoices/{invoice}/status', [DashboardController::class, 'adminInvoiceStatusUpdate'])->name('admin.invoices.status');
+        Route::post('/admin/invoices/{invoice}/delete', [DashboardController::class, 'adminInvoiceDestroy'])->name('admin.invoices.delete');
+        Route::get('/admin/invoices/{invoice}/download', [DashboardController::class, 'adminInvoicePdfDownload'])->name('admin.invoices.download');
+        Route::post('/admin/invoices/settings', [DashboardController::class, 'adminInvoiceSettingsUpdate'])->name('admin.invoices.settings.update');
         Route::post('/admin/service-requests/{serviceRequest}/status', [DashboardController::class, 'adminServiceRequestStatusUpdate'])->name('admin.service-requests.status');
         Route::get('/admin/leads/{lead}', [DashboardController::class, 'adminLeadShow'])->name('admin.leads.show');
         Route::get('/admin/leads/{lead}/conversation.pdf', [DashboardController::class, 'adminLeadConversationPdf'])->name('admin.leads.conversation-pdf');
@@ -109,6 +116,7 @@ Route::middleware('auth')->group(function (): void {
 
     Route::get('/user/dashboard', [DashboardController::class, 'userDashboard'])->middleware('role:user,client,agent')->name('user.dashboard');
     Route::post('/user/service-requests', [DashboardController::class, 'userServiceRequestStore'])->middleware('role:user,client,agent')->name('user.service-requests.store');
+    Route::get('/user/invoices/{invoice}/download', [DashboardController::class, 'userInvoicePdfDownload'])->middleware('role:user,client,agent')->name('user.invoices.download');
     Route::get('/user/quotes/{quote}', [DashboardController::class, 'userQuoteShow'])->middleware('role:user,client,agent')->name('user.quotes.show');
     Route::post('/user/quotes/{quote}/revision-request', [DashboardController::class, 'userQuoteRevisionRequest'])->middleware('role:user,client,agent')->name('user.quotes.revision-request');
     Route::get('/user/projects/{project}/media/{media}/preview', [DashboardController::class, 'userProjectMediaPreview'])->middleware('role:user,client,agent')->name('user.projects.media.preview');

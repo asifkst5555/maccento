@@ -8,6 +8,10 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (Schema::hasTable('lead_auto_email_settings')) {
+            return;
+        }
+
         Schema::create('lead_auto_email_settings', function (Blueprint $table): void {
             $table->id();
             $table->string('source', 80)->unique();

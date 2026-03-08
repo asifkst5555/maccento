@@ -114,4 +114,36 @@ class SendGridInboundParseWebhookTest extends TestCase
 
         $this->assertDatabaseCount('client_messages', 0);
     }
+
+    public function test_it_does_not_store_inbound_email_when_message_body_is_empty(): void
+    {
+        putenv('SENDGRID_INBOUND_WEBHOOK_TOKEN=test-inbound-token');
+        $_ENV['SENDGRID_INBOUND_WEBHOOK_TOKEN'] = 'test-inbound-token';
+        $_SERVER['SENDGRID_INBOUND_WEBHOOK_TOKEN'] = 'test-inbound-token';
+
+        $client = Client::query()->create([
+            'name' => 'Empty Body Client',
+            'email' => 'empty@example.com',
+            'status' => 'active',
+        ]);
+
+        $response = $this->postJson('/api/webhooks/sendgrid/inbound?token=test-inbound-token', [
+            'from' => 'empty@example.com',
+            'subject' => 'Re: Empty reply',
+            'text' => " \n \n ",
+            'html' => '<div> </div>',
+        ]);
+
+        $response
+            ->assertStatus(422)
+            ->assertJsonPath('ok', false)
+            ->assertJsonPath('message', 'Empty inbound message.');
+
+        $this->assertDatabaseCount('inbound_emails', 0);
+        $this->assertDatabaseCount('client_messages', 0);
+        $this->assertDatabaseHas('clients', [
+            'id' => $client->id,
+            'email' => 'empty@example.com',
+        ]);
+    }
 }

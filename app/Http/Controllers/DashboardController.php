@@ -14,6 +14,7 @@ use App\Models\EmailDraft;
 use App\Models\EmailLog;
 use App\Models\FollowUp;
 use App\Models\InboundEmail;
+use App\Models\InvoiceSetting;
 use App\Models\LeadAutoEmailSetting;
 use App\Models\LeadEvent;
 use App\Models\LeadProfile;
@@ -33,6 +34,7 @@ use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Mail;
@@ -531,10 +533,7 @@ class DashboardController extends Controller
 
     public function adminProjectsIndex(Request $request): View
     {
-        $display = trim((string) $request->string('project_view'));
-        if (!in_array($display, ['table', 'kanban'], true)) {
-            $display = 'table';
-        }
+        $display = 'table';
 
         $scope = trim((string) $request->string('project_scope'));
         if (!in_array($scope, ['ongoing', 'past', 'all'], true)) {
@@ -544,6 +543,10 @@ class DashboardController extends Controller
         $status = trim((string) $request->string('project_status'));
         $search = trim((string) $request->string('project_search'));
         $allowedStatuses = ['accepted', 'shooting', 'editing', 'complete'];
+        $projectAction = trim((string) $request->string('project_action'));
+        if (!in_array($projectAction, ['create', ''], true)) {
+            $projectAction = '';
+        }
 
         $baseQuery = ClientProject::query()
             ->with(['client:id,name,email,phone'])
@@ -578,13 +581,6 @@ class DashboardController extends Controller
             ->paginate(20)
             ->withQueryString();
 
-        $kanbanProjects = (clone $baseQuery)
-            ->orderByRaw('CASE WHEN due_at IS NULL THEN 1 ELSE 0 END')
-            ->orderBy('due_at')
-            ->latest('id')
-            ->limit(300)
-            ->get();
-
         $totalProjects = ClientProject::count();
         $ongoingProjects = ClientProject::whereIn('status', ['accepted', 'shooting', 'editing'])->count();
         $completedProjects = ClientProject::where('status', 'complete')->count();
@@ -600,6 +596,11 @@ class DashboardController extends Controller
             ->count();
 
         $canManageProjects = in_array(strtolower(trim((string) $request->user()?->role)), ['owner', 'admin', 'manager'], true);
+        $projectClients = Client::query()
+            ->select(['id', 'name', 'email', 'status'])
+            ->orderBy('name')
+            ->limit(400)
+            ->get();
 
         return view('admin.projects-index', [
             'projects' => $projects,
@@ -615,11 +616,50 @@ class DashboardController extends Controller
                 'project_scope' => $scope,
                 'project_status' => $status,
                 'project_search' => $search,
+                'project_action' => $projectAction,
             ],
-            'kanbanProjects' => $kanbanProjects,
             'projectStatuses' => $allowedStatuses,
             'canManageProjects' => $canManageProjects,
+            'projectClients' => $projectClients,
         ]);
+    }
+
+    public function adminProjectStore(Request $request): RedirectResponse
+    {
+        $this->ensurePipelineWriteAccess($request);
+
+        $validated = $request->validate([
+            'client_id' => ['required', 'integer', 'exists:clients,id'],
+            'title' => ['required', 'string', 'max:255'],
+            'service_type' => ['nullable', 'string', 'max:120'],
+            'property_address' => ['nullable', 'string', 'max:255'],
+            'scheduled_at' => ['nullable', 'date'],
+            'due_at' => ['nullable', 'date'],
+            'status' => ['required', 'in:accepted,shooting,editing,complete'],
+            'notes' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        if (!blank($validated['scheduled_at'] ?? null) && !blank($validated['due_at'] ?? null)) {
+            if (strtotime((string) $validated['due_at']) < strtotime((string) $validated['scheduled_at'])) {
+                return back()->withErrors(['due_at' => 'Due date/time cannot be earlier than schedule.'])->withInput();
+            }
+        }
+
+        $project = ClientProject::create([
+            'client_id' => (int) $validated['client_id'],
+            'created_by' => $request->user()?->id,
+            'title' => $validated['title'],
+            'service_type' => $validated['service_type'] ?? null,
+            'property_address' => $validated['property_address'] ?? null,
+            'scheduled_at' => $validated['scheduled_at'] ?? null,
+            'due_at' => $validated['due_at'] ?? null,
+            'status' => $validated['status'],
+            'notes' => $validated['notes'] ?? null,
+        ]);
+
+        return redirect()
+            ->route('admin.clients.show', ['client' => (int) $validated['client_id'], 'project_id' => $project->id])
+            ->with('status', 'Project created successfully.');
     }
 
     public function adminMediaDeliveryIndex(Request $request): View
@@ -940,6 +980,7 @@ class DashboardController extends Controller
             ->count();
         $totalAmount = (float) ((clone $baseQuery)->sum('amount') ?? 0);
         $paidAmount = (float) ((clone $baseQuery)->where('status', 'paid')->sum('amount') ?? 0);
+        $invoiceSettings = $this->resolveInvoiceSettings();
 
         return view('admin.invoices-index', [
             'invoices' => $invoices,
@@ -958,7 +999,28 @@ class DashboardController extends Controller
                 'invoice_project' => $projectFilter,
                 'invoice_project_title' => $projectFilterTitle,
             ],
+            'invoiceSettings' => $invoiceSettings,
         ]);
+    }
+
+    public function adminInvoiceSettingsUpdate(Request $request): RedirectResponse
+    {
+        $this->ensureOwnerAdminAccess($request);
+
+        $validated = $request->validate([
+            'include_tax_on_pdf' => ['nullable', 'in:0,1'],
+            'tax_rate_percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
+        ]);
+
+        $includeTax = (string) ($validated['include_tax_on_pdf'] ?? '0') === '1';
+        $taxRate = round((float) ($validated['tax_rate_percent'] ?? 0), 2);
+
+        $settings = $this->resolveInvoiceSettings();
+        $settings->include_tax_on_pdf = $includeTax;
+        $settings->tax_rate_percent = $taxRate;
+        $settings->save();
+
+        return back()->with('status', 'Invoice PDF tax settings updated.');
     }
 
     public function adminEmailsIndex(Request $request): View
@@ -1390,6 +1452,8 @@ class DashboardController extends Controller
             'template_key' => ['nullable', 'string', 'in:delivery_test,pipeline_snapshot,followup_digest'],
             'subject' => ['nullable', 'string', 'max:180'],
             'message' => ['nullable', 'string', 'max:10000'],
+            'attachments' => ['nullable', 'array', 'max:5'],
+            'attachments.*' => ['file', 'max:10240'],
         ]);
 
         $recipient = trim((string) ($validated['recipient_email'] ?? ''));
@@ -1434,6 +1498,8 @@ class DashboardController extends Controller
             $subject = $this->appendProjectThreadTag($subject, $threadProjectId);
         }
 
+        $attachments = $this->normalizeOutboundAttachments($request->file('attachments', []));
+
         $emailLog = $this->createEmailLogEntry([
             'created_by' => $request->user()?->id,
             'mode' => (string) ($validated['mode'] ?? 'custom'),
@@ -1470,6 +1536,7 @@ class DashboardController extends Controller
                 emailLogId: $emailLog?->id,
                 threadProjectId: $threadProjectId,
                 replyToAddress: filled($validated['reply_to'] ?? null) ? (string) $validated['reply_to'] : null,
+                outboundAttachmentMeta: $attachments,
             ));
 
             $this->notificationService()->notifyInternal(
@@ -1947,9 +2014,20 @@ class DashboardController extends Controller
             $linkedUser->save();
         }
 
-        $client = Client::create([
+        $client = Client::query()
+            ->where('user_id', $linkedUser->id)
+            ->orWhere('email', $email)
+            ->first();
+
+        $clientCreated = false;
+        if (!$client) {
+            $client = new Client();
+            $clientCreated = true;
+        }
+
+        $client->fill([
             'user_id' => $linkedUser->id,
-            'created_by' => $request->user()?->id,
+            'created_by' => $client->created_by ?: $request->user()?->id,
             'name' => $validated['name'],
             'email' => $email,
             'phone' => $validated['phone'] ?? null,
@@ -1957,8 +2035,11 @@ class DashboardController extends Controller
             'status' => $validated['status'],
             'notes' => $validated['notes'] ?? null,
         ]);
+        $client->save();
 
-        return redirect()->route('admin.clients.show', $client)->with('status', "Client created. {$accountMessage} Login password has been set.");
+        $statusMessage = $clientCreated ? 'Client created.' : 'Existing client updated.';
+
+        return redirect()->route('admin.clients.show', $client)->with('status', "{$statusMessage} {$accountMessage} Login password has been set.");
     }
 
     public function adminUsersIndex(Request $request): View
@@ -2059,7 +2140,7 @@ class DashboardController extends Controller
         return redirect()->route('admin.clients.index')->with('status', "{$clientName} deleted successfully.");
     }
 
-    public function adminClientShow(Client $client): View
+    public function adminClientShow(Request $request, Client $client): View
     {
         $client->load([
             'projects' => function ($query): void {
@@ -2069,6 +2150,12 @@ class DashboardController extends Controller
                         $mediaQuery->latest('id');
                     },
                     'invoices:id,client_project_id,status',
+                    'messages' => function ($messageQuery): void {
+                        $messageQuery->latest('id')->with('sender:id,name,email');
+                    },
+                    'serviceRequests' => function ($requestQuery): void {
+                        $requestQuery->latest('id')->with('requester:id,name,email');
+                    },
                 ]);
             },
             'invoices' => function ($query): void {
@@ -2078,13 +2165,24 @@ class DashboardController extends Controller
                 $query->latest('id')->with('sender:id,name,email');
             },
             'serviceRequests' => function ($query): void {
-                $query->latest('id')->with('requester:id,name,email');
+                $query->latest('id')->with(['requester:id,name,email', 'project:id,title']);
             },
         ]);
+
+        $focusedProjectId = $request->filled('project_id') ? (int) $request->query('project_id') : null;
+        $focusedProject = null;
+        if ($focusedProjectId !== null && $focusedProjectId > 0) {
+            $focusedProject = $client->projects->firstWhere('id', $focusedProjectId);
+            if (!$focusedProject) {
+                $focusedProjectId = null;
+            }
+        }
 
         return view('admin.client-show', [
             'client' => $client,
             'projectStatuses' => ['accepted', 'shooting', 'editing', 'complete'],
+            'focusedProject' => $focusedProject,
+            'focusedProjectId' => $focusedProjectId,
         ]);
     }
 
@@ -2469,7 +2567,7 @@ class DashboardController extends Controller
     {
         $validated = $request->validate([
             'client_project_id' => ['nullable', 'integer'],
-            'amount' => ['required', 'numeric', 'min:0'],
+            'amount' => ['required', 'numeric', 'min:0.01'],
             'currency' => ['required', 'string', 'max:10'],
             'status' => ['required', 'in:draft,sent,partial,paid,overdue'],
             'issued_at' => ['nullable', 'date'],
@@ -2489,6 +2587,12 @@ class DashboardController extends Controller
                 ->where('client_id', $client->id)
                 ->where('id', (int) $validated['client_project_id'])
                 ->value('id');
+
+            if ($projectId === null) {
+                return back()->withErrors([
+                    'client_project_id' => 'Selected project does not belong to this client.',
+                ])->withInput();
+            }
         }
 
         try {
@@ -2535,6 +2639,12 @@ class DashboardController extends Controller
                 ->where('client_id', $client->id)
                 ->where('id', (int) $validated['client_project_id'])
                 ->value('id');
+
+            if ($projectId === null) {
+                return back()->withErrors([
+                    'client_project_id' => 'Selected project does not belong to this client.',
+                ])->withInput();
+            }
         }
 
         ClientMessage::create([
@@ -2584,17 +2694,171 @@ class DashboardController extends Controller
         return back()->with('status', "Invoice {$invoice->invoice_number} updated.");
     }
 
+    public function adminInvoiceDestroy(Request $request, ClientInvoice $invoice): RedirectResponse
+    {
+        $this->ensurePipelineWriteAccess($request);
+
+        $invoiceNumber = (string) $invoice->invoice_number;
+        $invoice->delete();
+
+        return back()->with('status', "Invoice {$invoiceNumber} deleted successfully.");
+    }
+
+    public function adminInvoicePdfDownload(Request $request, ClientInvoice $invoice)
+    {
+        $this->ensurePipelineWriteAccess($request);
+
+        $invoice->loadMissing([
+            'client:id,user_id,name,email,phone,company',
+            'project:id,title,service_type,property_address',
+        ]);
+
+        $clientName = trim((string) ($invoice->client?->name ?? 'client'));
+        $safeName = Str::slug($clientName !== '' ? $clientName : 'client');
+        $filename = 'invoice-' . $invoice->invoice_number . '-' . $safeName . '.pdf';
+
+        $settings = $this->resolveInvoiceSettings();
+        $subtotal = round((float) $invoice->amount, 2);
+        $includeTax = (bool) $settings->include_tax_on_pdf;
+        $taxRate = max(0.0, (float) $settings->tax_rate_percent);
+        $taxAmount = $includeTax ? round(($subtotal * $taxRate) / 100, 2) : 0.0;
+        $total = round($subtotal + $taxAmount, 2);
+
+        $logoAbsolutePath = null;
+        foreach ([
+            public_path('assets/media/logo.png'),
+            public_path('media/logo.png'),
+            storage_path('app/public/media/logo.png'),
+        ] as $candidatePath) {
+            if (is_string($candidatePath) && $candidatePath !== '' && file_exists($candidatePath)) {
+                $logoAbsolutePath = $candidatePath;
+                break;
+            }
+        }
+
+        $pdf = Pdf::loadView('admin.pdf.invoice', [
+            'invoice' => $invoice,
+            'client' => $invoice->client,
+            'project' => $invoice->project,
+            'brandName' => 'Maccento Real Estate Media',
+            'brandPhone' => '+1 (514) 951-9141',
+            'brandEmail' => (string) config('mail.from.address', 'info@maccento.ca'),
+            'subtotal' => $subtotal,
+            'includeTax' => $includeTax,
+            'taxRate' => $taxRate,
+            'taxAmount' => $taxAmount,
+            'total' => $total,
+            'logoAbsolutePath' => $logoAbsolutePath,
+        ]);
+
+        return $pdf->download($filename);
+    }
+
     public function adminServiceRequestStatusUpdate(Request $request, ClientServiceRequest $serviceRequest): RedirectResponse
     {
         $validated = $request->validate([
             'status' => ['required', 'in:new,accepted,in_progress,completed,closed'],
+            'create_invoice' => ['nullable', 'in:0,1'],
+            'invoice_amount' => ['nullable', 'numeric', 'min:0.01'],
+            'invoice_currency' => ['nullable', 'string', 'max:10'],
+            'invoice_due_date' => ['nullable', 'date'],
+            'invoice_notes' => ['nullable', 'string', 'max:1500'],
+            'timeline_note' => ['nullable', 'string', 'max:400'],
         ]);
 
+        $createInvoice = (string) ($validated['create_invoice'] ?? '0') === '1';
+        $invoice = null;
+        if ($createInvoice) {
+            if (!in_array($validated['status'], ['accepted', 'in_progress'], true)) {
+                return back()->withErrors(['status' => 'To create an invoice, set status to Accepted or In Progress.'])->withInput();
+            }
+
+            $invoiceAmount = round((float) ($validated['invoice_amount'] ?? 0), 2);
+            if ($invoiceAmount <= 0) {
+                return back()->withErrors(['invoice_amount' => 'Invoice amount is required when creating an invoice.'])->withInput();
+            }
+
+            $invoiceCurrency = strtoupper(trim((string) ($validated['invoice_currency'] ?? 'USD')));
+            $issuedAt = now()->toDateString();
+            $dueDate = $validated['invoice_due_date'] ?? now()->addDays(7)->toDateString();
+
+            if (strtotime((string) $dueDate) < strtotime((string) $issuedAt)) {
+                return back()->withErrors(['invoice_due_date' => 'Invoice due date cannot be earlier than issue date.'])->withInput();
+            }
+        }
+
+        $previousStatus = (string) $serviceRequest->status;
         $serviceRequest->status = $validated['status'];
         $serviceRequest->save();
 
-        $serviceRequest->loadMissing('client');
+        $serviceRequest->loadMissing([
+            'client',
+            'project:id,title,service_type',
+        ]);
+
+        if ($createInvoice) {
+            $invoiceAmount = round((float) ($validated['invoice_amount'] ?? 0), 2);
+            $invoiceCurrency = strtoupper(trim((string) ($validated['invoice_currency'] ?? 'USD')));
+            $issuedAt = now()->toDateString();
+            $dueDate = $validated['invoice_due_date'] ?? now()->addDays(7)->toDateString();
+
+            $invoiceNotes = trim((string) ($validated['invoice_notes'] ?? ''));
+            if ($invoiceNotes === '') {
+                $invoiceNotes = 'Additional service request: ' . $serviceRequest->requested_service;
+            }
+
+            $invoice = ClientInvoice::create([
+                'client_id' => $serviceRequest->client_id,
+                'client_project_id' => $serviceRequest->client_project_id,
+                'created_by' => $request->user()?->id,
+                'invoice_number' => $this->generateInvoiceNumber(),
+                'amount' => $invoiceAmount,
+                'currency' => $invoiceCurrency,
+                'status' => 'sent',
+                'issued_at' => $issuedAt,
+                'due_date' => $dueDate,
+                'paid_at' => null,
+                'notes' => $invoiceNotes,
+            ]);
+        }
+
+        $timelineFragments = [];
+        if ($previousStatus !== $serviceRequest->status) {
+            $timelineFragments[] = 'Service request status changed from ' . $previousStatus . ' to ' . $serviceRequest->status . '.';
+        } else {
+            $timelineFragments[] = 'Service request status confirmed as ' . $serviceRequest->status . '.';
+        }
+
+        if ($invoice) {
+            $timelineFragments[] = 'Invoice ' . $invoice->invoice_number . ' created for this request.';
+        }
+
+        $timelineNote = trim((string) ($validated['timeline_note'] ?? ''));
+        if ($timelineNote !== '') {
+            $timelineFragments[] = $timelineNote;
+        }
+
+        ClientMessage::create([
+            'client_id' => $serviceRequest->client_id,
+            'client_project_id' => $serviceRequest->client_project_id,
+            'sender_user_id' => $request->user()?->id,
+            'sender_role' => 'admin',
+            'message' => implode(' ', $timelineFragments),
+            'sent_at' => now(),
+        ]);
+
         if ($serviceRequest->client) {
+            if ($invoice) {
+                $this->notifyClientUser(
+                    $serviceRequest->client,
+                    'invoice_created',
+                    'New invoice created',
+                    "Invoice {$invoice->invoice_number} has been created for your additional service request.",
+                    route('user.dashboard'),
+                    ['invoice_id' => $invoice->id, 'invoice_number' => $invoice->invoice_number]
+                );
+            }
+
             $this->notifyClientUser(
                 $serviceRequest->client,
                 'service_request_status_updated',
@@ -2602,6 +2866,10 @@ class DashboardController extends Controller
                 "Request \"{$serviceRequest->requested_service}\" is now {$serviceRequest->status}.",
                 route('user.dashboard')
             );
+        }
+
+        if ($invoice) {
+            return back()->with('status', 'Service request updated and invoice created.');
         }
 
         return back()->with('status', 'Service request updated.');
@@ -2744,11 +3012,24 @@ class DashboardController extends Controller
                         'media' => function ($mediaQuery): void {
                             $mediaQuery->latest('id');
                         },
-                        'invoices:id,client_project_id,status',
+                        'invoices' => function ($invoiceQuery): void {
+                            $invoiceQuery->latest('id')->with([
+                                'client:id,name,email,phone,company,user_id',
+                            ]);
+                        },
+                        'messages' => function ($messageQuery): void {
+                            $messageQuery->latest('id')->with('sender:id,name,email')->limit(15);
+                        },
+                        'serviceRequests' => function ($requestQuery): void {
+                            $requestQuery->latest('id')->with('requester:id,name,email')->limit(15);
+                        },
                     ]);
                 },
                 'invoices' => function ($query): void {
-                    $query->latest('id')->limit(8);
+                    $query->latest('id')->limit(8)->with([
+                        'project:id,title,service_type,property_address',
+                        'client:id,name,email,phone,company,user_id',
+                    ]);
                 },
                 'messages' => function ($query): void {
                     $query->latest('id')->limit(8);
@@ -2780,10 +3061,45 @@ class DashboardController extends Controller
         ]);
     }
 
+    public function userInvoicePdfDownload(Request $request, ClientInvoice $invoice)
+    {
+        $invoice->loadMissing([
+            'client:id,user_id,name,email,phone,company',
+            'project:id,title,service_type,property_address',
+        ]);
+
+        $this->ensureUserCanAccessInvoice($request, $invoice);
+
+        $clientName = trim((string) ($invoice->client?->name ?? 'client'));
+        $safeName = Str::slug($clientName !== '' ? $clientName : 'client');
+        $filename = 'invoice-' . $invoice->invoice_number . '-' . $safeName . '.pdf';
+
+        $settings = $this->resolveInvoiceSettings();
+        $subtotal = round((float) $invoice->amount, 2);
+        $includeTax = (bool) $settings->include_tax_on_pdf;
+        $taxRate = max(0.0, (float) $settings->tax_rate_percent);
+        $taxAmount = $includeTax ? round(($subtotal * $taxRate) / 100, 2) : 0.0;
+        $total = round($subtotal + $taxAmount, 2);
+
+        $pdf = Pdf::loadView('user.pdf.invoice', [
+            'invoice' => $invoice,
+            'client' => $invoice->client,
+            'project' => $invoice->project,
+            'subtotal' => $subtotal,
+            'includeTax' => $includeTax,
+            'taxRate' => $taxRate,
+            'taxAmount' => $taxAmount,
+            'total' => $total,
+        ]);
+
+        return $pdf->download($filename);
+    }
+
     public function userServiceRequestStore(Request $request): RedirectResponse
     {
         $user = $request->user();
         $validated = $request->validate([
+            'client_project_id' => ['nullable', 'integer'],
             'requested_service' => ['required', 'string', 'max:120'],
             'subject' => ['nullable', 'string', 'max:255'],
             'details' => ['nullable', 'string', 'max:2000'],
@@ -2807,8 +3123,22 @@ class DashboardController extends Controller
             ]);
         }
 
+        $projectId = null;
+        $projectTitle = null;
+        if (!blank($validated['client_project_id'] ?? null)) {
+            $project = ClientProject::query()
+                ->where('client_id', $client->id)
+                ->where('id', (int) $validated['client_project_id'])
+                ->first(['id', 'title']);
+            if ($project) {
+                $projectId = (int) $project->id;
+                $projectTitle = (string) $project->title;
+            }
+        }
+
         ClientServiceRequest::create([
             'client_id' => $client->id,
+            'client_project_id' => $projectId,
             'requester_user_id' => $user->id,
             'requested_service' => $validated['requested_service'],
             'subject' => $validated['subject'] ?? null,
@@ -2817,18 +3147,29 @@ class DashboardController extends Controller
             'status' => 'new',
         ]);
 
+        $messagePrefix = 'New service request submitted: ';
+        if ($projectTitle !== null && $projectTitle !== '') {
+            $messagePrefix = 'Additional service request for project "' . $projectTitle . '": ';
+        }
+
         ClientMessage::create([
             'client_id' => $client->id,
+            'client_project_id' => $projectId,
             'sender_user_id' => $user->id,
             'sender_role' => 'client',
-            'message' => 'New service request submitted: ' . $validated['requested_service'] . ($validated['subject'] ? ' - ' . $validated['subject'] : ''),
+            'message' => $messagePrefix . $validated['requested_service'] . ($validated['subject'] ? ' - ' . $validated['subject'] : ''),
             'sent_at' => now(),
         ]);
+
+        $internalSummary = "{$user->name} submitted: {$validated['requested_service']}.";
+        if ($projectTitle !== null && $projectTitle !== '') {
+            $internalSummary = "{$user->name} requested additional service for {$projectTitle}: {$validated['requested_service']}";
+        }
 
         $this->notificationService()->notifyInternal(
             'new_service_request',
             'New client service request',
-            "{$user->name} submitted: {$validated['requested_service']}.",
+            $internalSummary,
             route('admin.clients.index')
         );
 
@@ -3512,6 +3853,7 @@ class DashboardController extends Controller
         $cc = is_array($payload['cc'] ?? null) ? (array) $payload['cc'] : [];
         $bcc = is_array($payload['bcc'] ?? null) ? (array) $payload['bcc'] : [];
         $threadProjectId = !blank($payload['thread_project_id'] ?? null) ? (int) $payload['thread_project_id'] : null;
+        $attachments = is_array($payload['attachments'] ?? null) ? (array) $payload['attachments'] : [];
 
         $emailLog = $this->createEmailLogEntry([
             'created_by' => $payload['created_by'] ?? null,
@@ -3549,6 +3891,7 @@ class DashboardController extends Controller
                 emailLogId: $emailLog?->id,
                 threadProjectId: $threadProjectId,
                 replyToAddress: $replyTo,
+                outboundAttachmentMeta: $attachments,
             ));
 
             if ($emailLog) {
@@ -3587,6 +3930,34 @@ class DashboardController extends Controller
                 'error' => 'Email could not be sent. Please verify SendGrid and try again.',
             ];
         }
+    }
+
+    /**
+     * @param array<int,mixed> $files
+     * @return array<int,array{path:string,name:string,mime:?string}>
+     */
+    private function normalizeOutboundAttachments(array $files): array
+    {
+        $attachments = [];
+
+        foreach ($files as $file) {
+            if (!$file instanceof UploadedFile || !$file->isValid()) {
+                continue;
+            }
+
+            $path = $file->getRealPath();
+            if (!is_string($path) || $path === '' || !is_file($path)) {
+                continue;
+            }
+
+            $attachments[] = [
+                'path' => $path,
+                'name' => $file->getClientOriginalName(),
+                'mime' => $file->getClientMimeType(),
+            ];
+        }
+
+        return $attachments;
     }
 
     /**
@@ -3849,6 +4220,27 @@ class DashboardController extends Controller
         abort_unless($allowed, 403);
     }
 
+    private function ensureUserCanAccessInvoice(Request $request, ClientInvoice $invoice): void
+    {
+        $role = strtolower(trim((string) $request->user()?->role));
+        if (in_array($role, ['owner', 'admin', 'manager', 'photographer', 'editor'], true)) {
+            return;
+        }
+
+        $user = $request->user();
+        $invoice->loadMissing('client:id,user_id,email,phone');
+        $client = $invoice->client;
+
+        $allowed = $client !== null
+            && (
+                (int) ($client->user_id ?? 0) === (int) ($user?->id ?? 0)
+                || (!blank($client->email) && !blank($user?->email) && strcasecmp((string) $client->email, (string) $user->email) === 0)
+                || (!blank($client->phone) && !blank($user?->phone) && (string) $client->phone === (string) $user->phone)
+            );
+
+        abort_unless($allowed, 403);
+    }
+
     private function projectIsPaid(ClientProject $project): bool
     {
         return $project->invoices()->where('status', 'paid')->exists();
@@ -3976,6 +4368,19 @@ class DashboardController extends Controller
             'opacity_percent' => $opacityPercent,
             'signature' => $signature,
         ];
+    }
+
+    private function resolveInvoiceSettings(): InvoiceSetting
+    {
+        $settings = InvoiceSetting::query()->first();
+        if ($settings) {
+            return $settings;
+        }
+
+        return InvoiceSetting::query()->create([
+            'include_tax_on_pdf' => false,
+            'tax_rate_percent' => 0,
+        ]);
     }
 
     private function watermarkScaleFromSize(string $size): float

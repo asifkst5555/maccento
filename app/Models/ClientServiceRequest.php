@@ -12,6 +12,7 @@ class ClientServiceRequest extends Model
 
     protected $fillable = [
         'client_id',
+        'client_project_id',
         'requester_user_id',
         'requested_service',
         'subject',
@@ -32,5 +33,10 @@ class ClientServiceRequest extends Model
     public function requester(): BelongsTo
     {
         return $this->belongsTo(User::class, 'requester_user_id');
+    }
+
+    public function project(): BelongsTo
+    {
+        return $this->belongsTo(ClientProject::class, 'client_project_id');
     }
 }
