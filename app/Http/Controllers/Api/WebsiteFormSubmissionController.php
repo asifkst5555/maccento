@@ -8,6 +8,7 @@ use App\Services\LeadAutoCaptureService;
 use App\Services\PanelNotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Throwable;
 
 class WebsiteFormSubmissionController extends Controller
 {
@@ -68,23 +69,30 @@ class WebsiteFormSubmissionController extends Controller
             'region' => $validated['region'] ?? null,
             'message' => $validated['message'] ?? null,
             'status' => 'new',
-            'source' => $validated['source'] ?? 'website_contact_form',
+            'source' => $validated['source'] ?? 'website_contact_form_submission',
             'page_url' => $validated['page_url'] ?? null,
             'ip_address' => $request->ip(),
             'submitted_at' => now(),
         ]);
 
         $leadSource = (string) ($validated['source'] ?? 'website_contact_form_submission');
-        $capturedLead = $this->leadAutoCaptureService->captureAndWelcome([
-            'name' => (string) ($validated['name'] ?? ''),
-            'email' => (string) ($validated['email'] ?? ''),
-            'phone' => (string) ($validated['phone'] ?? ''),
-            'service_type' => $normalizedServiceString,
-            'location' => (string) ($validated['region'] ?? ''),
-            'notes' => (string) ($validated['message'] ?? ''),
-            'score' => 40,
-            'status' => 'new',
-        ], $leadSource);
+        $capturedLead = null;
+        $welcomeEmailExpected = filled($validated['email'] ?? null);
+
+        try {
+            $capturedLead = $this->leadAutoCaptureService->captureAndWelcome([
+                'name' => (string) ($validated['name'] ?? ''),
+                'email' => (string) ($validated['email'] ?? ''),
+                'phone' => (string) ($validated['phone'] ?? ''),
+                'service_type' => $normalizedServiceString,
+                'location' => (string) ($validated['region'] ?? ''),
+                'notes' => (string) ($validated['message'] ?? ''),
+                'score' => 40,
+                'status' => 'new',
+            ], $leadSource);
+        } catch (Throwable $exception) {
+            report($exception);
+        }
 
         $this->panelNotificationService->notifyInternal(
             'website_form_submitted',
@@ -97,7 +105,10 @@ class WebsiteFormSubmissionController extends Controller
         return response()->json([
             'ok' => true,
             'message' => 'Form submitted successfully.',
+            'request_id' => sprintf('WF-%06d', (int) $submission->id),
+            'submission_id' => (int) $submission->id,
             'lead_captured' => $capturedLead !== null,
+            'welcome_email_expected' => $welcomeEmailExpected,
         ]);
     }
 }

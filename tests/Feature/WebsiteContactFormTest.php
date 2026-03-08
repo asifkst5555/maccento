@@ -34,6 +34,9 @@ class WebsiteContactFormTest extends TestCase
             ->assertOk()
             ->assertJson([
                 'ok' => true,
+                'request_id' => 'WF-000001',
+                'submission_id' => 1,
+                'welcome_email_expected' => true,
             ]);
 
         $submission = WebsiteFormSubmission::query()->first();

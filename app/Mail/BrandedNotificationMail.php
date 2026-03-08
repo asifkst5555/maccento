@@ -54,7 +54,7 @@ class BrandedNotificationMail extends Mailable
                 'ctaUrl' => $this->ctaUrl,
                 'footerNote' => $this->footerNote,
                 'brandName' => (string) config('app.name', 'Maccento'),
-                'brandLogoUrl' => asset('assets/media/logo-footer.png'),
+                'brandLogoUrl' => $this->resolveBrandLogoUrl(),
             ]);
 
         if ($this->replyToAddress !== null && trim($this->replyToAddress) !== '') {
@@ -94,5 +94,30 @@ class BrandedNotificationMail extends Mailable
         });
 
         return $mail;
+    }
+
+    private function resolveBrandLogoUrl(): string
+    {
+        $appUrl = trim((string) config('app.url', ''));
+        $fallbackBase = trim((string) config('maccento_bot.company.website_url', 'https://maccento.ca'));
+        $baseUrl = $this->isLocalUrl($appUrl) ? $fallbackBase : $appUrl;
+
+        if ($baseUrl === '') {
+            $baseUrl = 'https://maccento.ca';
+        }
+
+        return rtrim($baseUrl, '/') . '/assets/media/logo.png';
+    }
+
+    private function isLocalUrl(string $url): bool
+    {
+        if ($url === '') {
+            return true;
+        }
+
+        $host = (string) parse_url($url, PHP_URL_HOST);
+        $host = strtolower(trim($host));
+
+        return in_array($host, ['', '127.0.0.1', 'localhost', '::1'], true);
     }
 }

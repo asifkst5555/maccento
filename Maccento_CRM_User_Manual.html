@@ -1,0 +1,775 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Maccento CRM User Manual</title>
+  <style>
+    @page {
+      margin: 24mm 18mm 22mm;
+    }
+
+    :root {
+      --brand-red: #be1e2d;
+      --brand-red-deep: #8f1420;
+      --ink: #1a2c42;
+      --muted: #5e7390;
+      --line: #d7e1ec;
+      --soft: #f5f8fc;
+      --soft-red: #fff4f5;
+      --card: #ffffff;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Arial, sans-serif;
+      color: var(--ink);
+      background: #ffffff;
+      font-size: 12.5px;
+      line-height: 1.58;
+    }
+
+    h1, h2, h3, h4, p, ul, ol {
+      margin-top: 0;
+    }
+
+    h1 {
+      font-size: 32px;
+      line-height: 1.12;
+      letter-spacing: -0.02em;
+      margin-bottom: 10px;
+    }
+
+    h2 {
+      font-size: 21px;
+      line-height: 1.2;
+      margin: 30px 0 12px;
+      padding-bottom: 7px;
+      border-bottom: 1px solid var(--line);
+      color: var(--brand-red-deep);
+    }
+
+    h3 {
+      font-size: 15px;
+      line-height: 1.3;
+      margin: 18px 0 8px;
+      color: #183455;
+    }
+
+    h4 {
+      font-size: 13px;
+      line-height: 1.3;
+      margin: 14px 0 6px;
+      color: #284766;
+    }
+
+    p {
+      margin-bottom: 10px;
+    }
+
+    ul, ol {
+      margin-bottom: 12px;
+      padding-left: 20px;
+    }
+
+    li {
+      margin-bottom: 5px;
+    }
+
+    .cover {
+      padding: 22px 24px;
+      border: 1px solid #f0c8cd;
+      border-radius: 18px;
+      background:
+        radial-gradient(circle at top right, rgba(190, 30, 45, 0.08), transparent 34%),
+        linear-gradient(180deg, #fffefe 0%, #fff5f6 100%);
+      margin-bottom: 18px;
+    }
+
+    .eyebrow {
+      display: inline-block;
+      margin-bottom: 10px;
+      padding: 5px 10px;
+      border-radius: 999px;
+      border: 1px solid #f1c3ca;
+      background: #ffffff;
+      color: var(--brand-red-deep);
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    .cover p.lead {
+      font-size: 14px;
+      line-height: 1.65;
+      color: #314b6b;
+      max-width: 760px;
+      margin-bottom: 0;
+    }
+
+    .meta-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 18px;
+    }
+
+    .meta-card {
+      padding: 12px 14px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.9);
+    }
+
+    .meta-card strong {
+      display: block;
+      margin-bottom: 5px;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+    }
+
+    .summary {
+      padding: 12px 14px;
+      border: 1px solid var(--line);
+      border-left: 4px solid var(--brand-red);
+      border-radius: 12px;
+      background: var(--soft);
+      margin: 12px 0 14px;
+    }
+
+    .callout {
+      padding: 12px 14px;
+      border: 1px solid #efd0d5;
+      border-radius: 12px;
+      background: var(--soft-red);
+      margin: 12px 0;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 10px 0 14px;
+    }
+
+    th, td {
+      border: 1px solid var(--line);
+      padding: 9px 10px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      background: #f8fbff;
+      color: #21405d;
+      font-size: 11.5px;
+      letter-spacing: 0.02em;
+    }
+
+    td {
+      background: #ffffff;
+    }
+
+    .section-card {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: var(--card);
+      padding: 14px 16px;
+      margin: 14px 0;
+    }
+
+    .pill-row {
+      margin: 10px 0 0;
+    }
+
+    .pill {
+      display: inline-block;
+      margin: 0 6px 6px 0;
+      padding: 4px 9px;
+      border-radius: 999px;
+      border: 1px solid #d9e3ef;
+      background: #fbfdff;
+      color: #355271;
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .footer {
+      margin-top: 24px;
+      padding-top: 10px;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .small {
+      font-size: 11.5px;
+      color: var(--muted);
+    }
+
+    .mono {
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 11.5px;
+    }
+
+    @media print {
+      .section-card,
+      .meta-card,
+      .summary,
+      .callout,
+      tr,
+      td,
+      th {
+        break-inside: avoid;
+      }
+    }
+  </style>
+</head>
+<body>
+  <section class="cover">
+    <span class="eyebrow">Maccento Real Estate Media</span>
+    <h1>Maccento CRM User Manual</h1>
+    <p class="lead">
+      This manual explains how the Maccento website, CRM backend, client portal, AI assistants, sales workflow,
+      invoicing, project tracking, media delivery, and communication tools work together. It is written as a practical
+      operations guide for day-to-day use.
+    </p>
+
+    <div class="meta-grid">
+      <div class="meta-card">
+        <strong>System Type</strong>
+        AI-assisted CRM and client portal for real estate media operations.
+      </div>
+      <div class="meta-card">
+        <strong>Primary Users</strong>
+        Owner, admin, manager, photographer, editor, client, and agent accounts.
+      </div>
+      <div class="meta-card">
+        <strong>Main Goal</strong>
+        Move leads from inquiry to quote, project, invoice, delivery, and client follow-up.
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>1. System Overview</h2>
+    <div class="summary">
+      Maccento CRM is a single operating system for website lead capture, internal sales pipeline management,
+      project tracking, invoice control, media delivery, email communication, and client self-service.
+    </div>
+
+    <div class="grid-2">
+      <div class="section-card">
+        <h3>Core Business Purpose</h3>
+        <ul>
+          <li>Capture new inquiries from the public website.</li>
+          <li>Convert qualified inquiries into quotes and projects.</li>
+          <li>Track operational work from accepted to complete.</li>
+          <li>Control invoice status and project delivery eligibility.</li>
+          <li>Give clients a clean portal for quotes, invoices, requests, and downloads.</li>
+        </ul>
+      </div>
+      <div class="section-card">
+        <h3>Main Product Areas</h3>
+        <ul>
+          <li>Public website and AI assistant.</li>
+          <li>Lead capture and quote pipeline.</li>
+          <li>Project workspace and media delivery.</li>
+          <li>Email Center and SendGrid-connected communication.</li>
+          <li>Client management and user portal.</li>
+        </ul>
+      </div>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Layer</th>
+          <th>What It Does</th>
+          <th>Who Uses It</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Website</td>
+          <td>Shows services, package builder, contact form, and public AI assistant.</td>
+          <td>Prospects, clients, agents, marketers.</td>
+        </tr>
+        <tr>
+          <td>Admin CRM</td>
+          <td>Manages leads, quotes, invoices, projects, email, delivery, users, and settings.</td>
+          <td>Owner, admin, manager, delivery team roles.</td>
+        </tr>
+        <tr>
+          <td>Client Portal</td>
+          <td>Lets clients review quotes, invoices, projects, downloads, and service requests.</td>
+          <td>Client, user, and agent roles.</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>2. Public Website Features</h2>
+
+    <h3>2.1 Public Entry Points</h3>
+    <ul>
+      <li>Home page marketing sections and service descriptions.</li>
+      <li>Public AI assistant for service, package, and booking questions.</li>
+      <li>Package builder for preset and custom service combinations.</li>
+      <li>Contact form for direct inquiry submission.</li>
+    </ul>
+
+    <h3>2.2 Services Presented Publicly</h3>
+    <div class="pill-row">
+      <span class="pill">Professional Photography (HDR)</span>
+      <span class="pill">Cinematic Property Films</span>
+      <span class="pill">Express Video Walkthroughs</span>
+      <span class="pill">Drone Photography &amp; Video</span>
+      <span class="pill">Virtual Staging</span>
+      <span class="pill">Day-to-Dusk Edits</span>
+      <span class="pill">3D Tours</span>
+      <span class="pill">Floor Plans</span>
+      <span class="pill">Social Media Content</span>
+      <span class="pill">Photo Retouching</span>
+    </div>
+
+    <h3>2.3 Website Lead Sources</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Source</th>
+          <th>How It Works</th>
+          <th>CRM Result</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Public AI Assistant</td>
+          <td>Visitors ask questions about services, pricing ranges, booking, and recommendations.</td>
+          <td>Conversation and lead context can be captured into CRM workflow.</td>
+        </tr>
+        <tr>
+          <td>Package Builder</td>
+          <td>Visitors select preset or custom services and build a quote-style request.</td>
+          <td>Quote/lead context is stored for admin follow-up.</td>
+        </tr>
+        <tr>
+          <td>Contact Form</td>
+          <td>Visitors submit direct inquiry details, including multiple selected services.</td>
+          <td>Website form submission and lead record enter the CRM.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout">
+      The public assistant is intentionally grounded to Maccento services, service area, booking flow, delivery timing,
+      and recommendation logic. For cancellation, refund, or custom payment-term questions, it should direct visitors to
+      contact the team at <span class="mono">info@maccento.ca</span> or <span class="mono">(514) 951-9141</span>.
+    </div>
+  </section>
+
+  <section>
+    <h2>3. Authentication and Roles</h2>
+
+    <h3>3.1 Login and Signup</h3>
+    <ul>
+      <li>Users access the system through the login page.</li>
+      <li>The signup page can create the first account when no user exists.</li>
+      <li>The first registered account becomes the first admin account.</li>
+      <li>After login, internal roles are routed to the admin dashboard and client-facing roles are routed to the user dashboard.</li>
+    </ul>
+
+    <h3>3.2 Role Model</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Role</th>
+          <th>Main Access Scope</th>
+          <th>Typical Use</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Owner</td>
+          <td>Full system access, including users and high-level settings.</td>
+          <td>Business control, operations, configuration, approvals.</td>
+        </tr>
+        <tr>
+          <td>Admin</td>
+          <td>Full daily CRM operations.</td>
+          <td>Sales, quotes, invoices, projects, email center, delivery.</td>
+        </tr>
+        <tr>
+          <td>Manager</td>
+          <td>Broad operations without owner-only user administration.</td>
+          <td>Pipeline supervision, delivery coordination, billing follow-up.</td>
+        </tr>
+        <tr>
+          <td>Photographer</td>
+          <td>Delivery-focused access.</td>
+          <td>Project visibility, media delivery, preview, operational context.</td>
+        </tr>
+        <tr>
+          <td>Editor</td>
+          <td>Delivery-focused access similar to photographer.</td>
+          <td>Media handling, delivery progress, project media review.</td>
+        </tr>
+        <tr>
+          <td>Client / User / Agent</td>
+          <td>Portal-only access to their own records.</td>
+          <td>Quotes, invoices, downloads, service requests, project view.</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>4. Admin CRM Modules</h2>
+
+    <h3>4.1 Dashboard</h3>
+    <ul>
+      <li>High-level operating summary for leads, projects, invoices, client activity, and notifications.</li>
+      <li>Acts as the internal landing page for admins and managers.</li>
+      <li>Supports real-time orientation through the admin assistant and notification center.</li>
+    </ul>
+
+    <h3>4.2 Lead Management</h3>
+    <p>Lead Management is the first operational layer after website capture.</p>
+    <ul>
+      <li><strong>All Leads:</strong> Complete lead list with filtering and scoring.</li>
+      <li><strong>Leads from AI Assistance:</strong> AI-originated inquiry focus.</li>
+      <li><strong>Leads from Packages:</strong> Package-builder and pricing-flow leads.</li>
+      <li><strong>Website Submissions:</strong> Direct website form submissions.</li>
+      <li>Lead records include status control, notes, follow-ups, and email actions.</li>
+    </ul>
+
+    <h3>4.3 Quote Pipeline</h3>
+    <ul>
+      <li>Manual quote creation and review of website/package quote activity.</li>
+      <li>Quote statuses include <span class="mono">new</span>, <span class="mono">reviewed</span>, <span class="mono">contacted</span>, <span class="mono">booked</span>, and <span class="mono">lost</span>.</li>
+      <li>Custom quotes support line-item adjustment and total recalculation.</li>
+      <li>Preset fixed package quotes are not intended for manual line-item editing.</li>
+      <li>Quote emails can be resent from the admin side.</li>
+      <li>Client portal users can submit revision requests back to the team.</li>
+    </ul>
+
+    <h3>4.4 Invoices</h3>
+    <ul>
+      <li>Create invoices from client and project contexts.</li>
+      <li>Update invoice status through <span class="mono">draft</span>, <span class="mono">sent</span>, <span class="mono">partial</span>, <span class="mono">paid</span>, and <span class="mono">overdue</span>.</li>
+      <li>Generate downloadable invoice PDFs for admin and clients.</li>
+      <li>Invoice settings support tax inclusion and tax rate configuration.</li>
+    </ul>
+
+    <h3>4.5 Projects</h3>
+    <ul>
+      <li>Primary operational workspace for active client work.</li>
+      <li>Project statuses include <span class="mono">accepted</span>, <span class="mono">shooting</span>, <span class="mono">editing</span>, and <span class="mono">complete</span>.</li>
+      <li>Projects link to clients, invoices, media, and service requests.</li>
+      <li>Admin users can open client and project contexts directly from project rows.</li>
+    </ul>
+
+    <h3>4.6 Media Delivery</h3>
+    <ul>
+      <li>Upload gallery media for a project.</li>
+      <li>Upload final delivery ZIP files.</li>
+      <li>Preview project media inside the admin panel.</li>
+      <li>Track payment gate context before delivery is opened to clients.</li>
+      <li>Manage watermark settings and rebuild behavior where permitted.</li>
+    </ul>
+
+    <h3>4.7 Clients</h3>
+    <ul>
+      <li>Create and manage client records.</li>
+      <li>Open a full client workspace with projects, invoices, requests, and messages.</li>
+      <li>Switch between all-project view and single-project mode.</li>
+      <li>Use the client page as the central account record for account-level operations.</li>
+    </ul>
+
+    <h3>4.8 Email Center</h3>
+    <ul>
+      <li>Unified inbox for inbound replies.</li>
+      <li>Sent mailbox with provider event timeline.</li>
+      <li>Draft mailbox with autosave and one-click send.</li>
+      <li>Compose email modal with AI-assisted writing and file attachments.</li>
+      <li>Automation settings and backfill actions for lead follow-up workflow.</li>
+    </ul>
+
+    <h3>4.9 Users</h3>
+    <ul>
+      <li>Internal user account management is reserved for high-permission roles.</li>
+      <li>Used to create, review, and remove internal CRM accounts.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>5. Client Workspace and Portal</h2>
+
+    <h3>5.1 Client Dashboard</h3>
+    <p>The client dashboard is the customer-facing workspace after login.</p>
+    <ul>
+      <li>Lead visibility for client-owned inquiries.</li>
+      <li>Quote listing with direct open action.</li>
+      <li>Request New Service form.</li>
+      <li>Project list with detailed popup view.</li>
+      <li>Invoice downloads and project-linked invoice visibility.</li>
+      <li>Media preview, media download, and final ZIP download when eligible.</li>
+    </ul>
+
+    <h3>5.2 Client Project Experience</h3>
+    <ul>
+      <li>Each project can show status, schedule, invoices, timeline, and related service requests.</li>
+      <li>Clients can submit additional service requests linked to a project.</li>
+      <li>Project downloads are controlled by payment state.</li>
+    </ul>
+
+    <h3>5.3 Client Service Requests</h3>
+    <p>Service requests are the client-side request-and-follow-up mechanism.</p>
+    <ul>
+      <li>Clients can request new work from their dashboard or from a project context.</li>
+      <li>Service request statuses include <span class="mono">new</span>, <span class="mono">accepted</span>, <span class="mono">in_progress</span>, <span class="mono">completed</span>, and <span class="mono">closed</span>.</li>
+      <li>Admins can review and update these requests from the CRM.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>6. AI Assistants</h2>
+
+    <div class="grid-2">
+      <div class="section-card">
+        <h3>Public AI Assistant</h3>
+        <ul>
+          <li>Answers service, package, booking, and recommendation questions.</li>
+          <li>Uses company service knowledge, package guidance, and delivery expectations.</li>
+          <li>Should not invent custom pricing or unsupported policies.</li>
+          <li>For policy questions outside configured rules, it directs visitors to email or call the team.</li>
+        </ul>
+      </div>
+      <div class="section-card">
+        <h3>Admin Assistant</h3>
+        <ul>
+          <li>Available across the admin panel as an internal operations helper.</li>
+          <li>Answers practical CRM workflow and navigation questions.</li>
+          <li>Uses role-aware and module-aware CRM knowledge.</li>
+          <li>Does not claim to have changed records or completed actions.</li>
+        </ul>
+      </div>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Assistant</th>
+          <th>Audience</th>
+          <th>Primary Topics</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Website Assistant</td>
+          <td>Prospects and clients</td>
+          <td>Services, package direction, booking, delivery timing, next step guidance.</td>
+        </tr>
+        <tr>
+          <td>Admin Assistant</td>
+          <td>Internal staff</td>
+          <td>CRM workflows, invoices, projects, clients, media delivery, lead operations, email center.</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>7. Email Center and Communication Workflow</h2>
+
+    <h3>7.1 Email Center Functions</h3>
+    <ul>
+      <li>Inbox stores inbound replies parsed into the CRM.</li>
+      <li>Sent view shows outbound emails and provider event tracking.</li>
+      <li>Drafts support autosave, edit, manual save, send, and delete.</li>
+      <li>AI draft writing helps generate first-pass outbound emails.</li>
+      <li>Compose email supports direct recipient routing, reply-to, CC, BCC, project tagging, and attachments.</li>
+    </ul>
+
+    <h3>7.2 SendGrid Integration</h3>
+    <ul>
+      <li>Outbound messages create email logs for CRM tracking.</li>
+      <li>SendGrid webhook events can update delivery/provider timeline visibility.</li>
+      <li>Inbound replies can be parsed into inbox records and linked to client/project context.</li>
+      <li>Project thread tags support more reliable email-thread mapping.</li>
+    </ul>
+
+    <h3>7.3 Compose Attachments</h3>
+    <ul>
+      <li>Admins can attach up to 5 files in compose.</li>
+      <li>Each attachment supports up to 10 MB.</li>
+      <li>Attachments are sent with the outbound email but are not stored in drafts.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>8. Media Delivery and Payment Rules</h2>
+
+    <h3>8.1 Delivery Workspace</h3>
+    <ul>
+      <li>Gallery upload area for images and videos.</li>
+      <li>Final ZIP upload area for client-ready delivery package.</li>
+      <li>Media preview actions for internal users.</li>
+      <li>Delivery state visibility from client and project views.</li>
+    </ul>
+
+    <h3>8.2 Watermark Logic</h3>
+    <ul>
+      <li>Watermark settings exist for authorized roles only.</li>
+      <li>Rebuild actions apply to preview/media workflow where configured.</li>
+      <li>Watermark controls are not intended as a replacement for final paid delivery packaging.</li>
+    </ul>
+
+    <h3>8.3 Payment Gate</h3>
+    <div class="callout">
+      Client project downloads are locked until the related project is paid. This rule protects final delivery access
+      and is one of the most important operational controls in the CRM.
+    </div>
+  </section>
+
+  <section>
+    <h2>9. Status Reference</h2>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Area</th>
+          <th>Statuses</th>
+          <th>Operational Meaning</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Leads</td>
+          <td>new, qualified, contacted, won, lost, nurturing</td>
+          <td>Sales qualification and follow-up progression.</td>
+        </tr>
+        <tr>
+          <td>Quotes</td>
+          <td>new, reviewed, contacted, booked, lost</td>
+          <td>Proposal stage and conversion tracking.</td>
+        </tr>
+        <tr>
+          <td>Projects</td>
+          <td>accepted, shooting, editing, complete</td>
+          <td>Production and delivery workflow.</td>
+        </tr>
+        <tr>
+          <td>Invoices</td>
+          <td>draft, sent, partial, paid, overdue</td>
+          <td>Billing and collection state.</td>
+        </tr>
+        <tr>
+          <td>Service Requests</td>
+          <td>new, accepted, in_progress, completed, closed</td>
+          <td>Client-request handling and resolution state.</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>10. Typical Operational Flow</h2>
+
+    <ol>
+      <li>A visitor uses the AI assistant, package builder, or contact form.</li>
+      <li>The system captures the inquiry into the CRM as a lead or submission source.</li>
+      <li>Admin reviews the lead, updates status, follows up, and may create a quote.</li>
+      <li>Once accepted, work progresses into a client and project context.</li>
+      <li>Invoices are created and tracked.</li>
+      <li>Media is uploaded and final delivery is prepared.</li>
+      <li>Once payment is complete, the client can access final media and ZIP downloads.</li>
+    </ol>
+  </section>
+
+  <section>
+    <h2>11. Operational Notes and Known Business Rules</h2>
+
+    <ul>
+      <li>Primary on-site service area is Greater Montreal.</li>
+      <li>Special locations can be discussed case by case.</li>
+      <li>Typical turnaround: photos in 24-48 hours, video around 72 hours.</li>
+      <li>Drone work depends on weather and safe flight conditions.</li>
+      <li>The current CRM knowledge base does not define automatic late fees, cancellation policy, or refund policy.</li>
+      <li>When those policy questions arise, staff should direct the client to the business team by phone or email for confirmation.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>12. Troubleshooting Guide</h2>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Issue</th>
+          <th>Likely Cause</th>
+          <th>Recommended Check</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Cannot log in</td>
+          <td>Empty user table, wrong active database, invalid credentials, or stale browser cookies.</td>
+          <td>Check user count, active DB connection, and clear browser cookies/session.</td>
+        </tr>
+        <tr>
+          <td>Client cannot download media</td>
+          <td>Invoice/project is not marked paid, or final delivery is not uploaded.</td>
+          <td>Review invoice status and project delivery files.</td>
+        </tr>
+        <tr>
+          <td>Inbound email not visible</td>
+          <td>SendGrid webhook/config issue, unmatched inbound parse, or message-body problem.</td>
+          <td>Check Email Center inbox, webhook route activity, and recent logs.</td>
+        </tr>
+        <tr>
+          <td>Attachment missing from sent email</td>
+          <td>Attachment not selected, validation size exceeded, or send failed before dispatch.</td>
+          <td>Review compose form selection, validation, and sent mailbox record.</td>
+        </tr>
+        <tr>
+          <td>Admin sees blocked action in UI</td>
+          <td>Role mismatch or outdated page state.</td>
+          <td>Confirm the user role and refresh the page after permission changes.</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>13. Feature Summary</h2>
+    <div class="summary">
+      Maccento CRM is not just a back-office admin panel. It is a full lead-to-delivery operating system with a public
+      marketing front end, dual AI assistants, a quote and invoice pipeline, client portal functions, media delivery
+      controls, and integrated email communication.
+    </div>
+
+    <p>
+      In day-to-day use, the system should be understood as a connected workflow:
+      <strong>website inquiry -> CRM review -> quote -> project -> invoice -> delivery -> client access</strong>.
+    </p>
+  </section>
+
+  <div class="footer">
+    Prepared for Maccento project operations. Document saved from the project workspace as a user-manual style reference.
+  </div>
+</body>
+</html>

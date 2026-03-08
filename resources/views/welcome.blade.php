@@ -903,7 +903,7 @@
           <strong class="contact-title">Let's Create Something that Sets Your Listing Apart</strong>
           <p class="contact-lead">From premium real estate media to strategic branding content and lead-focused visuals, Maccento Real Estate Media delivers refined, high-impact content designed to elevate your image and position your properties at their best.</p>
         </div>
-        <form class="form">
+        <form class="form" data-contact-form novalidate>
           <div class="form-grid">
             <input class="input" placeholder="Full Name" type="text" name="name">
             <input class="input" placeholder="Agency or Company?" type="text" name="company">
@@ -935,10 +935,29 @@
           </div>
           <textarea class="input" placeholder="Message" name="message"></textarea>
           <button class="btn contact-submit" type="submit">Contact Us Today!</button>
+          <p class="contact-status" data-contact-status aria-live="polite"></p>
         </form>
       </div>
     </section>
   </main>
+
+  <div class="contact-feedback" data-contact-processing hidden aria-live="polite" aria-busy="true">
+    <div class="contact-feedback-float">
+      <span class="contact-feedback-spinner" aria-hidden="true"></span>
+      <span>Processing your contact request...</span>
+    </div>
+  </div>
+
+  <div class="contact-success" data-contact-success hidden>
+    <div class="contact-success-card" role="dialog" aria-modal="true" aria-labelledby="contactSuccessTitle">
+      <h3 id="contactSuccessTitle">Request Submitted</h3>
+      <p>Your contact request has been received successfully.</p>
+      <p><strong>Request ID:</strong> <span data-contact-success-id>-</span></p>
+      <div class="contact-success-actions">
+        <button class="btn btn-secondary" type="button" data-contact-success-close>Close</button>
+      </div>
+    </div>
+  </div>
 
   <footer class="footer">
     <div class="container footer-inner">
@@ -2620,6 +2639,134 @@
       }
       applyLanguage(initialLang);
       initChatWidget();
+
+      const contactForm = document.querySelector('[data-contact-form]');
+      const contactStatus = document.querySelector('[data-contact-status]');
+      const contactProcessing = document.querySelector('[data-contact-processing]');
+      const contactSuccess = document.querySelector('[data-contact-success]');
+      const contactSuccessId = document.querySelector('[data-contact-success-id]');
+      const contactSuccessClose = document.querySelector('[data-contact-success-close]');
+
+      if (contactForm && contactStatus && contactProcessing && contactSuccess && contactSuccessId && contactSuccessClose) {
+        const contactSubmitBtn = contactForm.querySelector('.contact-submit');
+
+        const setContactProcessing = (active) => {
+          contactProcessing.hidden = !active;
+          contactProcessing.classList.toggle('is-active', active);
+          if (contactSubmitBtn) {
+            contactSubmitBtn.disabled = active;
+          }
+        };
+
+        const showContactSuccess = (requestId) => {
+          contactSuccessId.textContent = requestId || '-';
+          contactSuccess.hidden = false;
+          contactSuccess.classList.add('is-open');
+        };
+
+        const hideContactSuccess = () => {
+          contactSuccess.hidden = true;
+          contactSuccess.classList.remove('is-open');
+        };
+
+        const resetContactSelects = () => {
+          contactForm.querySelectorAll('[data-select]').forEach((select) => {
+            const trigger = select.querySelector('.custom-select-trigger');
+            const hiddenInput = select.querySelector('input[type="hidden"]');
+            const options = select.querySelectorAll('.custom-select-option');
+            const placeholder = String(select.dataset.placeholder || trigger?.textContent || '').trim();
+            const isMultiple = select.dataset.multiple === 'true';
+
+            if (hiddenInput) {
+              hiddenInput.value = '';
+            }
+
+            options.forEach((option) => option.classList.remove('active'));
+
+            if (trigger) {
+              trigger.textContent = isMultiple ? placeholder : (placeholder || 'Select');
+              trigger.setAttribute('aria-expanded', 'false');
+            }
+
+            select.classList.remove('open');
+          });
+        };
+
+        contactSuccessClose.addEventListener('click', hideContactSuccess);
+        contactSuccess.addEventListener('click', (event) => {
+          if (event.target === contactSuccess) {
+            hideContactSuccess();
+          }
+        });
+
+        contactForm.addEventListener('submit', async (event) => {
+          event.preventDefault();
+
+          const fd = new FormData(contactForm);
+          const name = String(fd.get('name') || '').trim();
+          const email = String(fd.get('email') || '').trim();
+          const phone = String(fd.get('phone') || '').trim();
+          const serviceValue = String(fd.get('service') || '').trim();
+          const services = serviceValue
+            .split(',')
+            .map((value) => value.trim())
+            .filter(Boolean);
+
+          if (!name) {
+            contactStatus.textContent = 'Please enter your full name.';
+            return;
+          }
+
+          if (!email && !phone) {
+            contactStatus.textContent = 'Please provide your email or phone number.';
+            return;
+          }
+
+          contactStatus.textContent = '';
+          hideContactSuccess();
+          setContactProcessing(true);
+
+          try {
+            const response = await fetch('/api/website-form/submit', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+              },
+              body: JSON.stringify({
+                name,
+                company: String(fd.get('company') || '').trim() || undefined,
+                phone: phone || undefined,
+                email: email || undefined,
+                service: serviceValue || undefined,
+                services: services.length ? services : undefined,
+                region: String(fd.get('region') || '').trim() || undefined,
+                message: String(fd.get('message') || '').trim() || undefined,
+                source: 'website_contact_form_submission',
+                page_url: window.location.href,
+              }),
+            });
+
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+              const firstError = data && data.errors
+                ? Object.values(data.errors).flat().find((msg) => typeof msg === 'string')
+                : null;
+              contactStatus.textContent = firstError || data.message || 'Unable to submit now. Please try again.';
+              return;
+            }
+
+            contactForm.reset();
+            resetContactSelects();
+            contactStatus.textContent = '';
+            showContactSuccess(String(data.request_id || data.submission_id || '-'));
+          } catch (error) {
+            contactStatus.textContent = 'Unable to submit now. Please try again.';
+          } finally {
+            setContactProcessing(false);
+          }
+        });
+      }
     })();
   </script>
   <script>

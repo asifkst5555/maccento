@@ -4,6 +4,7 @@ return [
     'company' => [
         'name' => 'Maccento Real Estate Media',
         'location' => 'Montreal, QC',
+        'website_url' => 'https://maccento.ca',
         'email' => 'info@maccento.ca',
         'phone' => '(514) 951-9141',
         'positioning' => 'Premium real estate media production for brokers, agents, teams, and property marketers.',
