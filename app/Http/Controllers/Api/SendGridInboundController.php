@@ -10,6 +10,7 @@ use App\Models\InboundEmail;
 use App\Services\PanelNotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class SendGridInboundController extends Controller
@@ -17,6 +18,15 @@ class SendGridInboundController extends Controller
     public function parse(Request $request): JsonResponse
     {
         if (!$this->isAuthorized($request)) {
+            Log::warning('SendGrid inbound webhook rejected.', [
+                'path' => $request->path(),
+                'ip' => $request->ip(),
+                'has_bearer_token' => filled($request->bearerToken()),
+                'has_header_token' => filled($request->header('X-Inbound-Webhook-Token')),
+                'has_query_token' => filled($request->query('token')),
+                'has_body_token' => filled($request->input('token')),
+            ]);
+
             return response()->json(['ok' => false, 'message' => 'Unauthorized inbound webhook request.'], 401);
         }
 
@@ -54,6 +64,13 @@ class SendGridInboundController extends Controller
         if ($client === null) {
             $inboundEmail->status = 'unmatched';
             $inboundEmail->save();
+
+            Log::info('SendGrid inbound email stored without CRM client match.', [
+                'inbound_email_id' => $inboundEmail->id,
+                'from_email' => $fromAddress,
+                'to_email' => $inboundEmail->to_email,
+                'subject' => $inboundEmail->subject,
+            ]);
 
             return response()->json([
                 'ok' => true,
@@ -95,6 +112,14 @@ class SendGridInboundController extends Controller
                 'subject' => $subject,
             ]
         );
+
+        Log::info('SendGrid inbound email linked to CRM client.', [
+            'inbound_email_id' => $inboundEmail->id,
+            'client_id' => $client->id,
+            'client_project_id' => $clientProjectId,
+            'client_message_id' => $message->id,
+            'from_email' => $fromAddress,
+        ]);
 
         return response()->json([
             'ok' => true,
@@ -180,9 +205,16 @@ class SendGridInboundController extends Controller
             return false;
         }
 
-        $candidate = (string) ($request->bearerToken()
-            ?? $request->header('X-Inbound-Webhook-Token')
-            ?? $request->query('token', ''));
+        $candidate = trim((string) $request->bearerToken());
+        if ($candidate === '') {
+            $candidate = trim((string) $request->header('X-Inbound-Webhook-Token', ''));
+        }
+        if ($candidate === '') {
+            $candidate = trim((string) $request->query('token', ''));
+        }
+        if ($candidate === '') {
+            $candidate = trim((string) $request->input('token', ''));
+        }
 
         if ($candidate === '') {
             return false;

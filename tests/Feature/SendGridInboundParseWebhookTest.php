@@ -146,4 +146,44 @@ class SendGridInboundParseWebhookTest extends TestCase
             'email' => 'empty@example.com',
         ]);
     }
+
+    public function test_it_accepts_legacy_non_api_webhook_path_for_sendgrid_inbound(): void
+    {
+        putenv('SENDGRID_INBOUND_WEBHOOK_TOKEN=test-inbound-token');
+        $_ENV['SENDGRID_INBOUND_WEBHOOK_TOKEN'] = 'test-inbound-token';
+        $_SERVER['SENDGRID_INBOUND_WEBHOOK_TOKEN'] = 'test-inbound-token';
+
+        $client = Client::query()->create([
+            'name' => 'Legacy Path Client',
+            'email' => 'legacy@example.com',
+            'status' => 'active',
+        ]);
+
+        $project = ClientProject::query()->create([
+            'client_id' => $client->id,
+            'title' => 'Legacy Path Listing',
+            'status' => 'accepted',
+        ]);
+
+        $response = $this->post('/webhooks/sendgrid/inbound', [
+            'token' => 'test-inbound-token',
+            'from' => 'legacy@example.com',
+            'subject' => "Re: Legacy route [P#{$project->id}]",
+            'text' => 'Legacy route body',
+        ]);
+
+        $response
+            ->assertOk()
+            ->assertJsonPath('ok', true)
+            ->assertJsonPath('stored', true)
+            ->assertJsonPath('client_id', $client->id)
+            ->assertJsonPath('client_project_id', $project->id);
+
+        $this->assertDatabaseHas('inbound_emails', [
+            'from_email' => 'legacy@example.com',
+            'client_id' => $client->id,
+            'client_project_id' => $project->id,
+            'status' => 'linked',
+        ]);
+    }
 }

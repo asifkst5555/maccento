@@ -2,6 +2,8 @@
 
 use App\Http\Controllers\AuthOtpController;
 use App\Http\Controllers\AdminAssistantController;
+use App\Http\Controllers\Api\SendGridInboundController;
+use App\Http\Controllers\Api\SendGridWebhookController;
 use App\Http\Controllers\DashboardController;
 use Illuminate\Support\Facades\Route;
 
@@ -21,6 +23,8 @@ Route::view('/about-us', 'welcome', ['page' => 'about'])->name('about');
 Route::view('/our-services', 'welcome', ['page' => 'services'])->name('services');
 Route::view('/portfolio', 'welcome', ['page' => 'portfolio'])->name('portfolio');
 Route::view('/our-plan', 'welcome', ['page' => 'plan'])->name('plan');
+Route::post('/webhooks/sendgrid/events', [SendGridWebhookController::class, 'events'])->middleware('throttle:sendgrid-webhook');
+Route::post('/webhooks/sendgrid/inbound', [SendGridInboundController::class, 'parse'])->middleware('throttle:sendgrid-webhook');
 
 Route::middleware('guest')->group(function (): void {
     Route::get('/login', [AuthOtpController::class, 'showLogin'])->name('login');
