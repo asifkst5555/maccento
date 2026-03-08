@@ -106,7 +106,7 @@ class BrandedNotificationMail extends Mailable
             $baseUrl = 'https://maccento.ca';
         }
 
-        return rtrim($baseUrl, '/') . '/assets/media/logo.png';
+        return rtrim($baseUrl, '/') . '/assets/media/logo-footer.png';
     }
 
     private function isLocalUrl(string $url): bool
