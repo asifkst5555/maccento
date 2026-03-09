@@ -118,14 +118,23 @@ Route::middleware('auth')->group(function (): void {
         Route::post('/admin/clients/{client}/delete', [DashboardController::class, 'adminClientDestroy'])->name('admin.clients.delete');
     });
 
-    Route::get('/user/dashboard', [DashboardController::class, 'userDashboard'])->middleware('role:user,client,agent')->name('user.dashboard');
-    Route::post('/user/service-requests', [DashboardController::class, 'userServiceRequestStore'])->middleware('role:user,client,agent')->name('user.service-requests.store');
-    Route::get('/user/invoices/{invoice}/download', [DashboardController::class, 'userInvoicePdfDownload'])->middleware('role:user,client,agent')->name('user.invoices.download');
-    Route::get('/user/quotes/{quote}', [DashboardController::class, 'userQuoteShow'])->middleware('role:user,client,agent')->name('user.quotes.show');
-    Route::post('/user/quotes/{quote}/revision-request', [DashboardController::class, 'userQuoteRevisionRequest'])->middleware('role:user,client,agent')->name('user.quotes.revision-request');
-    Route::get('/user/projects/{project}/media/{media}/preview', [DashboardController::class, 'userProjectMediaPreview'])->middleware('role:user,client,agent')->name('user.projects.media.preview');
-    Route::get('/user/projects/{project}/media/{media}/download', [DashboardController::class, 'userProjectMediaDownload'])->middleware('role:user,client,agent')->name('user.projects.media.download');
-    Route::get('/user/projects/{project}/download-zip', [DashboardController::class, 'userProjectMediaZipDownload'])->middleware('role:user,client,agent')->name('user.projects.media.download-zip');
+    Route::middleware('role:user,client,agent')->group(function (): void {
+        Route::get('/user/dashboard', [DashboardController::class, 'userDashboard'])->name('user.dashboard');
+        Route::get('/user/projects', [DashboardController::class, 'userProjectsIndex'])->name('user.projects.index');
+        Route::get('/user/projects/{project}', [DashboardController::class, 'userProjectShow'])->name('user.projects.show');
+        Route::get('/user/invoices', [DashboardController::class, 'userInvoicesIndex'])->name('user.invoices.index');
+        Route::get('/user/quotes', [DashboardController::class, 'userQuotesIndex'])->name('user.quotes.index');
+        Route::get('/user/messages', [DashboardController::class, 'userMessagesIndex'])->name('user.messages.index');
+        Route::get('/user/deliveries', [DashboardController::class, 'userDeliveriesIndex'])->name('user.deliveries.index');
+        Route::get('/user/account', [DashboardController::class, 'userAccountIndex'])->name('user.account.index');
+        Route::post('/user/service-requests', [DashboardController::class, 'userServiceRequestStore'])->name('user.service-requests.store');
+        Route::get('/user/invoices/{invoice}/download', [DashboardController::class, 'userInvoicePdfDownload'])->name('user.invoices.download');
+        Route::get('/user/quotes/{quote}', [DashboardController::class, 'userQuoteShow'])->name('user.quotes.show');
+        Route::post('/user/quotes/{quote}/revision-request', [DashboardController::class, 'userQuoteRevisionRequest'])->name('user.quotes.revision-request');
+        Route::get('/user/projects/{project}/media/{media}/preview', [DashboardController::class, 'userProjectMediaPreview'])->name('user.projects.media.preview');
+        Route::get('/user/projects/{project}/media/{media}/download', [DashboardController::class, 'userProjectMediaDownload'])->name('user.projects.media.download');
+        Route::get('/user/projects/{project}/download-zip', [DashboardController::class, 'userProjectMediaZipDownload'])->name('user.projects.media.download-zip');
+    });
     Route::get('/notifications/feed', [DashboardController::class, 'notificationsFeed'])->name('notifications.feed');
     Route::post('/notifications/read-all-ajax', [DashboardController::class, 'notificationsReadAllAjax'])->name('notifications.read-all-ajax');
     Route::post('/notifications/{notification}/read-ajax', [DashboardController::class, 'notificationsReadAjax'])->name('notifications.read-ajax');

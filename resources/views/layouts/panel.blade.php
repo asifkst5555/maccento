@@ -631,7 +631,7 @@
     }
   </style>
 </head>
-<body class="panel-page">
+<body class="panel-page{{ auth()->check() ? (in_array(strtolower((string) auth()->user()->role), ['admin', 'owner', 'manager', 'photographer', 'editor'], true) ? ' panel-page-admin' : ' panel-page-client') : '' }}">
   @auth
     @php
       $panelRole = strtolower((string) auth()->user()->role);
@@ -651,7 +651,7 @@
     @endphp
   @endauth
 
-  <div class="panel-app" id="panel-app">
+  <div class="panel-app @auth{{ $isInternalRole ? ' panel-app-admin' : ' panel-app-client' }}@endauth" id="panel-app">
     <aside class="panel-sidebar" id="panel-sidebar">
       <div class="panel-brand">
         <div class="panel-brand-logo" aria-label="Maccento CRM brand mark">
@@ -830,10 +830,38 @@
           </a>
           @endif
           @else
-          <p class="panel-nav-group-title">Overview</p>
+          <p class="panel-nav-group-title">Client Workspace</p>
           <a class="panel-nav-link @if(request()->routeIs('user.dashboard')) is-active @endif" href="{{ route('user.dashboard') }}" title="My Dashboard">
             <span class="panel-nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 1 0 9 9 9 9 0 0 0-9-9zm0 4a2.5 2.5 0 1 1-2.5 2.5A2.5 2.5 0 0 1 12 7zm0 11a6 6 0 0 1-4.85-2.45 4.8 4.8 0 0 1 9.7 0A6 6 0 0 1 12 18z" fill="currentColor"/></svg></span>
-            <span class="panel-nav-text">My Dashboard</span>
+            <span class="panel-nav-text">Overview</span>
+          </a>
+          <a class="panel-nav-link @if(request()->routeIs('user.projects.*')) is-active @endif" href="{{ route('user.projects.index') }}" title="Projects">
+            <span class="panel-nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v11a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 17.5v-11zm4 1.5h7m-7 4h7m-7 4h4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>
+            <span class="panel-nav-text">Projects</span>
+          </a>
+          <a class="panel-nav-link @if(request()->routeIs('user.deliveries.*')) is-active @endif" href="{{ route('user.deliveries.index') }}" title="Deliveries">
+            <span class="panel-nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14v10a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V7zm3-3h8l1 3H7l1-3zm1 8h6m-3-3v6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+            <span class="panel-nav-text">Media & Deliveries</span>
+          </a>
+
+          <p class="panel-nav-group-title">Billing</p>
+          <a class="panel-nav-link @if(request()->routeIs('user.invoices.*')) is-active @endif" href="{{ route('user.invoices.index') }}" title="Invoices">
+            <span class="panel-nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h10v18l-3-2-2 2-2-2-3 2V3zm3 5h4m-4 4h4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+            <span class="panel-nav-text">Invoices</span>
+          </a>
+          <a class="panel-nav-link @if(request()->routeIs('user.quotes.*')) is-active @endif" href="{{ route('user.quotes.index') }}" title="Quotes">
+            <span class="panel-nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4h12v16H6V4zm3 4h6m-6 4h6m-6 4h4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>
+            <span class="panel-nav-text">Quotations</span>
+          </a>
+
+          <p class="panel-nav-group-title">Communication</p>
+          <a class="panel-nav-link @if(request()->routeIs('user.messages.*')) is-active @endif" href="{{ route('user.messages.index') }}" title="Messages">
+            <span class="panel-nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6.5A2.5 2.5 0 0 1 7.5 4h9A2.5 2.5 0 0 1 19 6.5v6A2.5 2.5 0 0 1 16.5 15H10l-4 4v-4H7.5A2.5 2.5 0 0 1 5 12.5v-6z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg></span>
+            <span class="panel-nav-text">Messages</span>
+          </a>
+          <a class="panel-nav-link @if(request()->routeIs('user.account.*')) is-active @endif" href="{{ route('user.account.index') }}" title="Account">
+            <span class="panel-nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4zm-7 8a7 7 0 0 1 14 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>
+            <span class="panel-nav-text">Account</span>
           </a>
           @endif
         @endauth

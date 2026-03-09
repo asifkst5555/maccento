@@ -2543,6 +2543,23 @@ class DashboardController extends Controller
             abort(403, 'Project is not paid yet. Downloads are locked.');
         }
 
+        $finalZip = $project->media()
+            ->where('type', 'final_zip')
+            ->latest('id')
+            ->first();
+
+        if ($finalZip instanceof ClientProjectMedia) {
+            if (!Storage::disk($finalZip->disk)->exists($finalZip->path)) {
+                abort(404, 'Final delivery ZIP is not available right now.');
+            }
+
+            $downloadName = trim((string) $finalZip->original_name) !== ''
+                ? (string) $finalZip->original_name
+                : ('project-' . $project->id . '-delivery.zip');
+
+            return Storage::disk($finalZip->disk)->download($finalZip->path, $downloadName);
+        }
+
         $mediaItems = $project->media()
             ->whereIn('type', ['image', 'video'])
             ->orderBy('id')
@@ -3013,82 +3030,281 @@ class DashboardController extends Controller
     {
         $user = $request->user();
 
-        $leads = LeadProfile::query()
-            ->with('conversation:id,status,last_message_at')
-            ->where(function ($query) use ($user): void {
-                $query->where('email', $user->email);
-                if ($user->phone) {
-                    $query->orWhere('phone', $user->phone);
-                }
-            })
-            ->latest('id')
-            ->paginate(10);
-
-        $quotes = QuoteBuild::query()
-            ->where(function ($query) use ($user): void {
-                $query->where('user_id', $user->id)
-                    ->orWhere('options->contact_email', $user->email);
-                if ($user->phone) {
-                    $query->orWhere('options->contact_phone', $user->phone);
-                }
-            })
-            ->latest('id')
-            ->limit(20)
-            ->get(['id', 'quote_id', 'status', 'estimated_total', 'currency', 'submitted_at', 'services']);
-
-        $client = Client::query()
-            ->with([
-                'projects' => function ($query): void {
-                    $query->latest('id')->limit(8)->with([
+        $client = $this->resolvePortalClient($user, [
+            'projects' => function ($query): void {
+                $query->latest('scheduled_at')->latest('id')
+                    ->limit(6)
+                    ->withCount([
+                        'media as gallery_media_count' => function ($mediaQuery): void {
+                            $mediaQuery->whereIn('type', ['image', 'video']);
+                        },
+                        'media as final_zip_count' => function ($mediaQuery): void {
+                            $mediaQuery->where('type', 'final_zip');
+                        },
+                        'messages',
+                        'serviceRequests',
+                    ])
+                    ->with([
                         'media' => function ($mediaQuery): void {
                             $mediaQuery->latest('id');
                         },
                         'invoices' => function ($invoiceQuery): void {
-                            $invoiceQuery->latest('id')->with([
-                                'client:id,name,email,phone,company,user_id',
-                            ]);
-                        },
-                        'messages' => function ($messageQuery): void {
-                            $messageQuery->latest('id')->with('sender:id,name,email')->limit(15);
-                        },
-                        'serviceRequests' => function ($requestQuery): void {
-                            $requestQuery->latest('id')->with('requester:id,name,email')->limit(15);
+                            $invoiceQuery->latest('id')->with('client:id,name,email,phone,company,user_id');
                         },
                     ]);
-                },
-                'invoices' => function ($query): void {
-                    $query->latest('id')->limit(8)->with([
+            },
+            'invoices' => function ($query): void {
+                $query->latest('id')
+                    ->limit(6)
+                    ->with([
                         'project:id,title,service_type,property_address',
                         'client:id,name,email,phone,company,user_id',
                     ]);
-                },
-                'messages' => function ($query): void {
-                    $query->latest('id')->limit(8);
-                },
-                'serviceRequests' => function ($query): void {
-                    $query->latest('id')->limit(10);
-                },
-            ])
-            ->where(function ($query) use ($user): void {
-                $query->where('user_id', $user->id)
-                    ->orWhere('email', $user->email);
-                if (!blank($user->phone)) {
-                    $query->orWhere('phone', $user->phone);
-                }
-            })
-            ->latest('id')
-            ->first();
+            },
+            'messages' => function ($query): void {
+                $query->latest('id')
+                    ->limit(6)
+                    ->with([
+                        'sender:id,name,email',
+                        'project:id,title,status',
+                    ]);
+            },
+            'serviceRequests' => function ($query): void {
+                $query->latest('id')
+                    ->limit(6)
+                    ->with('project:id,title,status');
+            },
+        ]);
 
-        $galleryPayloadByProject = $client
-            ? $this->buildProjectGalleryPayloadMap($client->projects, true, false, true)
-            : [];
+        $leadQuery = $this->userLeadQuery($user);
+        $quoteQuery = $this->userQuoteQuery($user);
+        $portalStats = $this->buildUserPortalStats($client, $leadQuery, $quoteQuery);
+        $leads = (clone $leadQuery)
+            ->latest('id')
+            ->limit(5)
+            ->get(['id', 'service_type', 'location', 'status', 'score']);
+        $quotes = (clone $quoteQuery)
+            ->latest('id')
+            ->limit(5)
+            ->get(['id', 'quote_id', 'status', 'estimated_total', 'currency', 'submitted_at', 'services']);
+        $recentProjects = $client?->projects ?? collect();
+        $recentInvoices = $client?->invoices ?? collect();
+        $recentMessages = $client?->messages ?? collect();
 
         return view('user.dashboard', [
+            'client' => $client,
+            'portalStats' => $portalStats,
             'leads' => $leads,
             'quotes' => $quotes,
+            'recentProjects' => $recentProjects,
+            'recentInvoices' => $recentInvoices,
+            'recentMessages' => $recentMessages,
+        ]);
+    }
+
+    public function userProjectsIndex(Request $request): View
+    {
+        $user = $request->user();
+        $client = $this->resolvePortalClient($user);
+        $portalStats = $this->buildUserPortalStats($client, $this->userLeadQuery($user), $this->userQuoteQuery($user));
+        $projects = $client
+            ? ClientProject::query()
+                ->where('client_id', $client->id)
+                ->withCount([
+                    'media as gallery_media_count' => function ($mediaQuery): void {
+                        $mediaQuery->whereIn('type', ['image', 'video']);
+                    },
+                    'media as final_zip_count' => function ($mediaQuery): void {
+                        $mediaQuery->where('type', 'final_zip');
+                    },
+                    'messages',
+                    'serviceRequests',
+                ])
+                ->with([
+                    'invoices:id,client_id,client_project_id,status,amount,currency,due_date',
+                    'quoteBuild:id,quote_id,status',
+                ])
+                ->latest('scheduled_at')
+                ->latest('id')
+                ->paginate(8)
+            : $this->emptyPaginator(8);
+
+        return view('user.projects-index', [
             'client' => $client,
-            'projectStatuses' => ['accepted', 'shooting', 'editing', 'complete'],
+            'portalStats' => $portalStats,
+            'projects' => $projects,
+        ]);
+    }
+
+    public function userProjectShow(Request $request, ClientProject $project): View
+    {
+        $this->ensureUserCanAccessProject($request, $project);
+
+        $user = $request->user();
+        $client = $this->resolvePortalClient($user);
+        $portalStats = $this->buildUserPortalStats($client, $this->userLeadQuery($user), $this->userQuoteQuery($user));
+
+        $project->load([
+            'client:id,user_id,name,email,phone,company,status',
+            'quoteBuild:id,quote_id,status,estimated_total,currency,submitted_at',
+            'media' => function ($query): void {
+                $query->latest('id');
+            },
+            'invoices' => function ($query): void {
+                $query->latest('id')->with('client:id,name,email');
+            },
+            'messages' => function ($query): void {
+                $query->latest('id')->with('sender:id,name,email');
+            },
+            'serviceRequests' => function ($query): void {
+                $query->latest('id')->with('requester:id,name,email');
+            },
+        ]);
+
+        $galleryPayload = $this->buildProjectGalleryPayload($project, true, false, true);
+
+        return view('user.project-show', [
+            'client' => $client,
+            'portalStats' => $portalStats,
+            'project' => $project,
+            'galleryPayload' => $galleryPayload,
+            'isPaid' => $this->projectIsPaid($project),
+        ]);
+    }
+
+    public function userInvoicesIndex(Request $request): View
+    {
+        $user = $request->user();
+        $client = $this->resolvePortalClient($user);
+        $portalStats = $this->buildUserPortalStats($client, $this->userLeadQuery($user), $this->userQuoteQuery($user));
+        $invoices = $client
+            ? ClientInvoice::query()
+                ->where('client_id', $client->id)
+                ->with([
+                    'project:id,title,service_type,property_address,status',
+                    'client:id,name,email',
+                ])
+                ->latest('id')
+                ->paginate(10)
+            : $this->emptyPaginator(10);
+
+        return view('user.invoices-index', [
+            'client' => $client,
+            'portalStats' => $portalStats,
+            'invoices' => $invoices,
+        ]);
+    }
+
+    public function userQuotesIndex(Request $request): View
+    {
+        $user = $request->user();
+        $client = $this->resolvePortalClient($user);
+        $portalStats = $this->buildUserPortalStats($client, $this->userLeadQuery($user), $this->userQuoteQuery($user));
+        $quotes = $this->userQuoteQuery($user)
+            ->latest('id')
+            ->paginate(10, ['id', 'quote_id', 'status', 'estimated_total', 'currency', 'submitted_at', 'services', 'listing_type']);
+
+        return view('user.quotes-index', [
+            'client' => $client,
+            'portalStats' => $portalStats,
+            'quotes' => $quotes,
+        ]);
+    }
+
+    public function userMessagesIndex(Request $request): View
+    {
+        $user = $request->user();
+        $client = $this->resolvePortalClient($user);
+        $portalStats = $this->buildUserPortalStats($client, $this->userLeadQuery($user), $this->userQuoteQuery($user));
+        $messages = $client
+            ? ClientMessage::query()
+                ->where('client_id', $client->id)
+                ->with([
+                    'sender:id,name,email',
+                    'project:id,title,status',
+                ])
+                ->latest('id')
+                ->paginate(12)
+            : $this->emptyPaginator(12);
+        $serviceRequests = $client
+            ? ClientServiceRequest::query()
+                ->where('client_id', $client->id)
+                ->with('project:id,title,status')
+                ->latest('id')
+                ->paginate(12, ['*'], 'requests_page')
+            : $this->emptyPaginator(12, 'requests_page');
+        $projects = $client
+            ? ClientProject::query()
+                ->where('client_id', $client->id)
+                ->withCount([
+                    'messages',
+                    'serviceRequests',
+                ])
+                ->latest('scheduled_at')
+                ->latest('id')
+                ->get(['id', 'title'])
+            : collect();
+
+        return view('user.messages-index', [
+            'client' => $client,
+            'portalStats' => $portalStats,
+            'messages' => $messages,
+            'serviceRequests' => $serviceRequests,
+            'projects' => $projects,
+        ]);
+    }
+
+    public function userDeliveriesIndex(Request $request): View
+    {
+        $user = $request->user();
+        $client = $this->resolvePortalClient($user);
+        $portalStats = $this->buildUserPortalStats($client, $this->userLeadQuery($user), $this->userQuoteQuery($user));
+        $projects = $client
+            ? ClientProject::query()
+                ->where('client_id', $client->id)
+                ->withCount([
+                    'media as gallery_media_count' => function ($mediaQuery): void {
+                        $mediaQuery->whereIn('type', ['image', 'video']);
+                    },
+                    'media as final_zip_count' => function ($mediaQuery): void {
+                        $mediaQuery->where('type', 'final_zip');
+                    },
+                ])
+                ->with([
+                    'media' => function ($mediaQuery): void {
+                        $mediaQuery->latest('id');
+                    },
+                    'invoices:id,client_project_id,status',
+                ])
+                ->latest('scheduled_at')
+                ->latest('id')
+                ->paginate(8)
+            : $this->emptyPaginator(8);
+        $galleryPayloadByProject = $client
+            ? $this->buildProjectGalleryPayloadMap($projects->getCollection(), true, false, true)
+            : [];
+
+        return view('user.deliveries-index', [
+            'client' => $client,
+            'portalStats' => $portalStats,
+            'projects' => $projects,
             'galleryPayloadByProject' => $galleryPayloadByProject,
+        ]);
+    }
+
+    public function userAccountIndex(Request $request): View
+    {
+        $user = $request->user();
+        $client = $this->resolvePortalClient($user, [
+            'projects' => function ($query): void {
+                $query->latest('id')->limit(3);
+            },
+        ]);
+        $portalStats = $this->buildUserPortalStats($client, $this->userLeadQuery($user), $this->userQuoteQuery($user));
+
+        return view('user.account-index', [
+            'client' => $client,
+            'portalStats' => $portalStats,
         ]);
     }
 
@@ -4211,6 +4427,100 @@ class DashboardController extends Controller
         }
 
         return $value;
+    }
+
+    private function resolvePortalClient(User $user, array $with = []): ?Client
+    {
+        return Client::query()
+            ->with($with)
+            ->where(function ($query) use ($user): void {
+                $query->where('user_id', $user->id)
+                    ->orWhere('email', $user->email);
+
+                if (!blank($user->phone)) {
+                    $query->orWhere('phone', $user->phone);
+                }
+            })
+            ->latest('id')
+            ->first();
+    }
+
+    private function userLeadQuery(User $user)
+    {
+        return LeadProfile::query()
+            ->where(function ($query) use ($user): void {
+                $query->where('email', $user->email);
+
+                if (!blank($user->phone)) {
+                    $query->orWhere('phone', $user->phone);
+                }
+            });
+    }
+
+    private function userQuoteQuery(User $user)
+    {
+        return QuoteBuild::query()
+            ->where(function ($query) use ($user): void {
+                $query->where('user_id', $user->id)
+                    ->orWhere('options->contact_email', $user->email);
+
+                if (!blank($user->phone)) {
+                    $query->orWhere('options->contact_phone', $user->phone);
+                }
+            });
+    }
+
+    private function buildUserPortalStats(?Client $client, $leadQuery, $quoteQuery): array
+    {
+        $projectStatuses = ['accepted', 'shooting', 'editing'];
+        $activeProjects = 0;
+        $deliveriesReady = 0;
+        $unpaidInvoices = 0;
+        $messageCount = 0;
+
+        if ($client) {
+            $activeProjects = ClientProject::query()
+                ->where('client_id', $client->id)
+                ->whereIn('status', $projectStatuses)
+                ->count();
+
+            $deliveriesReady = ClientProject::query()
+                ->where('client_id', $client->id)
+                ->whereHas('media', function ($query): void {
+                    $query->where('type', 'final_zip');
+                })
+                ->count();
+
+            $unpaidInvoices = ClientInvoice::query()
+                ->where('client_id', $client->id)
+                ->whereNotIn('status', ['paid'])
+                ->count();
+
+            $messageCount = ClientMessage::query()
+                ->where('client_id', $client->id)
+                ->count();
+        }
+
+        $pendingQuotes = (clone $quoteQuery)
+            ->whereNotIn('status', ['booked', 'lost'])
+            ->count();
+
+        return [
+            'active_projects' => $activeProjects,
+            'unpaid_invoices' => $unpaidInvoices,
+            'pending_quotes' => $pendingQuotes,
+            'deliveries_ready' => $deliveriesReady,
+            'message_count' => $messageCount,
+            'lead_count' => (clone $leadQuery)->count(),
+        ];
+    }
+
+    private function emptyPaginator(int $perPage = 10, string $pageName = 'page'): LengthAwarePaginator
+    {
+        return new LengthAwarePaginator([], 0, $perPage, 1, [
+            'path' => request()->url(),
+            'pageName' => $pageName,
+        ]);
     }
 
     private function isOwnerRole(string $role): bool
