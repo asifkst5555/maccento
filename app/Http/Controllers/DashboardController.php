@@ -1301,8 +1301,10 @@ class DashboardController extends Controller
             $draft->created_by = $request->user()?->id;
         }
 
+        $forcedReplyTo = $this->crmInboundReplyToAddress();
+
         $draft->recipient_email = filled($validated['recipient_email'] ?? null) ? (string) $validated['recipient_email'] : null;
-        $draft->reply_to = filled($validated['reply_to'] ?? null) ? (string) $validated['reply_to'] : null;
+        $draft->reply_to = $forcedReplyTo;
         $draft->cc = filled($validated['cc'] ?? null) ? (string) $validated['cc'] : null;
         $draft->bcc = filled($validated['bcc'] ?? null) ? (string) $validated['bcc'] : null;
         $draft->client_project_id = !blank($validated['client_project_id'] ?? null) ? (int) $validated['client_project_id'] : null;
@@ -1375,7 +1377,7 @@ class DashboardController extends Controller
             'mode' => 'draft',
             'template_key' => null,
             'recipient_email' => (string) $draft->recipient_email,
-            'reply_to' => $draft->reply_to,
+            'reply_to' => $this->crmInboundReplyToAddress(),
             'cc' => $ccList['valid'],
             'bcc' => $bccList['valid'],
             'subject' => $subject,
@@ -1442,7 +1444,10 @@ class DashboardController extends Controller
     {
         $this->ensurePipelineWriteAccess($request);
 
+        $forcedReplyTo = $this->crmInboundReplyToAddress();
+
         $validated = $request->validate([
+            'draft_id' => ['nullable', 'integer'],
             'mode' => ['required', 'in:template,custom'],
             'recipient_email' => ['required', 'email', 'max:255'],
             'client_project_id' => ['nullable', 'integer'],
@@ -1457,6 +1462,10 @@ class DashboardController extends Controller
         ]);
 
         $recipient = trim((string) ($validated['recipient_email'] ?? ''));
+        $draft = null;
+        if (!blank($validated['draft_id'] ?? null)) {
+            $draft = EmailDraft::query()->find((int) $validated['draft_id']);
+        }
         $ccList = $this->parseEmailList((string) ($validated['cc'] ?? ''));
         $bccList = $this->parseEmailList((string) ($validated['bcc'] ?? ''));
 
@@ -1505,7 +1514,7 @@ class DashboardController extends Controller
             'mode' => (string) ($validated['mode'] ?? 'custom'),
             'template_key' => (string) ($validated['template_key'] ?? ''),
             'recipient_email' => $recipient,
-            'reply_to' => filled($validated['reply_to'] ?? null) ? (string) $validated['reply_to'] : null,
+            'reply_to' => $forcedReplyTo,
             'cc' => count($ccList['valid']) > 0 ? implode(', ', $ccList['valid']) : null,
             'bcc' => count($bccList['valid']) > 0 ? implode(', ', $bccList['valid']) : null,
             'subject' => $subject,
@@ -1535,7 +1544,7 @@ class DashboardController extends Controller
                 footerNote: 'Need help? Reply to this email and our team will assist you.',
                 emailLogId: $emailLog?->id,
                 threadProjectId: $threadProjectId,
-                replyToAddress: filled($validated['reply_to'] ?? null) ? (string) $validated['reply_to'] : null,
+                replyToAddress: $forcedReplyTo,
                 outboundAttachmentMeta: $attachments,
             ));
 
@@ -1561,7 +1570,7 @@ class DashboardController extends Controller
                     'mode' => (string) ($validated['mode'] ?? 'custom'),
                     'template_key' => (string) ($validated['template_key'] ?? ''),
                     'recipient_email' => $recipient,
-                    'reply_to' => filled($validated['reply_to'] ?? null) ? (string) $validated['reply_to'] : null,
+                    'reply_to' => $forcedReplyTo,
                     'cc' => count($ccList['valid']) > 0 ? implode(', ', $ccList['valid']) : null,
                     'bcc' => count($bccList['valid']) > 0 ? implode(', ', $bccList['valid']) : null,
                     'subject' => $subject,
@@ -1572,6 +1581,12 @@ class DashboardController extends Controller
                     'provider_status' => 'processed',
                     'provider_last_event_at' => now(),
                 ]);
+            }
+
+            if ($draft !== null) {
+                $draft->status = 'sent';
+                $draft->last_opened_at = now();
+                $draft->save();
             }
         } catch (Throwable $exception) {
             if ($emailLog !== null) {
@@ -1587,7 +1602,7 @@ class DashboardController extends Controller
                     'mode' => (string) ($validated['mode'] ?? 'custom'),
                     'template_key' => (string) ($validated['template_key'] ?? ''),
                     'recipient_email' => $recipient,
-                    'reply_to' => filled($validated['reply_to'] ?? null) ? (string) $validated['reply_to'] : null,
+                    'reply_to' => $forcedReplyTo,
                     'cc' => count($ccList['valid']) > 0 ? implode(', ', $ccList['valid']) : null,
                     'bcc' => count($bccList['valid']) > 0 ? implode(', ', $bccList['valid']) : null,
                     'subject' => $subject,
@@ -3860,7 +3875,7 @@ class DashboardController extends Controller
         $recipient = trim((string) ($payload['recipient_email'] ?? ''));
         $subject = trim((string) ($payload['subject'] ?? ''));
         $message = trim((string) ($payload['message'] ?? ''));
-        $replyTo = filled($payload['reply_to'] ?? null) ? (string) $payload['reply_to'] : null;
+        $replyTo = $this->crmInboundReplyToAddress();
         $cc = is_array($payload['cc'] ?? null) ? (array) $payload['cc'] : [];
         $bcc = is_array($payload['bcc'] ?? null) ? (array) $payload['bcc'] : [];
         $threadProjectId = !blank($payload['thread_project_id'] ?? null) ? (int) $payload['thread_project_id'] : null;

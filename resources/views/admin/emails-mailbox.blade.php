@@ -299,7 +299,8 @@
           </label>
           <label>
             <span>Reply-to Address</span>
-            <input class="panel-input" type="email" name="reply_to" value="{{ $compose['reply_to'] }}" placeholder="crm@reply.maccento.ca">
+            <input class="panel-input" type="email" name="reply_to" value="{{ $compose['reply_to'] }}" placeholder="crm@reply.maccento.ca" readonly>
+            <small class="panel-muted">Replies are routed automatically into CRM inbox.</small>
           </label>
           <label>
             <span>CC <small class="panel-muted">(optional)</small></span>
