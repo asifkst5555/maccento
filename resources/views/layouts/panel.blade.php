@@ -714,7 +714,7 @@
             <span class="panel-nav-count">{{ number_format((int) ($leadNavCounts['submissions'] ?? 0)) }}</span>
           </a>
 
-          <p class="panel-nav-group-title">Sales Operations</p>
+          <p class="panel-nav-group-title">Sales & Billing</p>
           <a class="panel-nav-link @if(request()->routeIs('admin.quotes.*')) is-active @endif" href="{{ route('admin.quotes.index') }}" title="Quote Pipeline">
             <span class="panel-nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4V5zm3 3v2h10V8H7zm0 4v2h6v-2H7z" fill="currentColor"/></svg></span>
             <span class="panel-nav-text">Quote Pipeline</span>
@@ -722,6 +722,11 @@
           <a class="panel-nav-link @if(request()->routeIs('admin.invoices.*')) is-active @endif" href="{{ route('admin.invoices.index') }}" title="Invoices">
             <span class="panel-nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h9l5 5v13a1 1 0 0 1-1 1H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zm8 1.5V9h4.5M8 13h8m-8 3h8m-8-6h5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
             <span class="panel-nav-text">Invoices</span>
+          </a>
+          <p class="panel-nav-group-title">Communication</p>
+          <a class="panel-nav-link @if(request()->routeIs('admin.messages.*')) is-active @endif" href="{{ route('admin.messages.index') }}" title="User Messages">
+            <span class="panel-nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v7A2.5 2.5 0 0 1 17.5 14H10l-4.5 4v-4H6.5A2.5 2.5 0 0 1 4 11.5v-5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg></span>
+            <span class="panel-nav-text">User Messages</span>
           </a>
           @php
             $composeActive = request()->routeIs('admin.emails.inbox') && (string) request()->query('compose') === '1';
@@ -1638,5 +1643,9 @@
   </script>
 </body>
 </html>
+
+
+
+
 
 

@@ -2217,6 +2217,124 @@ class DashboardController extends Controller
         ]);
     }
 
+    public function adminClientMessagesIndex(Request $request): View
+    {
+        $search = trim((string) $request->string('search'));
+        $clientId = $request->filled('client_id') ? (int) $request->input('client_id') : null;
+        $senderRole = trim((string) $request->string('sender_role'));
+
+        $messagesQuery = ClientMessage::query()
+            ->with([
+                'client:id,name,email,status',
+                'project:id,title,status',
+                'sender:id,name,email',
+            ])
+            ->when($clientId !== null && $clientId > 0, function ($query) use ($clientId): void {
+                $query->where('client_id', $clientId);
+            })
+            ->when($senderRole !== '', function ($query) use ($senderRole): void {
+                $query->where('sender_role', $senderRole);
+            })
+            ->when($search !== '', function ($query) use ($search): void {
+                $query->where(function ($inner) use ($search): void {
+                    $inner->where('message', 'like', "%{$search}%")
+                        ->orWhereHas('client', function ($clientQuery) use ($search): void {
+                            $clientQuery->where('name', 'like', "%{$search}%")
+                                ->orWhere('email', 'like', "%{$search}%");
+                        })
+                        ->orWhereHas('project', function ($projectQuery) use ($search): void {
+                            $projectQuery->where('title', 'like', "%{$search}%");
+                        });
+                });
+            });
+
+        $messages = (clone $messagesQuery)
+            ->latest('sent_at')
+            ->latest('id')
+            ->paginate(18)
+            ->withQueryString();
+
+        $clients = Client::query()
+            ->with(['projects' => function ($query): void {
+                $query->latest('id')->get(['id', 'client_id', 'title', 'status']);
+            }])
+            ->latest('name')
+            ->get(['id', 'name', 'email', 'status']);
+
+        $latestThreads = ClientMessage::query()
+            ->with([
+                'client:id,name,email,status',
+                'project:id,title,status',
+                'sender:id,name,email',
+            ])
+            ->latest('sent_at')
+            ->latest('id')
+            ->get()
+            ->unique('client_id')
+            ->take(8)
+            ->values();
+
+        return view('admin.client-messages-index', [
+            'messages' => $messages,
+            'clients' => $clients,
+            'latestThreads' => $latestThreads,
+            'messageStats' => [
+                'total_messages' => ClientMessage::query()->count(),
+                'client_threads' => ClientMessage::query()->distinct('client_id')->count('client_id'),
+                'admin_sent' => ClientMessage::query()->where('sender_role', 'admin')->count(),
+                'client_sent' => ClientMessage::query()->where('sender_role', 'client')->count(),
+            ],
+            'filters' => [
+                'search' => $search,
+                'client_id' => $clientId,
+                'sender_role' => $senderRole,
+            ],
+        ]);
+    }
+
+    public function adminClientMessagesCenterStore(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'client_id' => ['required', 'integer', 'exists:clients,id'],
+            'client_project_id' => ['nullable', 'integer'],
+            'message' => ['required', 'string', 'max:3000'],
+        ]);
+
+        $client = Client::query()->findOrFail((int) $validated['client_id']);
+        $projectId = null;
+        if (!blank($validated['client_project_id'] ?? null)) {
+            $projectId = ClientProject::query()
+                ->where('client_id', $client->id)
+                ->where('id', (int) $validated['client_project_id'])
+                ->value('id');
+
+            if ($projectId === null) {
+                return back()->withErrors([
+                    'client_project_id' => 'Selected project does not belong to this client.',
+                ])->withInput();
+            }
+        }
+
+        ClientMessage::create([
+            'client_id' => $client->id,
+            'client_project_id' => $projectId,
+            'sender_user_id' => $request->user()?->id,
+            'sender_role' => 'admin',
+            'message' => $validated['message'],
+            'sent_at' => now(),
+        ]);
+
+        $this->notifyClientUser(
+            $client,
+            'new_admin_message',
+            'New message from admin',
+            mb_strimwidth($validated['message'], 0, 140, '...'),
+            route('user.messages.index')
+        );
+
+        return redirect()->route('admin.messages.index', ['client_id' => $client->id])->with('status', 'Message sent successfully.');
+    }
+
     public function adminClientProjectStore(Request $request, Client $client): RedirectResponse
     {
         $validated = $request->validate([
@@ -5026,3 +5144,5 @@ class DashboardController extends Controller
         return 'INV-' . $date . '-' . strtoupper(uniqid());
     }
 }
+
+

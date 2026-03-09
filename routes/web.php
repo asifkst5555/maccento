@@ -58,6 +58,7 @@ Route::middleware('auth')->group(function (): void {
         Route::get('/admin/leads-packages', [DashboardController::class, 'adminPackageLeadsIndex'])->name('admin.leads.packages.index');
         Route::get('/admin/quotes', [DashboardController::class, 'adminQuotesIndex'])->name('admin.quotes.index');
         Route::get('/admin/invoices', [DashboardController::class, 'adminInvoicesIndex'])->name('admin.invoices.index');
+        Route::get('/admin/messages', [DashboardController::class, 'adminClientMessagesIndex'])->name('admin.messages.index');
         Route::get('/admin/emails', [DashboardController::class, 'adminEmailsIndex'])->name('admin.emails.index');
         Route::get('/admin/emails/inbox', [DashboardController::class, 'adminEmailsInbox'])->name('admin.emails.inbox');
         Route::get('/admin/emails/sent', [DashboardController::class, 'adminEmailsSent'])->name('admin.emails.sent');
@@ -92,6 +93,7 @@ Route::middleware('auth')->group(function (): void {
         Route::post('/admin/media-delivery/folders/migrate', [DashboardController::class, 'adminMediaFolderMigrationRun'])->name('admin.media-delivery.folders.migrate');
         Route::post('/admin/clients/{client}/invoices', [DashboardController::class, 'adminClientInvoiceStore'])->name('admin.clients.invoices.store');
         Route::post('/admin/clients/{client}/messages', [DashboardController::class, 'adminClientMessageStore'])->name('admin.clients.messages.store');
+        Route::post('/admin/messages', [DashboardController::class, 'adminClientMessagesCenterStore'])->name('admin.messages.store');
         Route::post('/admin/invoices/{invoice}/status', [DashboardController::class, 'adminInvoiceStatusUpdate'])->name('admin.invoices.status');
         Route::post('/admin/invoices/{invoice}/delete', [DashboardController::class, 'adminInvoiceDestroy'])->name('admin.invoices.delete');
         Route::get('/admin/invoices/{invoice}/download', [DashboardController::class, 'adminInvoicePdfDownload'])->name('admin.invoices.download');
@@ -143,3 +145,5 @@ Route::middleware('auth')->group(function (): void {
 });
 
 Route::post('/logout', [AuthOtpController::class, 'logout'])->middleware('auth')->name('logout');
+
+

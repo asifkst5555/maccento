@@ -161,3 +161,4 @@ class AdminPageLoadTest extends TestCase
             ->assertSee('Client replied.', false);
     }
 }
+
