@@ -1,6 +1,8 @@
 @props([
     'project',
     'galleryCount' => 0,
+    'rawCount' => null,
+    'editedCount' => null,
     'zipCount' => 0,
     'isPaid' => false,
     'showClient' => false,
@@ -25,7 +27,11 @@
   @endif
 
   <p class="panel-muted" style="margin: 6px 0 0;">
-    Gallery: {{ $galleryCount }} | Final ZIP: {{ $zipCount }} |
+    @if($rawCount !== null || $editedCount !== null)
+      Raw: {{ $rawCount ?? 0 }} | Edited/Final: {{ $editedCount ?? 0 }} | Final ZIP: {{ $zipCount }} |
+    @else
+      Gallery: {{ $galleryCount }} | Final ZIP: {{ $zipCount }} |
+    @endif
     Payment: <strong>{{ $isPaid ? 'Paid' : 'Unpaid' }}</strong>
   </p>
 </div>

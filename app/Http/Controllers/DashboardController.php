@@ -8,6 +8,7 @@ use App\Models\Client;
 use App\Models\ClientInvoice;
 use App\Models\ClientMessage;
 use App\Models\ClientProject;
+use App\Models\ClientProjectComment;
 use App\Models\ClientProjectMedia;
 use App\Models\ClientServiceRequest;
 use App\Models\EmailDraft;
@@ -666,13 +667,16 @@ class DashboardController extends Controller
     public function adminMediaDeliveryIndex(Request $request): View
     {
         $search = trim((string) $request->string('media_search'));
+        $role = strtolower(trim((string) $request->user()?->role));
+        $userId = (int) ($request->user()?->id ?? 0);
 
         $projects = ClientProject::query()
             ->with([
                 'client:id,name,email,phone',
                 'media' => function ($query): void {
-                    $query->latest('id');
+                    $query->latest('id')->with('uploader:id,name,email,role');
                 },
+                'assignments.user:id,name,email,role',
                 'invoices:id,client_project_id,status',
             ])
             ->when($search !== '', function ($query) use ($search): void {
@@ -687,12 +691,19 @@ class DashboardController extends Controller
                         });
                 });
             })
+            ->when(in_array($role, ['photographer', 'editor'], true), function ($query) use ($userId): void {
+                $query->whereHas('assignments', function ($assignmentQuery) use ($userId): void {
+                    $assignmentQuery->where('user_id', $userId);
+                });
+            })
             ->latest('id')
             ->paginate(12)
             ->withQueryString();
 
-        $canManageMedia = in_array(strtolower(trim((string) $request->user()?->role)), ['owner', 'admin', 'manager'], true);
-        $canViewInvoices = in_array(strtolower(trim((string) $request->user()?->role)), ['owner', 'admin', 'manager'], true);
+        $canUploadMedia = in_array($role, ['owner', 'admin', 'manager', 'photographer', 'editor'], true);
+        $canDeleteMedia = in_array($role, ['owner', 'admin', 'manager'], true);
+        $isScopedMediaUser = in_array($role, ['photographer', 'editor'], true);
+        $canViewInvoices = in_array($role, ['owner', 'admin', 'manager'], true);
         $galleryPayloadByProject = $this->buildProjectGalleryPayloadMap($projects->getCollection(), false, true, false);
 
         return view('admin.media-delivery-index', [
@@ -700,7 +711,9 @@ class DashboardController extends Controller
             'filters' => [
                 'media_search' => $search,
             ],
-            'canManageMedia' => $canManageMedia,
+            'canUploadMedia' => $canUploadMedia,
+            'canDeleteMedia' => $canDeleteMedia,
+            'isScopedMediaUser' => $isScopedMediaUser,
             'canViewInvoices' => $canViewInvoices,
             'galleryPayloadByProject' => $galleryPayloadByProject,
         ]);
@@ -2178,12 +2191,16 @@ class DashboardController extends Controller
                 $query->latest('id')->with([
                     'creator:id,name,email',
                     'media' => function ($mediaQuery): void {
-                        $mediaQuery->latest('id');
+                        $mediaQuery->latest('id')->with('uploader:id,name,email,role');
                     },
                     'invoices:id,client_project_id,status',
                     'messages' => function ($messageQuery): void {
                         $messageQuery->latest('id')->with('sender:id,name,email');
                     },
+                    'comments' => function ($commentQuery): void {
+                        $commentQuery->latest('id')->with('user:id,name,email,role');
+                    },
+                    'assignments.user:id,name,email,role',
                     'serviceRequests' => function ($requestQuery): void {
                         $requestQuery->latest('id')->with('requester:id,name,email');
                     },
@@ -2214,6 +2231,7 @@ class DashboardController extends Controller
             'projectStatuses' => ['accepted', 'shooting', 'editing', 'complete'],
             'focusedProject' => $focusedProject,
             'focusedProjectId' => $focusedProjectId,
+            'assignableUsers' => $this->assignableProjectUsers(),
         ]);
     }
 
@@ -2223,18 +2241,14 @@ class DashboardController extends Controller
         $clientId = $request->filled('client_id') ? (int) $request->input('client_id') : null;
         $senderRole = trim((string) $request->string('sender_role'));
 
-        $messagesQuery = ClientMessage::query()
+        $baseMessagesQuery = ClientMessage::query()
             ->with([
                 'client:id,name,email,status',
                 'project:id,title,status',
                 'sender:id,name,email',
-            ])
-            ->when($clientId !== null && $clientId > 0, function ($query) use ($clientId): void {
-                $query->where('client_id', $clientId);
-            })
-            ->when($senderRole !== '', function ($query) use ($senderRole): void {
-                $query->where('sender_role', $senderRole);
-            })
+            ]);
+
+        $threadMessages = (clone $baseMessagesQuery)
             ->when($search !== '', function ($query) use ($search): void {
                 $query->where(function ($inner) use ($search): void {
                     $inner->where('message', 'like', "%{$search}%")
@@ -2246,38 +2260,67 @@ class DashboardController extends Controller
                             $projectQuery->where('title', 'like', "%{$search}%");
                         });
                 });
-            });
-
-        $messages = (clone $messagesQuery)
+            })
+            ->when($senderRole !== '', function ($query) use ($senderRole): void {
+                $query->where('sender_role', $senderRole);
+            })
             ->latest('sent_at')
             ->latest('id')
-            ->paginate(18)
-            ->withQueryString();
+            ->get();
+
+        $threadSummaries = $threadMessages
+            ->filter(fn (ClientMessage $message): bool => $message->client_id !== null)
+            ->unique('client_id')
+            ->values();
+
+        if ($clientId === null || $clientId <= 0) {
+            $clientId = (int) ($threadSummaries->first()?->client_id ?: 0);
+        }
+
+        if ($clientId <= 0) {
+            $clientId = (int) (Client::query()->orderBy('name')->value('id') ?: 0);
+        }
+
+        $activeClient = $clientId > 0
+            ? Client::query()->with(['projects' => function ($query): void {
+                $query->latest('id')->get(['id', 'client_id', 'title', 'status']);
+            }])->find($clientId, ['id', 'name', 'email', 'status', 'company', 'phone'])
+            : null;
+
+        $activeMessages = collect();
+        if ($activeClient) {
+            $activeMessages = ClientMessage::query()
+                ->with([
+                    'client:id,name,email,status',
+                    'project:id,title,status',
+                    'sender:id,name,email',
+                ])
+                ->where('client_id', $activeClient->id)
+                ->latest('sent_at')
+                ->latest('id')
+                ->limit(200)
+                ->get()
+                ->sortBy(function (ClientMessage $message): array {
+                    return [
+                        optional($message->sent_at)->timestamp ?? optional($message->created_at)->timestamp ?? 0,
+                        $message->id,
+                    ];
+                })
+                ->values();
+        }
 
         $clients = Client::query()
             ->with(['projects' => function ($query): void {
                 $query->latest('id')->get(['id', 'client_id', 'title', 'status']);
             }])
-            ->latest('name')
+            ->orderBy('name')
             ->get(['id', 'name', 'email', 'status']);
 
-        $latestThreads = ClientMessage::query()
-            ->with([
-                'client:id,name,email,status',
-                'project:id,title,status',
-                'sender:id,name,email',
-            ])
-            ->latest('sent_at')
-            ->latest('id')
-            ->get()
-            ->unique('client_id')
-            ->take(8)
-            ->values();
-
         return view('admin.client-messages-index', [
-            'messages' => $messages,
             'clients' => $clients,
-            'latestThreads' => $latestThreads,
+            'threadSummaries' => $threadSummaries,
+            'activeClient' => $activeClient,
+            'activeMessages' => $activeMessages,
             'messageStats' => [
                 'total_messages' => ClientMessage::query()->count(),
                 'client_threads' => ClientMessage::query()->distinct('client_id')->count('client_id'),
@@ -2286,7 +2329,7 @@ class DashboardController extends Controller
             ],
             'filters' => [
                 'search' => $search,
-                'client_id' => $clientId,
+                'client_id' => $activeClient?->id,
                 'sender_role' => $senderRole,
             ],
         ]);
@@ -2345,9 +2388,11 @@ class DashboardController extends Controller
             'due_at' => ['nullable', 'date'],
             'status' => ['required', 'in:accepted,shooting,editing,complete'],
             'notes' => ['nullable', 'string', 'max:2000'],
+            'assigned_user_ids' => ['nullable', 'array'],
+            'assigned_user_ids.*' => ['integer', 'exists:users,id'],
         ]);
 
-        ClientProject::create([
+        $project = ClientProject::create([
             'client_id' => $client->id,
             'created_by' => $request->user()?->id,
             'title' => $validated['title'],
@@ -2358,6 +2403,13 @@ class DashboardController extends Controller
             'status' => $validated['status'],
             'notes' => $validated['notes'] ?? null,
         ]);
+
+        $assignmentIds = $this->sanitizeAssignableUserIds((array) ($validated['assigned_user_ids'] ?? []));
+        if ($assignmentIds !== []) {
+            $project->assignedUsers()->syncWithPivotValues($assignmentIds, [
+                'assigned_by' => $request->user()?->id,
+            ]);
+        }
 
         return back()->with('status', 'Project created.');
     }
@@ -2387,15 +2439,65 @@ class DashboardController extends Controller
         return back()->with('status', 'Project status updated.');
     }
 
+    public function adminProjectAssignmentsUpdate(Request $request, ClientProject $project): RedirectResponse
+    {
+        $this->ensurePipelineWriteAccess($request);
+
+        $validated = $request->validate([
+            'assigned_user_ids' => ['nullable', 'array'],
+            'assigned_user_ids.*' => ['integer', 'exists:users,id'],
+        ]);
+
+        $assignmentIds = $this->sanitizeAssignableUserIds((array) ($validated['assigned_user_ids'] ?? []));
+        $project->assignedUsers()->syncWithPivotValues($assignmentIds, [
+            'assigned_by' => $request->user()?->id,
+        ]);
+
+        return back()->with('status', 'Assigned team updated.');
+    }
+
+    public function adminProjectCommentStore(Request $request, ClientProject $project): RedirectResponse
+    {
+        $this->ensureInternalUserCanCommentOnProject($request, $project);
+
+        $validated = $request->validate([
+            'body' => ['required', 'string', 'max:4000'],
+        ]);
+
+        ClientProjectComment::query()->create([
+            'client_project_id' => $project->id,
+            'user_id' => $request->user()?->id,
+            'sender_role' => strtolower(trim((string) ($request->user()?->role ?: 'admin'))),
+            'body' => $validated['body'],
+        ]);
+
+        if ($project->client) {
+            $this->notifyClientUser(
+                $project->client,
+                'project_comment_added',
+                'New project update',
+                mb_strimwidth($validated['body'], 0, 140, '...'),
+                route('user.projects.show', $project)
+            );
+        }
+
+        return back()->with('status', 'Project comment posted.');
+    }
+
     public function adminProjectMediaStore(Request $request, ClientProject $project): RedirectResponse
     {
+        $this->ensureInternalUserCanUploadProjectMedia($request, $project);
+
         $validated = $request->validate([
+            'media_stage' => ['required', 'string', 'in:raw,edited'],
             'media_files' => ['required', 'array', 'min:1'],
             'media_files.*' => ['required', 'file', 'max:512000'],
         ]);
 
+        $mediaStage = (string) ($validated['media_stage'] ?? 'raw');
         $saved = 0;
         $projectMediaBasePath = $this->projectMediaBasePath($project);
+        $galleryUploadPath = $this->projectMediaUploadPath($project, $request->user(), $this->projectMediaBucketForStage($mediaStage));
         $watermarkSettings = $this->getWatermarkSettings();
         $watermarkRenderConfig = $this->resolveWatermarkRenderConfig($watermarkSettings);
         $watermarkSignature = (string) ($watermarkRenderConfig['signature'] ?? '');
@@ -2407,7 +2509,7 @@ class DashboardController extends Controller
                 continue;
             }
 
-            $storedPath = $file->store("{$projectMediaBasePath}/gallery", 'public');
+            $storedPath = $file->store($galleryUploadPath, 'public');
             if (!$storedPath) {
                 continue;
             }
@@ -2433,6 +2535,7 @@ class DashboardController extends Controller
                 'client_project_id' => $project->id,
                 'uploaded_by' => $request->user()?->id,
                 'type' => $type,
+                'delivery_stage' => $mediaStage,
                 'disk' => 'public',
                 'path' => $storedPath,
                 'watermark_disk' => $watermarkDisk,
@@ -2450,22 +2553,27 @@ class DashboardController extends Controller
             return back()->withErrors(['media_files' => 'No valid image or video files were uploaded.']);
         }
 
-        return back()->with('status', "{$saved} gallery file(s) uploaded.");
+        $stageLabel = $mediaStage === 'edited' ? 'edited/final media' : 'raw footage media';
+
+        return back()->with('status', "{$saved} {$stageLabel} file(s) uploaded.");
     }
 
     public function adminProjectDeliveryZipStore(Request $request, ClientProject $project): RedirectResponse
     {
+        $this->ensureInternalUserCanUploadProjectMedia($request, $project);
+
         $validated = $request->validate([
             'delivery_zip' => ['required', 'file', 'mimes:zip', 'max:1024000'],
         ]);
 
         $file = $validated['delivery_zip'];
-        $storedPath = $file->store($this->projectMediaBasePath($project) . '/delivery', 'public');
+        $storedPath = $file->store($this->projectMediaUploadPath($project, $request->user(), 'delivery'), 'public');
 
         ClientProjectMedia::create([
             'client_project_id' => $project->id,
             'uploaded_by' => $request->user()?->id,
             'type' => 'final_zip',
+            'delivery_stage' => 'final_zip',
             'disk' => 'public',
             'path' => $storedPath,
             'original_name' => (string) ($file->getClientOriginalName() ?: basename($storedPath)),
@@ -2478,6 +2586,8 @@ class DashboardController extends Controller
 
     public function adminProjectMediaView(Request $request, ClientProject $project, ClientProjectMedia $media)
     {
+        $this->ensureInternalUserCanAccessAssignedProject($request, $project);
+
         if ((int) $media->client_project_id !== (int) $project->id) {
             abort(404);
         }
@@ -3274,6 +3384,10 @@ class DashboardController extends Controller
             'messages' => function ($query): void {
                 $query->latest('id')->with('sender:id,name,email');
             },
+            'comments' => function ($query): void {
+                $query->latest('id')->with('user:id,name,email,role');
+            },
+            'assignments.user:id,name,email,role',
             'serviceRequests' => function ($query): void {
                 $query->latest('id')->with('requester:id,name,email');
             },
@@ -3288,6 +3402,24 @@ class DashboardController extends Controller
             'galleryPayload' => $galleryPayload,
             'isPaid' => $this->projectIsPaid($project),
         ]);
+    }
+
+    public function userProjectCommentStore(Request $request, ClientProject $project): RedirectResponse
+    {
+        $this->ensureUserCanAccessProject($request, $project);
+
+        $validated = $request->validate([
+            'body' => ['required', 'string', 'max:4000'],
+        ]);
+
+        ClientProjectComment::query()->create([
+            'client_project_id' => $project->id,
+            'user_id' => $request->user()?->id,
+            'sender_role' => 'client',
+            'body' => $validated['body'],
+        ]);
+
+        return back()->with('status', 'Project comment posted.');
     }
 
     public function userInvoicesIndex(Request $request): View
@@ -3390,7 +3522,7 @@ class DashboardController extends Controller
                 ])
                 ->with([
                     'media' => function ($mediaQuery): void {
-                        $mediaQuery->latest('id');
+                        $mediaQuery->latest('id')->with('uploader:id,name,email,role');
                     },
                     'invoices:id,client_project_id,status',
                 ])
@@ -4663,6 +4795,60 @@ class DashboardController extends Controller
         abort_unless(in_array($role, ['owner', 'admin', 'manager'], true), 403);
     }
 
+    private function assignableProjectUsers()
+    {
+        return User::query()
+            ->whereIn('role', ['owner', 'admin', 'manager', 'photographer', 'editor'])
+            ->orderBy('role')
+            ->orderBy('name')
+            ->get(['id', 'name', 'email', 'role']);
+    }
+
+    private function sanitizeAssignableUserIds(array $userIds): array
+    {
+        if ($userIds === []) {
+            return [];
+        }
+
+        return User::query()
+            ->whereIn('id', array_map('intval', $userIds))
+            ->whereIn('role', ['owner', 'admin', 'manager', 'photographer', 'editor'])
+            ->pluck('id')
+            ->map(static fn ($id): int => (int) $id)
+            ->values()
+            ->all();
+    }
+
+    private function ensureInternalUserCanCommentOnProject(Request $request, ClientProject $project): void
+    {
+        $this->ensureInternalUserCanAccessAssignedProject($request, $project);
+    }
+
+    private function ensureInternalUserCanUploadProjectMedia(Request $request, ClientProject $project): void
+    {
+        $role = strtolower(trim((string) $request->user()?->role));
+        abort_unless(in_array($role, ['owner', 'admin', 'manager', 'photographer', 'editor'], true), 403);
+
+        if (in_array($role, ['photographer', 'editor'], true)) {
+            $this->ensureInternalUserCanAccessAssignedProject($request, $project);
+        }
+    }
+
+    private function ensureInternalUserCanAccessAssignedProject(Request $request, ClientProject $project): void
+    {
+        $role = strtolower(trim((string) $request->user()?->role));
+
+        if (in_array($role, ['owner', 'admin', 'manager'], true)) {
+            return;
+        }
+
+        abort_unless(in_array($role, ['photographer', 'editor'], true), 403);
+
+        $project->loadMissing('assignments');
+        $assignedUserIds = $project->assignments->pluck('user_id')->map(static fn ($id): int => (int) $id)->all();
+        abort_unless(in_array((int) ($request->user()?->id ?? 0), $assignedUserIds, true), 403);
+    }
+
     private function ensureOwnerAdminAccess(Request $request): void
     {
         $role = strtolower(trim((string) $request->user()?->role));
@@ -4875,6 +5061,33 @@ class DashboardController extends Controller
         }
 
         return 'media/' . $slug . '-' . (int) $project->id;
+    }
+
+    private function projectMediaUploadPath(ClientProject $project, ?User $user, string $bucket): string
+    {
+        $roleFolder = $this->projectMediaRoleFolder((string) ($user?->role ?? 'staff'));
+        $userSlug = Str::slug((string) ($user?->name ?? ('user-' . (int) ($user?->id ?? 0))));
+        $userSegment = 'user-' . (int) ($user?->id ?? 0) . ($userSlug !== '' ? '-' . $userSlug : '');
+
+        return $this->projectMediaBasePath($project) . '/' . trim($bucket, '/') . '/' . $roleFolder . '/' . $userSegment;
+    }
+
+    private function projectMediaBucketForStage(string $stage): string
+    {
+        return match (strtolower(trim($stage))) {
+            'edited' => 'edited-final',
+            default => 'raw-footage',
+        };
+    }
+
+    private function projectMediaRoleFolder(string $role): string
+    {
+        $normalized = strtolower(trim($role));
+
+        return match ($normalized) {
+            'owner', 'admin', 'manager', 'photographer', 'editor' => $normalized,
+            default => 'staff',
+        };
     }
 
     /**
@@ -5144,5 +5357,6 @@ class DashboardController extends Controller
         return 'INV-' . $date . '-' . strtoupper(uniqid());
     }
 }
+
 
 

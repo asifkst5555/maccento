@@ -14,6 +14,7 @@ class ClientProjectMedia extends Model
         'client_project_id',
         'uploaded_by',
         'type',
+        'delivery_stage',
         'disk',
         'path',
         'watermark_disk',
@@ -27,6 +28,11 @@ class ClientProjectMedia extends Model
     protected $casts = [
         'size_bytes' => 'integer',
     ];
+
+    public function deliveryStage(): string
+    {
+        return (string) ($this->delivery_stage ?: ($this->type === 'final_zip' ? 'final_zip' : 'raw'));
+    }
 
     public function project(): BelongsTo
     {

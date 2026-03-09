@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Client;
 use App\Models\ClientProject;
+use App\Models\ClientProjectAssignment;
 use App\Models\ClientProjectMedia;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -37,6 +38,12 @@ class MediaDeliveryAccessTest extends TestCase
             'client_id' => $client->id,
             'title' => 'Listing Shoot',
             'status' => 'accepted',
+        ]);
+
+        ClientProjectAssignment::query()->create([
+            'client_project_id' => $project->id,
+            'user_id' => $user->id,
+            'assigned_by' => $user->id,
         ]);
 
         $file = UploadedFile::fake()->create('delivery.zip', 128, 'application/zip');

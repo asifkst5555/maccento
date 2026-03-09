@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ClientProject extends Model
@@ -68,6 +69,23 @@ class ClientProject extends Model
     public function serviceRequests(): HasMany
     {
         return $this->hasMany(ClientServiceRequest::class);
+    }
+
+    public function assignments(): HasMany
+    {
+        return $this->hasMany(ClientProjectAssignment::class);
+    }
+
+    public function assignedUsers(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'client_project_assignments')
+            ->withPivot('assigned_by')
+            ->withTimestamps();
+    }
+
+    public function comments(): HasMany
+    {
+        return $this->hasMany(ClientProjectComment::class)->latest('id');
     }
 
     public function isFullyPaid(): bool

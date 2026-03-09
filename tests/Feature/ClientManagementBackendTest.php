@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Client;
 use App\Models\ClientMessage;
 use App\Models\ClientProject;
+use App\Models\ClientProjectComment;
 use App\Models\ClientServiceRequest;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -146,5 +147,101 @@ class ClientManagementBackendTest extends TestCase
         $this->assertSame('new', $serviceRequest->status);
         $this->assertDatabaseCount('client_invoices', 0);
         $this->assertDatabaseCount('client_messages', 0);
+    }
+
+    public function test_admin_can_create_project_with_optional_team_assignments(): void
+    {
+        $admin = User::query()->create([
+            'name' => 'Admin User',
+            'email' => 'admin@example.com',
+            'password' => bcrypt('secret123'),
+            'role' => 'admin',
+            'status' => 'active',
+        ]);
+
+        $photographer = User::query()->create([
+            'name' => 'Photo User',
+            'email' => 'photo@example.com',
+            'password' => bcrypt('secret123'),
+            'role' => 'photographer',
+            'status' => 'active',
+        ]);
+
+        $editor = User::query()->create([
+            'name' => 'Editor User',
+            'email' => 'editor@example.com',
+            'password' => bcrypt('secret123'),
+            'role' => 'editor',
+            'status' => 'active',
+        ]);
+
+        $client = Client::query()->create([
+            'name' => 'Primary Client',
+            'email' => 'primary@example.com',
+            'status' => 'active',
+        ]);
+
+        $response = $this
+            ->actingAs($admin)
+            ->post(route('admin.clients.projects.store', $client), [
+                'title' => 'Assigned Project',
+                'service_type' => 'photo,video',
+                'status' => 'accepted',
+                'assigned_user_ids' => [$photographer->id, $editor->id],
+            ]);
+
+        $response->assertRedirect();
+
+        $project = ClientProject::query()->where('title', 'Assigned Project')->firstOrFail();
+
+        $this->assertDatabaseHas('client_project_assignments', [
+            'client_project_id' => $project->id,
+            'user_id' => $photographer->id,
+        ]);
+
+        $this->assertDatabaseHas('client_project_assignments', [
+            'client_project_id' => $project->id,
+            'user_id' => $editor->id,
+        ]);
+    }
+
+    public function test_client_can_post_project_comment_in_portal(): void
+    {
+        $clientUser = User::query()->create([
+            'name' => 'Client User',
+            'email' => 'client@example.com',
+            'password' => bcrypt('secret123'),
+            'role' => 'client',
+            'status' => 'active',
+        ]);
+
+        $client = Client::query()->create([
+            'user_id' => $clientUser->id,
+            'name' => 'Primary Client',
+            'email' => 'client@example.com',
+            'status' => 'active',
+        ]);
+
+        $project = ClientProject::query()->create([
+            'client_id' => $client->id,
+            'title' => 'Client Project',
+            'status' => 'accepted',
+        ]);
+
+        $response = $this
+            ->actingAs($clientUser)
+            ->from(route('user.projects.show', $project))
+            ->post(route('user.projects.comments.store', $project), [
+                'body' => 'Client posted a project comment.',
+            ]);
+
+        $response->assertRedirect(route('user.projects.show', $project));
+
+        $this->assertDatabaseHas('client_project_comments', [
+            'client_project_id' => $project->id,
+            'user_id' => $clientUser->id,
+            'sender_role' => 'client',
+            'body' => 'Client posted a project comment.',
+        ]);
     }
 }

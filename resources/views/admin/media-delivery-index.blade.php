@@ -171,19 +171,56 @@
   </div>
 
   <div class="panel-stack">
+    @if($isScopedMediaUser)
+    <p class="panel-muted">Showing only projects assigned to you. Uploads are stored under each project in your role and user folder.</p>
+    @endif
     @forelse($projects as $project)
     @php
-      $galleryItems = $project->media->whereIn('type', ['image', 'video'])->values();
-      $galleryPreviewItems = $galleryItems->take(2);
+      $rawItems = $project->media->filter(fn ($item) => in_array($item->type, ['image', 'video'], true) && (($item->delivery_stage ?? null) !== 'edited'))->values();
+      $editedItems = $project->media->filter(fn ($item) => in_array($item->type, ['image', 'video'], true) && (($item->delivery_stage ?? null) === 'edited'))->values();
+      $galleryItems = $rawItems->concat($editedItems)->values();
       $zipItems = $project->media->where('type', 'final_zip')->values();
       $isPaid = $project->invoices->contains(fn($invoice) => $invoice->status === 'paid');
-      $projectGalleryPayload = $galleryPayloadByProject[$project->id] ?? [];
+      $preferredPreviewItems = $editedItems->isNotEmpty() ? $editedItems : $rawItems;
+      $projectGalleryPayload = $preferredPreviewItems->map(function ($item) use ($project) {
+        return [
+          'id' => (int) $item->id,
+          'name' => (string) $item->original_name,
+          'type' => (string) $item->type,
+          'mime' => (string) ($item->mime_type ?? ''),
+          'url' => route('admin.projects.media.view', ['project' => $project, 'media' => $item]),
+        ];
+      })->all();
+      $rawGalleryPayload = $rawItems->map(function ($item) use ($project) {
+        return [
+          'id' => (int) $item->id,
+          'name' => (string) $item->original_name,
+          'type' => (string) $item->type,
+          'mime' => (string) ($item->mime_type ?? ''),
+          'url' => route('admin.projects.media.view', ['project' => $project, 'media' => $item]),
+        ];
+      })->all();
+      $editedGalleryPayload = $editedItems->map(function ($item) use ($project) {
+        return [
+          'id' => (int) $item->id,
+          'name' => (string) $item->original_name,
+          'type' => (string) $item->type,
+          'mime' => (string) ($item->mime_type ?? ''),
+          'url' => route('admin.projects.media.view', ['project' => $project, 'media' => $item]),
+        ];
+      })->all();
     @endphp
     <article class="panel-card media-project-card" data-project-media-card="{{ $project->id }}" data-project-id="{{ $project->id }}">
+      @php
+        $assignmentIds = $project->assignments->pluck('user_id')->map(static fn ($id): int => (int) $id)->all();
+        $canUploadProjectMedia = ($canUploadMedia ?? false) && (!($isScopedMediaUser ?? false) || in_array((int) auth()->id(), $assignmentIds, true));
+      @endphp
       <div class="panel-form-row media-project-header" style="justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap;">
         <x-project-media-summary
           :project="$project"
           :gallery-count="$galleryItems->count()"
+          :raw-count="$rawItems->count()"
+          :edited-count="$editedItems->count()"
           :zip-count="$zipItems->count()"
           :is-paid="$isPaid"
           :show-client="true"
@@ -192,7 +229,7 @@
           <button class="panel-btn panel-btn-primary media-project-toggle" type="button" data-project-toggle aria-expanded="true" aria-label="Toggle project details" style="color: #fff; border-color: #a8162a;">
             <svg class="media-project-toggle-icon" viewBox="0 0 24 24" aria-hidden="true" style="width: 32px; height: 32px; color: #fff;"><path d="M8 10l4 4 4-4" fill="none" stroke="#ffffff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </button>
-          @if($galleryItems->isNotEmpty())
+          @if($preferredPreviewItems->isNotEmpty())
           <button
             class="panel-btn panel-btn-primary"
             type="button"
@@ -215,119 +252,153 @@
 
       <div class="media-project-details" data-project-details>
 
-      @if($canManageMedia)
-      <div class="media-delivery-upload-grid">
-        <article class="media-delivery-upload-card">
-          <h4 class="panel-section-title">Gallery Upload</h4>
-          <form method="post" action="{{ route('admin.projects.media.store', $project) }}" class="panel-stack" enctype="multipart/form-data">
-            @csrf
-            <label class="panel-muted">Upload Gallery Images/Videos</label>
-            <input class="panel-input" type="file" name="media_files[]" accept="image/*,video/*" multiple required>
-            <button class="panel-btn panel-btn-primary" type="submit">Upload Gallery</button>
-          </form>
-        </article>
+      @if($canUploadProjectMedia)
+      <div class="media-stage-section">
+        <div class="media-delivery-upload-grid">
+          <article class="media-delivery-upload-card">
+            <h4 class="panel-section-title">Raw Media Gallery</h4>
+            <form method="post" action="{{ route('admin.projects.media.store', $project) }}" class="panel-stack" enctype="multipart/form-data">
+              @csrf
+              <input type="hidden" name="media_stage" value="raw">
+              <label class="panel-muted">Upload Raw Footage Media</label>
+              <input class="panel-input" type="file" name="media_files[]" accept="image/*,video/*" multiple required>
+              <button class="panel-btn panel-btn-primary" type="submit">Upload Raw Footage</button>
+            </form>
+          </article>
 
-        <article class="media-delivery-upload-card">
-          <h4 class="panel-section-title">Final ZIP Upload</h4>
-          <form method="post" action="{{ route('admin.projects.delivery-zip.store', $project) }}" class="panel-stack" enctype="multipart/form-data">
-            @csrf
-            <label class="panel-muted">Upload Final Delivery ZIP</label>
-            <input class="panel-input" type="file" name="delivery_zip" accept=".zip,application/zip" required>
-            <button class="panel-btn" type="submit">Upload Final ZIP</button>
-          </form>
-        </article>
+          <section class="panel-card media-file-list-card">
+            <h4 class="panel-section-title">Raw Footage Media</h4>
+            <div class="media-file-list">
+              @forelse($rawItems as $index => $mediaItem)
+              @php
+                $mediaName = $mediaItem->original_name;
+              @endphp
+              <article class="media-file-row @if($index >= 2) is-hidden-by-default @endif" data-gallery-row>
+                <div class="media-file-meta">
+                  <span class="media-file-kind">{{ strtoupper($mediaItem->type) }}</span>
+                  <span class="media-file-name">{{ $mediaName }}</span>
+                  <span class="panel-muted">Uploaded by {{ $mediaItem->uploader?->name ?: 'System' }} @if($mediaItem->uploader?->role)&bull; {{ ucfirst($mediaItem->uploader->role) }} @endif</span>
+                </div>
+                <div class="media-file-actions">
+                  <a class="panel-link" href="{{ route('admin.projects.media.view', ['project' => $project, 'media' => $mediaItem]) }}" target="_blank" rel="noopener">View</a>
+                  @if($canDeleteMedia)
+                  <form method="post" action="{{ route('admin.projects.media.delete', ['project' => $project, 'media' => $mediaItem]) }}" data-delete-form data-delete-name="{{ $mediaItem->original_name }}">
+                    @csrf
+                    <button class="panel-btn panel-btn-danger panel-btn-icon" type="button" data-delete-trigger title="Delete media" aria-label="Delete media"><span class="panel-icon-trash" aria-hidden="true"><svg viewBox="0 0 20 20"><path d="M5 6h10M8 6V4h4v2m-6 0l.5 9h7L14 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span></button>
+                  </form>
+                  @endif
+                </div>
+              </article>
+              @empty
+              <p class="panel-muted">No raw footage media yet.</p>
+              @endforelse
+              @if($rawItems->count() > 2)
+              <div class="panel-form-row media-file-list-cta media-file-list-cta-group">
+                <button class="panel-btn" type="button" data-gallery-list-toggle aria-expanded="false">Show All Raw Media ({{ $rawItems->count() }})</button>
+                <button class="panel-btn panel-btn-primary" type="button" data-gallery-open data-project-id="{{ $project->id }}" data-gallery-items='@json($rawGalleryPayload)'>View Raw Footage ({{ $rawItems->count() }})</button>
+              </div>
+              @endif
+            </div>
+          </section>
+        </div>
       </div>
       @endif
 
-      <div class="panel-grid media-delivery-files-grid">
-        <section class="panel-card media-file-list-card">
-          <h4 class="panel-section-title">Gallery Files</h4>
-          <div class="media-file-list">
-            @forelse($galleryItems as $index => $mediaItem)
-            @php
-              $mediaName = $mediaItem->original_name;
-              if (preg_match('/Ã.|Â|â€|â€“|â€”/u', (string) $mediaName)) {
-                $decodedName = @iconv('Windows-1252', 'UTF-8//IGNORE', (string) $mediaName);
-                if (is_string($decodedName) && $decodedName !== '') {
-                  $mediaName = $decodedName;
-                }
-              }
-            @endphp
-            <article class="media-file-row @if($index >= 2) is-hidden-by-default @endif" data-gallery-row>
-              <div class="media-file-meta">
-                <span class="media-file-kind">{{ strtoupper($mediaItem->type) }}</span>
-                <span class="media-file-name">{{ $mediaName }}</span>
-              </div>
-              <div class="media-file-actions">
-                <a class="panel-link" href="{{ route('admin.projects.media.view', ['project' => $project, 'media' => $mediaItem]) }}" target="_blank" rel="noopener">View</a>
-                @if($canManageMedia)
-                <form method="post" action="{{ route('admin.projects.media.delete', ['project' => $project, 'media' => $mediaItem]) }}" data-delete-form data-delete-name="{{ $mediaItem->original_name }}">
-                  @csrf
-                  <button class="panel-btn panel-btn-danger panel-btn-icon" type="button" data-delete-trigger title="Delete media" aria-label="Delete media"><span class="panel-icon-trash" aria-hidden="true"><svg viewBox="0 0 20 20"><path d="M5 6h10M8 6V4h4v2m-6 0l.5 9h7L14 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span></button>
-                </form>
-                @endif
-              </div>
-            </article>
-            @empty
-            <p class="panel-muted">No gallery files yet.</p>
-            @endforelse
-            @if($galleryItems->count() > 2)
-            <div class="panel-form-row media-file-list-cta media-file-list-cta-group">
-              <button
-                class="panel-btn"
-                type="button"
-                data-gallery-list-toggle
-                aria-expanded="false"
-              >
-                Show All Media List ({{ $galleryItems->count() }})
-              </button>
-              <button
-                class="panel-btn panel-btn-primary"
-                type="button"
-                data-gallery-open
-                data-project-id="{{ $project->id }}"
-                data-gallery-items='@json($projectGalleryPayload)'
-              >
-                View All Gallery Files ({{ $galleryItems->count() }})
-              </button>
-            </div>
-            @endif
-          </div>
-        </section>
+      <div class="media-stage-section">
+        <div class="media-delivery-upload-grid">
+          @if($canUploadProjectMedia)
+          <article class="media-delivery-upload-card">
+            <h4 class="panel-section-title">Edited/Final Media Upload</h4>
+            <form method="post" action="{{ route('admin.projects.media.store', $project) }}" class="panel-stack" enctype="multipart/form-data">
+              @csrf
+              <input type="hidden" name="media_stage" value="edited">
+              <label class="panel-muted">Upload Edited/Final Media Files</label>
+              <input class="panel-input" type="file" name="media_files[]" accept="image/*,video/*" multiple required>
+              <button class="panel-btn panel-btn-primary" type="submit">Upload Edited/Final Media</button>
+            </form>
+          </article>
+          @endif
 
-        <section class="panel-card media-file-list-card">
-          <h4 class="panel-section-title">Final Delivery ZIP</h4>
-          <div class="media-file-list">
-            @forelse($zipItems as $zipItem)
-            @php
-              $zipName = $zipItem->original_name;
-              if (preg_match('/Ã.|Â|â€|â€“|â€”/u', (string) $zipName)) {
-                $decodedZipName = @iconv('Windows-1252', 'UTF-8//IGNORE', (string) $zipName);
-                if (is_string($decodedZipName) && $decodedZipName !== '') {
-                  $zipName = $decodedZipName;
-                }
-              }
-            @endphp
-            <article class="media-file-row">
-              <div class="media-file-meta">
-                <span class="media-file-kind">ZIP</span>
-                <span class="media-file-name">{{ $zipName }}</span>
+          <section class="panel-card media-file-list-card">
+            <h4 class="panel-section-title">Edited/Final Media Files</h4>
+            <div class="media-file-list">
+              @forelse($editedItems as $index => $mediaItem)
+              @php
+                $mediaName = $mediaItem->original_name;
+              @endphp
+              <article class="media-file-row @if($index >= 2) is-hidden-by-default @endif" data-gallery-row>
+                <div class="media-file-meta">
+                  <span class="media-file-kind">{{ strtoupper($mediaItem->type) }}</span>
+                  <span class="media-file-name">{{ $mediaName }}</span>
+                  <span class="panel-muted">Uploaded by {{ $mediaItem->uploader?->name ?: 'System' }} @if($mediaItem->uploader?->role)&bull; {{ ucfirst($mediaItem->uploader->role) }} @endif</span>
+                </div>
+                <div class="media-file-actions">
+                  <a class="panel-link" href="{{ route('admin.projects.media.view', ['project' => $project, 'media' => $mediaItem]) }}" target="_blank" rel="noopener">View</a>
+                  @if($canDeleteMedia)
+                  <form method="post" action="{{ route('admin.projects.media.delete', ['project' => $project, 'media' => $mediaItem]) }}" data-delete-form data-delete-name="{{ $mediaItem->original_name }}">
+                    @csrf
+                    <button class="panel-btn panel-btn-danger panel-btn-icon" type="button" data-delete-trigger title="Delete media" aria-label="Delete media"><span class="panel-icon-trash" aria-hidden="true"><svg viewBox="0 0 20 20"><path d="M5 6h10M8 6V4h4v2m-6 0l.5 9h7L14 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span></button>
+                  </form>
+                  @endif
+                </div>
+              </article>
+              @empty
+              <p class="panel-muted">No edited/final media files yet.</p>
+              @endforelse
+              @if($editedItems->count() > 2)
+              <div class="panel-form-row media-file-list-cta media-file-list-cta-group">
+                <button class="panel-btn" type="button" data-gallery-list-toggle aria-expanded="false">Show All Edited/Final Media ({{ $editedItems->count() }})</button>
+                <button class="panel-btn panel-btn-primary" type="button" data-gallery-open data-project-id="{{ $project->id }}" data-gallery-items='@json($editedGalleryPayload)'>View Edited/Final Media ({{ $editedItems->count() }})</button>
               </div>
-              <div class="media-file-actions">
-                <a class="panel-link" href="{{ route('admin.projects.media.view', ['project' => $project, 'media' => $zipItem]) }}" target="_blank" rel="noopener">View ZIP</a>
-                @if($canManageMedia)
-                <form method="post" action="{{ route('admin.projects.media.delete', ['project' => $project, 'media' => $zipItem]) }}" data-delete-form data-delete-name="{{ $zipItem->original_name }}">
-                  @csrf
-                  <button class="panel-btn panel-btn-danger panel-btn-icon" type="button" data-delete-trigger title="Delete ZIP" aria-label="Delete ZIP"><span class="panel-icon-trash" aria-hidden="true"><svg viewBox="0 0 20 20"><path d="M5 6h10M8 6V4h4v2m-6 0l.5 9h7L14 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span></button>
-                </form>
-                @endif
-              </div>
-            </article>
-            @empty
-            <p class="panel-muted">No final ZIP uploaded yet.</p>
-            @endforelse
-          </div>
-        </section>
+              @endif
+            </div>
+          </section>
+        </div>
+      </div>
+
+      <div class="media-stage-section">
+        <div class="media-delivery-upload-grid">
+          @if($canUploadProjectMedia)
+          <article class="media-delivery-upload-card">
+            <h4 class="panel-section-title">Final ZIP Upload</h4>
+            <form method="post" action="{{ route('admin.projects.delivery-zip.store', $project) }}" class="panel-stack" enctype="multipart/form-data">
+              @csrf
+              <label class="panel-muted">Upload Final Delivery ZIP</label>
+              <input class="panel-input" type="file" name="delivery_zip" accept=".zip,application/zip" required>
+              <button class="panel-btn" type="submit">Upload Final ZIP</button>
+            </form>
+          </article>
+          @endif
+
+          <section class="panel-card media-file-list-card">
+            <h4 class="panel-section-title">Final Delivery ZIP</h4>
+            <div class="media-file-list">
+              @forelse($zipItems as $zipItem)
+              @php
+                $zipName = $zipItem->original_name;
+              @endphp
+              <article class="media-file-row">
+                <div class="media-file-meta">
+                  <span class="media-file-kind">ZIP</span>
+                  <span class="media-file-name">{{ $zipName }}</span>
+                  <span class="panel-muted">Uploaded by {{ $zipItem->uploader?->name ?: 'System' }} @if($zipItem->uploader?->role)&bull; {{ ucfirst($zipItem->uploader->role) }} @endif</span>
+                </div>
+                <div class="media-file-actions">
+                  <a class="panel-link" href="{{ route('admin.projects.media.view', ['project' => $project, 'media' => $zipItem]) }}" target="_blank" rel="noopener">View ZIP</a>
+                  @if($canDeleteMedia)
+                  <form method="post" action="{{ route('admin.projects.media.delete', ['project' => $project, 'media' => $zipItem]) }}" data-delete-form data-delete-name="{{ $zipItem->original_name }}">
+                    @csrf
+                    <button class="panel-btn panel-btn-danger panel-btn-icon" type="button" data-delete-trigger title="Delete ZIP" aria-label="Delete ZIP"><span class="panel-icon-trash" aria-hidden="true"><svg viewBox="0 0 20 20"><path d="M5 6h10M8 6V4h4v2m-6 0l.5 9h7L14 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span></button>
+                  </form>
+                  @endif
+                </div>
+              </article>
+              @empty
+              <p class="panel-muted">No final ZIP uploaded yet.</p>
+              @endforelse
+            </div>
+          </section>
+        </div>
       </div>
       </div>
     </article>
@@ -338,7 +409,7 @@
 
   <x-panel-pagination :paginator="$projects" />
 
-  @if(!$canManageMedia)
+  @if(!$canUploadMedia)
   <p class="panel-muted" style="margin-top: 1rem;">Your role is read-only for media uploads. Contact an admin/owner/manager to upload files.</p>
   @endif
 </section>

@@ -48,6 +48,9 @@ Route::middleware('auth')->group(function (): void {
         Route::post('/admin/projects', [DashboardController::class, 'adminProjectStore'])->name('admin.projects.store');
         Route::get('/admin/media-delivery', [DashboardController::class, 'adminMediaDeliveryIndex'])->name('admin.media-delivery.index');
         Route::get('/admin/projects/{project}/media/{media}/view', [DashboardController::class, 'adminProjectMediaView'])->name('admin.projects.media.view');
+        Route::post('/admin/projects/{project}/comments', [DashboardController::class, 'adminProjectCommentStore'])->name('admin.projects.comments.store');
+        Route::post('/admin/projects/{project}/media', [DashboardController::class, 'adminProjectMediaStore'])->name('admin.projects.media.store');
+        Route::post('/admin/projects/{project}/delivery-zip', [DashboardController::class, 'adminProjectDeliveryZipStore'])->name('admin.projects.delivery-zip.store');
         Route::get('/admin/clients', [DashboardController::class, 'adminClientsIndex'])->name('admin.clients.index');
         Route::get('/admin/clients/{client}', [DashboardController::class, 'adminClientShow'])->name('admin.clients.show');
     });
@@ -83,9 +86,8 @@ Route::middleware('auth')->group(function (): void {
         Route::post('/admin/clients', [DashboardController::class, 'adminClientStore'])->name('admin.clients.store');
         Route::post('/admin/clients/{client}/projects', [DashboardController::class, 'adminClientProjectStore'])->name('admin.clients.projects.store');
         Route::post('/admin/projects/{project}/status', [DashboardController::class, 'adminClientProjectStatusUpdate'])->name('admin.projects.status');
-        Route::post('/admin/projects/{project}/media', [DashboardController::class, 'adminProjectMediaStore'])->name('admin.projects.media.store');
+        Route::post('/admin/projects/{project}/assignments', [DashboardController::class, 'adminProjectAssignmentsUpdate'])->name('admin.projects.assignments.update');
         Route::post('/admin/projects/{project}/media/{media}/delete', [DashboardController::class, 'adminProjectMediaDestroy'])->name('admin.projects.media.delete');
-        Route::post('/admin/projects/{project}/delivery-zip', [DashboardController::class, 'adminProjectDeliveryZipStore'])->name('admin.projects.delivery-zip.store');
         Route::get('/admin/media-delivery/watermark', [DashboardController::class, 'adminMediaWatermarkSettingsIndex'])->name('admin.media-delivery.watermark.index');
         Route::get('/admin/media-delivery/watermark/logo', [DashboardController::class, 'adminMediaWatermarkLogoView'])->name('admin.media-delivery.watermark.logo');
         Route::post('/admin/media-delivery/watermark', [DashboardController::class, 'adminMediaWatermarkSettingsUpdate'])->name('admin.media-delivery.watermark.update');
@@ -133,6 +135,7 @@ Route::middleware('auth')->group(function (): void {
         Route::get('/user/invoices/{invoice}/download', [DashboardController::class, 'userInvoicePdfDownload'])->name('user.invoices.download');
         Route::get('/user/quotes/{quote}', [DashboardController::class, 'userQuoteShow'])->name('user.quotes.show');
         Route::post('/user/quotes/{quote}/revision-request', [DashboardController::class, 'userQuoteRevisionRequest'])->name('user.quotes.revision-request');
+        Route::post('/user/projects/{project}/comments', [DashboardController::class, 'userProjectCommentStore'])->name('user.projects.comments.store');
         Route::get('/user/projects/{project}/media/{media}/preview', [DashboardController::class, 'userProjectMediaPreview'])->name('user.projects.media.preview');
         Route::get('/user/projects/{project}/media/{media}/download', [DashboardController::class, 'userProjectMediaDownload'])->name('user.projects.media.download');
         Route::get('/user/projects/{project}/download-zip', [DashboardController::class, 'userProjectMediaZipDownload'])->name('user.projects.media.download-zip');

@@ -220,22 +220,49 @@
     </article>
   </section>
 
-  <section class="panel-card client-portal-stack">
-    <h2 class="panel-section-title">Project Conversation</h2>
-    @forelse($project->messages as $message)
-      <div class="panel-chat-item {{ $message->sender_role === 'client' ? 'is-user' : 'is-assistant' }}">
-        <p class="panel-chat-role">
-          {{ strtoupper($message->sender_role) }}
-          @if($message->sender)
-            &bull; {{ $message->sender->name }}
-          @endif
-        </p>
-        <p class="panel-chat-text">{{ $message->message }}</p>
-        <p class="panel-muted">{{ $message->sent_at?->format('Y-m-d H:i') ?: $message->created_at?->format('Y-m-d H:i') }}</p>
+  <section class="project-team-grid">
+    <article class="panel-card project-team-card">
+      <h2 class="panel-section-title">Assigned Team</h2>
+      <div class="project-assignee-list">
+        @forelse($project->assignments as $assignment)
+          <span class="project-assignee-chip">
+            <span>{{ $assignment->user?->name ?: 'Unknown team member' }}</span>
+            <span class="project-assignee-role">{{ ucfirst($assignment->user?->role ?: 'staff') }}</span>
+          </span>
+        @empty
+          <span class="panel-muted">No team members are assigned to this project yet.</span>
+        @endforelse
       </div>
-    @empty
-      <div class="client-portal-empty">No project conversation is available yet.</div>
-    @endforelse
+    </article>
+
+    <article class="panel-card project-discussion-card">
+      <h2 class="panel-section-title">Project Discussion</h2>
+      <div class="project-discussion-stream">
+        @forelse($project->comments->sortBy('id') as $comment)
+          <article class="project-comment-card {{ $comment->sender_role === 'client' ? '' : 'is-internal' }}">
+            <div class="project-comment-head">
+              <div class="project-comment-author">
+                <span class="project-comment-avatar">{{ \Illuminate\Support\Str::upper(\Illuminate\Support\Str::substr($comment->user?->name ?: ($comment->sender_role ?: 'U'), 0, 2)) }}</span>
+                <div>
+                  <p class="project-comment-name">{{ $comment->user?->name ?: ucfirst($comment->sender_role) }}</p>
+                  <p class="project-comment-meta">{{ ucfirst(str_replace('_', ' ', $comment->sender_role)) }}</p>
+                </div>
+              </div>
+              <span class="project-comment-time">{{ $comment->created_at?->format('M j, Y g:i A') }}</span>
+            </div>
+            <p class="project-comment-body">{{ $comment->body }}</p>
+          </article>
+        @empty
+          <div class="client-portal-empty">No project discussion is available yet.</div>
+        @endforelse
+      </div>
+
+      <form method="post" action="{{ route('user.projects.comments.store', $project) }}" class="project-discussion-form">
+        @csrf
+        <textarea class="panel-textarea" name="body" placeholder="Write a comment for the project team" required>{{ old('body') }}</textarea>
+        <button class="panel-btn panel-btn-primary" type="submit">Post Comment</button>
+      </form>
+    </article>
   </section>
 </div>
 
