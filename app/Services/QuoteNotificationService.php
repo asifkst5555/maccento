@@ -22,6 +22,10 @@ class QuoteNotificationService
         $clientEmail = (string) data_get($quoteBuild->options, 'contact_email', '');
         $clientName = (string) data_get($quoteBuild->options, 'contact_name', 'Client');
         $adminEmail = (string) env('QUOTE_ADMIN_EMAIL', (string) config('mail.from.address'));
+        $replyTo = trim((string) env('SENDGRID_INBOUND_REPLY_TO', ''));
+        if ($replyTo === '') {
+            $replyTo = 'crm@reply.maccento.ca';
+        }
         $threadProjectId = ClientProject::query()->where('quote_build_id', $quoteBuild->id)->value('id');
         $clientSubject = $this->appendProjectThreadTag("Maccento Quote {$quoteBuild->quote_id}", $threadProjectId ? (int) $threadProjectId : null);
         $adminSubject = $this->appendProjectThreadTag("New Quote Submission {$quoteBuild->quote_id}", $threadProjectId ? (int) $threadProjectId : null);
@@ -50,6 +54,7 @@ class QuoteNotificationService
                     ctaUrl: null,
                     footerNote: 'If you need updates, simply reply to this email and our team will help.',
                     threadProjectId: $threadProjectId ? (int) $threadProjectId : null,
+                    replyToAddress: $replyTo,
                 ));
             }
 
