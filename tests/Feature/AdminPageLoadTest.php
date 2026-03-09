@@ -109,6 +109,7 @@ class AdminPageLoadTest extends TestCase
             route('admin.emails.automation.index'),
             route('admin.leads.index'),
             route('admin.quotes.index'),
+            route('admin.messages.index'),
         ];
 
         foreach ($routes as $url) {

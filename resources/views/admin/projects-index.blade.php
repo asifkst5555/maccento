@@ -147,6 +147,24 @@
     margin-bottom: 6px;
   }
 
+  .corp-admin-shell .project-create-assignment-block {
+    gap: 0.7rem;
+    padding: 0.9rem 1rem;
+    border: 1px solid #d8e2ef;
+    border-radius: 12px;
+    background: linear-gradient(180deg, #fbfdff 0%, #f3f7fc 100%);
+  }
+
+  .corp-admin-shell .project-team-select {
+    min-height: 154px;
+    padding-right: 14px !important;
+    background-image: none !important;
+  }
+
+  .corp-admin-shell .project-team-select option {
+    padding: 0.55rem 0.7rem;
+  }
+
   @media (max-width: 1024px) {
     .corp-admin-shell .panel-sticky-filters {
       position: static;
@@ -243,6 +261,19 @@
         <select class="panel-select" name="status" required>
           @foreach($projectStatuses as $status)
           <option value="{{ $status }}" @selected(old('status', 'accepted') === $status)>{{ ucfirst($status) }}</option>
+          @endforeach
+        </select>
+      </div>
+      <div class="panel-stack project-create-assignment-block">
+        <div>
+          <h3 class="panel-section-title" style="margin-bottom: 6px;">Assign Project Team</h3>
+          <p class="panel-muted" style="margin: 0;">Optional. Assign one or more internal users like manager, photographer, or editor right away.</p>
+        </div>
+        <select class="panel-select project-team-select" name="assigned_user_ids[]" multiple size="6">
+          @foreach($assignableUsers as $assignableUser)
+          <option value="{{ $assignableUser->id }}" @selected(collect(old('assigned_user_ids', []))->contains((string) $assignableUser->id) || collect(old('assigned_user_ids', []))->contains($assignableUser->id))>
+            {{ $assignableUser->name }} @if($assignableUser->role) - {{ ucfirst($assignableUser->role) }} @endif
+          </option>
           @endforeach
         </select>
       </div>

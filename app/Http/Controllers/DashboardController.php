@@ -8,6 +8,7 @@ use App\Models\Client;
 use App\Models\ClientInvoice;
 use App\Models\ClientMessage;
 use App\Models\ClientProject;
+use App\Models\ClientProjectAssignment;
 use App\Models\ClientProjectComment;
 use App\Models\ClientProjectMedia;
 use App\Models\ClientServiceRequest;
@@ -623,6 +624,7 @@ class DashboardController extends Controller
             'projectStatuses' => $allowedStatuses,
             'canManageProjects' => $canManageProjects,
             'projectClients' => $projectClients,
+            'assignableUsers' => $this->assignableProjectUsers(),
         ]);
     }
 
@@ -639,6 +641,8 @@ class DashboardController extends Controller
             'due_at' => ['nullable', 'date'],
             'status' => ['required', 'in:accepted,shooting,editing,complete'],
             'notes' => ['nullable', 'string', 'max:2000'],
+            'assigned_user_ids' => ['nullable', 'array'],
+            'assigned_user_ids.*' => ['integer', 'exists:users,id'],
         ]);
 
         if (!blank($validated['scheduled_at'] ?? null) && !blank($validated['due_at'] ?? null)) {
@@ -658,6 +662,19 @@ class DashboardController extends Controller
             'status' => $validated['status'],
             'notes' => $validated['notes'] ?? null,
         ]);
+
+        $assignmentIds = $this->sanitizeAssignableUserIds((array) ($validated['assigned_user_ids'] ?? []));
+        if ($assignmentIds !== []) {
+            $assignmentRows = array_map(fn (int $userId): array => [
+                'client_project_id' => $project->id,
+                'user_id' => $userId,
+                'assigned_by' => (int) ($request->user()?->id ?? 0),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ], $assignmentIds);
+
+            ClientProjectAssignment::query()->insert($assignmentRows);
+        }
 
         return redirect()
             ->route('admin.clients.show', ['client' => (int) $validated['client_id'], 'project_id' => $project->id])
@@ -2283,8 +2300,8 @@ class DashboardController extends Controller
 
         $activeClient = $clientId > 0
             ? Client::query()->with(['projects' => function ($query): void {
-                $query->latest('id')->get(['id', 'client_id', 'title', 'status']);
-            }])->find($clientId, ['id', 'name', 'email', 'status', 'company', 'phone'])
+                $query->latest('id');
+            }])->find($clientId)
             : null;
 
         $activeMessages = collect();
@@ -2311,10 +2328,10 @@ class DashboardController extends Controller
 
         $clients = Client::query()
             ->with(['projects' => function ($query): void {
-                $query->latest('id')->get(['id', 'client_id', 'title', 'status']);
+                $query->latest('id');
             }])
             ->orderBy('name')
-            ->get(['id', 'name', 'email', 'status']);
+            ->get();
 
         return view('admin.client-messages-index', [
             'clients' => $clients,
@@ -2556,6 +2573,32 @@ class DashboardController extends Controller
         $stageLabel = $mediaStage === 'edited' ? 'edited/final media' : 'raw footage media';
 
         return back()->with('status', "{$saved} {$stageLabel} file(s) uploaded.");
+    }
+
+    public function adminProjectRawZipStore(Request $request, ClientProject $project): RedirectResponse
+    {
+        $this->ensureInternalUserCanUploadProjectMedia($request, $project);
+
+        $validated = $request->validate([
+            'raw_zip' => ['required', 'file', 'mimes:zip', 'max:1024000'],
+        ]);
+
+        $file = $validated['raw_zip'];
+        $storedPath = $file->store($this->projectMediaUploadPath($project, $request->user(), 'raw-zip'), 'public');
+
+        ClientProjectMedia::create([
+            'client_project_id' => $project->id,
+            'uploaded_by' => $request->user()?->id,
+            'type' => 'raw_zip',
+            'delivery_stage' => 'raw',
+            'disk' => 'public',
+            'path' => $storedPath,
+            'original_name' => (string) ($file->getClientOriginalName() ?: basename($storedPath)),
+            'mime_type' => (string) ($file->getClientMimeType() ?: 'application/zip'),
+            'size_bytes' => (int) $file->getSize(),
+        ]);
+
+        return back()->with('status', 'Raw footage ZIP uploaded.');
     }
 
     public function adminProjectDeliveryZipStore(Request $request, ClientProject $project): RedirectResponse

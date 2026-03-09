@@ -555,10 +555,11 @@
             $assignmentIds = $project->assignments->pluck('user_id')->map(static fn ($id): int => (int) $id)->all();
             $canUploadProjectMedia = $canManagePipeline || (in_array(strtolower(trim((string) auth()->user()?->role)), ['photographer', 'editor'], true) && in_array((int) auth()->id(), $assignmentIds, true));
             $rawItems = $project->media->filter(fn ($item) => in_array($item->type, ['image', 'video'], true) && (($item->delivery_stage ?? null) !== 'edited'))->values();
+      $rawZipItems = $project->media->where('type', 'raw_zip')->values();
             $editedItems = $project->media->filter(fn ($item) => in_array($item->type, ['image', 'video'], true) && (($item->delivery_stage ?? null) === 'edited'))->values();
             $galleryItems = $rawItems->concat($editedItems)->values();
             $zipItems = $project->media->where('type', 'final_zip')->values();
-            $rawCount = $rawItems->count();
+            $rawCount = $rawItems->count() + $rawZipItems->count();
             $editedCount = $editedItems->count();
             $deliveryZipCount = $zipItems->count();
             $isPaid = $project->invoices->contains(fn($invoice) => $invoice->status === 'paid');
@@ -635,6 +636,12 @@
                       <input class="panel-input" type="file" name="media_files[]" accept="image/*,video/*" multiple required>
                       <button class="panel-btn panel-btn-primary" type="submit">Upload Raw Footage</button>
                     </form>
+                    <form method="post" action="{{ route('admin.projects.raw-zip.store', $project) }}" class="panel-stack" enctype="multipart/form-data">
+                      @csrf
+                      <label class="panel-muted">Upload Raw Footage ZIP</label>
+                      <input class="panel-input" type="file" name="raw_zip" accept=".zip,application/zip" required>
+                      <button class="panel-btn" type="submit">Upload Raw ZIP</button>
+                    </form>
                   </article>
 
                   <section class="panel-card media-file-list-card">
@@ -663,6 +670,26 @@
                       @empty
                       <p class="panel-muted">No raw footage media yet.</p>
                       @endforelse
+                      @if($rawZipItems->isNotEmpty())
+                        @foreach($rawZipItems as $rawZipItem)
+                        <article class="media-file-row">
+                          <div class="media-file-meta">
+                            <span class="media-file-kind">RAW ZIP</span>
+                            <span class="media-file-name">{{ $rawZipItem->original_name }}</span>
+                            <span class="panel-muted">Uploaded by {{ $rawZipItem->uploader?->name ?: 'System' }} @if($rawZipItem->uploader?->role)&bull; {{ ucfirst($rawZipItem->uploader->role) }} @endif</span>
+                          </div>
+                          <div class="media-file-actions">
+                            <a class="panel-link" href="{{ route('admin.projects.media.view', ['project' => $project, 'media' => $rawZipItem]) }}" target="_blank" rel="noopener">View ZIP</a>
+                            @if($canManagePipeline)
+                            <form method="post" action="{{ route('admin.projects.media.delete', ['project' => $project, 'media' => $rawZipItem]) }}" data-delete-form data-delete-name="{{ $rawZipItem->original_name }}">
+                              @csrf
+                              <button class="panel-btn panel-btn-danger panel-btn-icon" type="button" data-delete-trigger title="Delete raw ZIP" aria-label="Delete raw ZIP"><span class="panel-icon-trash" aria-hidden="true"><svg viewBox="0 0 20 20"><path d="M5 6h10M8 6V4h4v2m-6 0l.5 9h7L14 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span></button>
+                            </form>
+                            @endif
+                          </div>
+                        </article>
+                        @endforeach
+                      @endif
                       @if($rawItems->count() > 2)
                       <div class="panel-form-row media-file-list-cta media-file-list-cta-group">
                         <button class="panel-btn" type="button" data-gallery-list-toggle aria-expanded="false">Show All Raw Media ({{ $rawItems->count() }})</button>

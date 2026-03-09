@@ -50,6 +50,7 @@ Route::middleware('auth')->group(function (): void {
         Route::get('/admin/projects/{project}/media/{media}/view', [DashboardController::class, 'adminProjectMediaView'])->name('admin.projects.media.view');
         Route::post('/admin/projects/{project}/comments', [DashboardController::class, 'adminProjectCommentStore'])->name('admin.projects.comments.store');
         Route::post('/admin/projects/{project}/media', [DashboardController::class, 'adminProjectMediaStore'])->name('admin.projects.media.store');
+        Route::post('/admin/projects/{project}/raw-zip', [DashboardController::class, 'adminProjectRawZipStore'])->name('admin.projects.raw-zip.store');
         Route::post('/admin/projects/{project}/delivery-zip', [DashboardController::class, 'adminProjectDeliveryZipStore'])->name('admin.projects.delivery-zip.store');
         Route::get('/admin/clients', [DashboardController::class, 'adminClientsIndex'])->name('admin.clients.index');
         Route::get('/admin/clients/{client}', [DashboardController::class, 'adminClientShow'])->name('admin.clients.show');

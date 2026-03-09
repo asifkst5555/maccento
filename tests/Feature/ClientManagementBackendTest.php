@@ -205,6 +205,64 @@ class ClientManagementBackendTest extends TestCase
         ]);
     }
 
+
+    public function test_admin_projects_workspace_create_form_can_assign_team_members(): void
+    {
+        $admin = User::query()->create([
+            'name' => 'Workspace Admin',
+            'email' => 'workspace-admin@example.com',
+            'password' => bcrypt('secret123'),
+            'role' => 'admin',
+            'status' => 'active',
+        ]);
+
+        $manager = User::query()->create([
+            'name' => 'Manager User',
+            'email' => 'manager@example.com',
+            'password' => bcrypt('secret123'),
+            'role' => 'manager',
+            'status' => 'active',
+        ]);
+
+        $photographer = User::query()->create([
+            'name' => 'Shoot User',
+            'email' => 'shoot@example.com',
+            'password' => bcrypt('secret123'),
+            'role' => 'photographer',
+            'status' => 'active',
+        ]);
+
+        $client = Client::query()->create([
+            'name' => 'Workspace Client',
+            'email' => 'workspace-client@example.com',
+            'status' => 'active',
+        ]);
+
+        $response = $this
+            ->actingAs($admin)
+            ->post(route('admin.projects.store'), [
+                'client_id' => $client->id,
+                'title' => 'Workspace Assigned Project',
+                'service_type' => 'photo,drone',
+                'status' => 'accepted',
+                'assigned_user_ids' => [$manager->id, $photographer->id],
+            ]);
+
+        $response->assertRedirect();
+
+        $project = ClientProject::query()->where('title', 'Workspace Assigned Project')->firstOrFail();
+
+        $this->assertDatabaseHas('client_project_assignments', [
+            'client_project_id' => $project->id,
+            'user_id' => $manager->id,
+        ]);
+
+        $this->assertDatabaseHas('client_project_assignments', [
+            'client_project_id' => $project->id,
+            'user_id' => $photographer->id,
+        ]);
+    }
+
     public function test_client_can_post_project_comment_in_portal(): void
     {
         $clientUser = User::query()->create([

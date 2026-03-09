@@ -396,7 +396,7 @@
             href="{{ route('admin.messages.index', ['client_id' => $client->id, 'search' => $filters['search'] ?? null, 'sender_role' => $filters['sender_role'] ?? null]) }}"
             class="messages-thread-item{{ (int) ($activeClient?->id ?? 0) === (int) $client->id ? ' is-active' : '' }}"
           >
-            <div class="messages-thread-avatar">{{ \\Illuminate\\Support\\Str::upper(\\Illuminate\\Support\\Str::substr($client->name ?: 'C', 0, 2)) }}</div>
+            <div class="messages-thread-avatar">{{ strtoupper(substr($client->name ?: 'C', 0, 2)) }}</div>
             <div class="messages-thread-main">
               <div class="messages-thread-row">
                 <h3 class="messages-thread-name">{{ $client->name ?: ('Client #' . $client->id) }}</h3>
@@ -410,7 +410,7 @@
               </p>
               <p class="messages-thread-preview">
                 @if($summary)
-                  <strong>{{ strtoupper($summary->sender_role) }}:</strong> {{ \\Illuminate\\Support\\Str::limit($summary->message, 90) }}
+                  <strong>{{ strtoupper($summary->sender_role) }}:</strong> {{ mb_strimwidth((string) $summary->message, 0, 90, '...') }}
                 @else
                   No direct conversation yet. Start the thread from CRM.
                 @endif

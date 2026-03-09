@@ -167,6 +167,52 @@ class AdminRoleAccessTest extends TestCase
         $this->assertStringContainsString('/edited-final/editor/user-' . $editor->id . '-edit-user/', (string) $media->path);
     }
 
+
+    public function test_assigned_photographer_can_upload_raw_zip_into_role_scoped_project_folder(): void
+    {
+        Storage::fake('public');
+
+        $photographer = User::query()->create([
+            'name' => 'Photo Zip User',
+            'email' => 'photo-zip@example.com',
+            'password' => bcrypt('secret123'),
+            'role' => 'photographer',
+            'status' => 'active',
+        ]);
+
+        $client = Client::query()->create([
+            'name' => 'Client Four',
+            'email' => 'client-four@example.com',
+            'status' => 'active',
+        ]);
+
+        $project = ClientProject::query()->create([
+            'client_id' => $client->id,
+            'title' => 'Raw Zip Project',
+            'status' => 'shooting',
+        ]);
+
+        ClientProjectAssignment::query()->create([
+            'client_project_id' => $project->id,
+            'user_id' => $photographer->id,
+            'assigned_by' => $photographer->id,
+        ]);
+
+        $response = $this
+            ->actingAs($photographer)
+            ->post(route('admin.projects.raw-zip.store', $project), [
+                'raw_zip' => UploadedFile::fake()->create('raw-footage.zip', 128, 'application/zip'),
+            ]);
+
+        $response->assertRedirect();
+
+        $media = ClientProjectMedia::query()->firstOrFail();
+        $this->assertSame($photographer->id, (int) $media->uploaded_by);
+        $this->assertSame('raw_zip', (string) $media->type);
+        $this->assertSame('raw', (string) $media->delivery_stage);
+        $this->assertStringContainsString('/raw-zip/photographer/user-' . $photographer->id . '-photo-zip-user/', (string) $media->path);
+    }
+
     public function test_manager_can_access_watermark_settings(): void
     {
         $manager = User::query()->create([
