@@ -3646,7 +3646,7 @@ class DashboardController extends Controller
                     ->latest('id')
                     ->limit(16)
                     ->get()
-                    ->map(static function (InboundEmail $mail): array {
+                    ->map(static function (InboundEmail $mail) use ($openMessageId): array {
                         $body = trim((string) ($mail->body_text ?? ''));
                         if ($body === '') {
                             $body = trim(strip_tags((string) ($mail->body_html ?? '')));

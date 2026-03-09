@@ -118,4 +118,46 @@ class AdminPageLoadTest extends TestCase
                 ->assertOk();
         }
     }
+
+    public function test_admin_email_inbox_detail_view_loads_successfully(): void
+    {
+        $admin = User::query()->create([
+            'name' => 'Admin User',
+            'email' => 'admin@example.com',
+            'password' => bcrypt('secret123'),
+            'role' => 'admin',
+            'status' => 'active',
+        ]);
+
+        $client = Client::query()->create([
+            'name' => 'Client One',
+            'email' => 'client-one@example.com',
+            'status' => 'active',
+        ]);
+
+        $project = ClientProject::query()->create([
+            'client_id' => $client->id,
+            'title' => 'Main Project',
+            'status' => 'accepted',
+        ]);
+
+        $inbound = InboundEmail::query()->create([
+            'provider' => 'sendgrid',
+            'from_email' => 'client-one@example.com',
+            'to_email' => 'crm@reply.maccento.ca',
+            'subject' => 'Reply [P#' . $project->id . ']',
+            'body_text' => 'Client replied.',
+            'status' => 'linked',
+            'client_id' => $client->id,
+            'client_project_id' => $project->id,
+            'received_at' => now(),
+        ]);
+
+        $this
+            ->actingAs($admin)
+            ->get(route('admin.emails.inbox', ['open_id' => $inbound->id]))
+            ->assertOk()
+            ->assertSee('Reply [P#' . $project->id . ']', false)
+            ->assertSee('Client replied.', false);
+    }
 }
