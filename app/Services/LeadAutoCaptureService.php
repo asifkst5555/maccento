@@ -175,7 +175,10 @@ class LeadAutoCaptureService
         $message = $this->fallbackMessage($lead, $source, $attributes);
         $providerName = 'fallback';
         $modelName = 'n/a';
-        $replyTo = trim((string) env('SENDGRID_INBOUND_REPLY_TO', (string) config('mail.from.address')));
+        $replyTo = trim((string) env('SENDGRID_INBOUND_REPLY_TO', ''));
+        if ($replyTo === '') {
+            $replyTo = 'crm@reply.maccento.ca';
+        }
         $emailLog = null;
 
         try {

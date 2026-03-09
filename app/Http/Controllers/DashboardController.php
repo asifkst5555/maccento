@@ -3523,7 +3523,7 @@ class DashboardController extends Controller
     private function renderAdminEmailMailbox(Request $request, string $folder): View
     {
         $defaultRecipient = (string) env('QUOTE_ADMIN_EMAIL', (string) config('mail.lead_alert_address', (string) config('mail.from.address')));
-        $defaultReplyTo = (string) env('SENDGRID_INBOUND_REPLY_TO', $defaultRecipient);
+        $defaultReplyTo = $this->crmInboundReplyToAddress();
 
         $quickTemplates = [
             [
@@ -3838,6 +3838,17 @@ class DashboardController extends Controller
             'openMessageId' => $openMessageId,
             'compose' => $compose,
         ]);
+    }
+
+    private function crmInboundReplyToAddress(): string
+    {
+        $replyTo = trim((string) env('SENDGRID_INBOUND_REPLY_TO', ''));
+
+        if ($replyTo !== '') {
+            return $replyTo;
+        }
+
+        return 'crm@reply.maccento.ca';
     }
 
     /**
