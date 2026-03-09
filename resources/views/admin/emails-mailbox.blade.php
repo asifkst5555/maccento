@@ -1607,6 +1607,81 @@ body.crm-compose-modal-open {
   .crm-compose-grid-2 {
     grid-template-columns: 1fr;
   }
+
+  .crm-compose-head,
+  .crm-thread-pane__header {
+    align-items: flex-start !important;
+  }
+
+  .crm-compose-badges,
+  .crm-compose-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .crm-compose-actions .panel-btn {
+    flex: 1 1 180px;
+  }
+}
+
+@media (max-width: 640px) {
+  .crm-mail-tabs {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .crm-mail-tab {
+    justify-content: space-between;
+  }
+
+  .crm-mailbox-main-head,
+  .crm-thread-pane__header .panel-form-row,
+  .crm-compose-head {
+    align-items: stretch !important;
+  }
+
+  .crm-compose-badges {
+    gap: 6px;
+  }
+
+  .crm-compose-badges .panel-badge,
+  .crm-compose-badges .panel-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .crm-compose-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+    width: 100%;
+  }
+
+  .crm-compose-actions .panel-btn {
+    width: 100%;
+  }
+
+  .crm-mail-actions,
+  .crm-mail-actions--draft {
+    width: 100%;
+  }
+
+  .crm-mail-actions .panel-btn,
+  .crm-mail-actions .panel-link,
+  .crm-mail-actions form,
+  .crm-mail-actions--draft .panel-btn,
+  .crm-mail-actions--draft .panel-link,
+  .crm-mail-actions--draft form {
+    width: 100%;
+  }
+
+  .crm-compose-attachment-item {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .crm-compose-attachment-item span {
+    white-space: normal;
+  }
 }
 </style>
 @endsection

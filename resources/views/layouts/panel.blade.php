@@ -502,40 +502,13 @@
       opacity: 0.92;
     }
 
-    body.panel-page .panel-sidebar {
-      position: fixed !important;
-      left: 0 !important;
-      top: 0 !important;
-      width: 270px !important;
-      height: 100vh !important;
-      z-index: 120 !important;
-    }
-
-    body.panel-page .panel-main {
-      margin-left: 270px !important;
-    }
-
-    body.panel-page .panel-app.sidebar-collapsed .panel-sidebar {
-      width: 84px !important;
-    }
-
-    body.panel-page .panel-app.sidebar-collapsed .panel-main {
-      margin-left: 84px !important;
-    }
-
     body.panel-page .panel-brand {
       position: sticky !important;
       top: 0 !important;
       z-index: 20 !important;
       padding: 18px 16px !important;
-    }
-
-    body.panel-page .panel-topbar {
-      position: fixed !important;
-      top: 0 !important;
-      left: calc(var(--panel-sidebar-width, 270px) + var(--panel-shell-gutter, 22px)) !important;
-      right: var(--panel-shell-gutter, 22px) !important;
-      z-index: 60 !important;
+      background: linear-gradient(180deg, rgba(17, 24, 39, 0.98) 0%, rgba(20, 29, 45, 0.96) 100%) !important;
+      backdrop-filter: blur(12px);
     }
 
     body.panel-page .panel-sidebar .panel-nav {
@@ -596,15 +569,17 @@
     }
 
     @media (max-width: 1100px) {
-      body.panel-page .panel-topbar {
-        position: sticky !important;
-        top: 10px !important;
-        left: auto !important;
-        right: auto !important;
+      body.panel-page .panel-sidebar .panel-nav {
+        padding: 14px 10px 18px !important;
       }
 
-      body.panel-page .panel-main {
-        margin-left: 0 !important;
+      body.panel-page .panel-sidebar .panel-nav-link,
+      body.panel-page .panel-sidebar .panel-subnav-link {
+        min-height: 42px;
+      }
+
+      body.panel-page .panel-sidebar .panel-sidebar-foot {
+        padding: 12px 12px 18px !important;
       }
     }
 
@@ -1061,6 +1036,13 @@
 
       const storageKey = 'maccento_panel_sidebar_collapsed';
       const media = window.matchMedia('(max-width: 1100px)');
+      const setSidebarOpen = function (open) {
+        app.classList.toggle('sidebar-open', open);
+        document.body.classList.toggle('panel-mobile-nav-open', media.matches && open);
+        if (mobileToggle) {
+          mobileToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+        }
+      };
 
       const applyStoredState = function () {
         if (media.matches) return;
@@ -1072,27 +1054,20 @@
 
       if (mobileToggle) {
         mobileToggle.addEventListener('click', function () {
-          const open = app.classList.toggle('sidebar-open');
-          mobileToggle.setAttribute('aria-expanded', String(open));
+          setSidebarOpen(!app.classList.contains('sidebar-open'));
         });
       }
 
       if (sidebarOverlay) {
         sidebarOverlay.addEventListener('click', function () {
-          app.classList.remove('sidebar-open');
-          if (mobileToggle) {
-            mobileToggle.setAttribute('aria-expanded', 'false');
-          }
+          setSidebarOpen(false);
         });
       }
 
-      document.querySelectorAll('.panel-sidebar .panel-nav-link').forEach(function (link) {
+      document.querySelectorAll('.panel-sidebar .panel-nav-link, .panel-sidebar .panel-subnav-link').forEach(function (link) {
         link.addEventListener('click', function () {
           if (!media.matches) return;
-          app.classList.remove('sidebar-open');
-          if (mobileToggle) {
-            mobileToggle.setAttribute('aria-expanded', 'false');
-          }
+          setSidebarOpen(false);
         });
       });
 
@@ -1107,13 +1082,39 @@
       media.addEventListener('change', function () {
         if (media.matches) {
           app.classList.remove('sidebar-collapsed');
+          document.body.classList.remove('panel-mobile-nav-open');
           return;
         }
-        app.classList.remove('sidebar-open');
-        if (mobileToggle) {
-          mobileToggle.setAttribute('aria-expanded', 'false');
-        }
+        setSidebarOpen(false);
         applyStoredState();
+      });
+
+      document.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape' && app.classList.contains('sidebar-open')) {
+          setSidebarOpen(false);
+        }
+      });
+
+      document.querySelectorAll('.panel-table').forEach(function (table) {
+        const headers = Array.from(table.querySelectorAll('thead th')).map(function (header) {
+          return String(header.textContent || '').trim();
+        });
+
+        if (headers.length === 0) {
+          return;
+        }
+
+        table.querySelectorAll('tbody tr').forEach(function (row) {
+          Array.from(row.children).forEach(function (cell, index) {
+            if (!(cell instanceof HTMLElement)) {
+              return;
+            }
+
+            if (!cell.hasAttribute('data-label')) {
+              cell.setAttribute('data-label', headers[index] || 'Detail');
+            }
+          });
+        });
       });
 
       const subnavGroups = Array.from(document.querySelectorAll('[data-subnav-group]'));

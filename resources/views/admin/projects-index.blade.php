@@ -152,6 +152,45 @@
       position: static;
     }
   }
+
+  @media (max-width: 640px) {
+    .corp-admin-shell .panel-card {
+      border-radius: 12px;
+    }
+
+    .corp-admin-shell .panel-sticky-filters {
+      padding: 0.65rem;
+    }
+
+    .corp-admin-shell .panel-sticky-filters .panel-form-row,
+    .corp-admin-shell .create-project-card .panel-form-row {
+      align-items: stretch;
+    }
+
+    .corp-admin-shell .panel-sticky-filters .panel-btn,
+    .corp-admin-shell .panel-sticky-filters .panel-link,
+    .corp-admin-shell .create-project-card .panel-btn,
+    .corp-admin-shell .create-project-card .panel-link {
+      width: 100%;
+      justify-content: center;
+    }
+
+    .corp-admin-shell .panel-table td[data-label="Action"] .panel-form-row {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .corp-admin-shell .panel-table td[data-label="Action"] .panel-select,
+    .corp-admin-shell .panel-table td[data-label="Action"] .panel-btn,
+    .corp-admin-shell .panel-table td[data-label="Action"] .panel-link {
+      width: 100%;
+    }
+
+    .corp-admin-shell .panel-table td[data-label="Project"],
+    .corp-admin-shell .panel-table td[data-label="Client"] {
+      font-weight: 600;
+    }
+  }
 </style>
 <div class="corp-admin-shell">
 <section class="panel-grid panel-grid-kpi">

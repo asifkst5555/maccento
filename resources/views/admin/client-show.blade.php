@@ -397,6 +397,81 @@
       justify-content: flex-start;
     }
   }
+
+  @media (max-width: 640px) {
+    .client-corporate-shell {
+      padding: 0.7rem;
+      gap: 0.8rem;
+    }
+
+    .client-corporate-shell .panel-card {
+      border-radius: 12px;
+    }
+
+    .client-corporate-shell .panel-card-head,
+    .client-corporate-shell .media-project-header,
+    .client-corporate-shell .row-tight,
+    .client-corporate-shell .service-filter-row,
+    .client-corporate-shell .row-between {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .client-corporate-shell .media-project-controls,
+    .client-corporate-shell .media-file-actions,
+    .client-corporate-shell .media-file-list-cta-group {
+      width: 100%;
+      justify-content: stretch;
+    }
+
+    .client-corporate-shell .media-project-controls > *,
+    .client-corporate-shell .media-file-actions > *,
+    .client-corporate-shell .media-file-list-cta-group > * {
+      width: 100%;
+    }
+
+    .client-corporate-shell .media-project-toggle {
+      width: 100%;
+      height: 42px;
+      border-radius: 12px;
+    }
+
+    .client-corporate-shell .media-file-row {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .client-corporate-shell .inline-checkbox-label {
+      white-space: normal;
+      align-items: flex-start;
+    }
+
+    .client-corporate-shell .inline-delete-form {
+      display: block;
+      margin-left: 0;
+      margin-top: 8px;
+    }
+
+    .client-corporate-shell .panel-form-row > .panel-btn,
+    .client-corporate-shell .panel-form-row > .panel-link,
+    .client-corporate-shell .panel-form-row > form,
+    .client-corporate-shell .panel-form-row > label {
+      width: 100%;
+      flex: 1 1 100%;
+    }
+
+    .client-corporate-shell .panel-table td[data-label="Action"] .panel-form-row {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .client-corporate-shell .panel-table td[data-label="Action"] .panel-select,
+    .client-corporate-shell .panel-table td[data-label="Action"] .panel-input,
+    .client-corporate-shell .panel-table td[data-label="Action"] .panel-btn,
+    .client-corporate-shell .panel-table td[data-label="Action"] .panel-link {
+      width: 100%;
+    }
+  }
 </style>
 <section class="panel-two-col client-corporate-shell">
   <div class="panel-main-col">

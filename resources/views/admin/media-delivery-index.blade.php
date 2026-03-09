@@ -111,6 +111,49 @@
       grid-template-columns: 1fr;
     }
   }
+
+  @media (max-width: 640px) {
+    .media-file-row {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .media-file-actions,
+    .media-file-list-cta,
+    .media-file-list-cta-group {
+      width: 100%;
+      justify-content: stretch;
+    }
+
+    .media-file-actions > *,
+    .media-file-list-cta-group > * {
+      width: 100%;
+    }
+
+    .media-delivery-upload-card .panel-btn,
+    .media-delivery-upload-card .panel-input,
+    .media-delivery-upload-card .panel-link {
+      width: 100%;
+    }
+
+    .media-project-header > .panel-form-row {
+      width: 100%;
+      align-items: stretch !important;
+    }
+
+    .media-project-header > .panel-form-row > * {
+      width: 100%;
+      flex: 1 1 100%;
+    }
+
+    .media-project-toggle {
+      height: 42px;
+    }
+
+    .panel-sticky-filters .panel-form-row {
+      align-items: stretch;
+    }
+  }
 </style>
 <section class="panel-card">
   @php

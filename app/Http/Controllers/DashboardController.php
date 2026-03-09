@@ -38,6 +38,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -2007,24 +2008,27 @@ class DashboardController extends Controller
             ->first();
 
         if ($linkedUser) {
-            if (blank($linkedUser->phone) && !blank($validated['phone'] ?? null)) {
+            if ($this->tableHasColumn('users', 'phone') && blank($linkedUser->phone) && !blank($validated['phone'] ?? null)) {
                 $linkedUser->phone = (string) $validated['phone'];
             }
             $linkedUser->password = $passwordForAdmin;
+            if ($this->tableHasColumn('users', 'role') && !in_array((string) $linkedUser->role, ['client', 'agent'], true)) {
+                $linkedUser->role = $validated['role'];
+            }
             $linkedUser->save();
             $accountMessage = 'Existing login account linked.';
         } else {
-            $linkedUser = User::create([
+            $linkedUser = User::create($this->filterTableColumns('users', [
                 'name' => $validated['name'],
                 'email' => $email,
                 'phone' => $validated['phone'] ?? null,
                 'role' => $validated['role'],
                 'password' => $passwordForAdmin,
-            ]);
+            ]));
             $accountMessage = 'Login created.';
         }
 
-        if (!in_array((string) $linkedUser->role, ['client', 'agent'], true)) {
+        if ($this->tableHasColumn('users', 'role') && !in_array((string) $linkedUser->role, ['client', 'agent'], true)) {
             $linkedUser->role = $validated['role'];
             $linkedUser->save();
         }
@@ -2040,7 +2044,7 @@ class DashboardController extends Controller
             $clientCreated = true;
         }
 
-        $client->fill([
+        $client->fill($this->filterTableColumns('clients', [
             'user_id' => $linkedUser->id,
             'created_by' => $client->created_by ?: $request->user()?->id,
             'name' => $validated['name'],
@@ -2049,12 +2053,24 @@ class DashboardController extends Controller
             'company' => $validated['company'] ?? null,
             'status' => $validated['status'],
             'notes' => $validated['notes'] ?? null,
-        ]);
+        ]));
         $client->save();
 
         $statusMessage = $clientCreated ? 'Client created.' : 'Existing client updated.';
 
         return redirect()->route('admin.clients.show', $client)->with('status', "{$statusMessage} {$accountMessage} Login password has been set.");
+    }
+
+    private function filterTableColumns(string $table, array $attributes): array
+    {
+        $allowed = array_flip(Schema::getColumnListing($table));
+
+        return array_intersect_key($attributes, $allowed);
+    }
+
+    private function tableHasColumn(string $table, string $column): bool
+    {
+        return Schema::hasColumn($table, $column);
     }
 
     public function adminUsersIndex(Request $request): View
