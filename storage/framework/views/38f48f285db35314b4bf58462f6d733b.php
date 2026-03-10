@@ -1571,7 +1571,7 @@
           <a class="panel-nav-link <?php if(request()->routeIs('admin.messages.*')): ?> is-active <?php endif; ?>" href="<?php echo e(route('admin.messages.index')); ?>" title="Messages/Chats">
             <span class="panel-nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v7A2.5 2.5 0 0 1 17.5 14H10l-4.5 4v-4H6.5A2.5 2.5 0 0 1 4 11.5v-5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg></span>
             <span class="panel-nav-text">Messages/Chats</span>
-          </a>\r\n          <p class="panel-nav-group-title">Delivery</p>
+          </a>          <p class="panel-nav-group-title">Delivery</p>
           <?php
             $projectCreateActive = request()->routeIs('admin.projects.index') && (string) request()->query('project_action') === 'create';
             $projectCompletedActive = request()->routeIs('admin.projects.index') && (string) request()->query('project_scope', 'ongoing') === 'past';
@@ -2508,6 +2508,7 @@
   </script>
 </body>
 </html>
+
 
 
 
