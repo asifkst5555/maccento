@@ -5,17 +5,20 @@
 ])
 
 @section('content')
+@php($mode = $mode ?? 'clients')
 <style>
   .messages-chat-shell {
-    --messages-bg: linear-gradient(180deg, #f7f9fc 0%, #eef3f8 100%);
-    --messages-ink: #11263f;
-    --messages-muted: #60738d;
-    --messages-line: #d7e1ec;
+    --messages-bg: radial-gradient(circle at top, #f7f8fb 0%, #eef2f7 55%, #e9eef5 100%);
+    --messages-ink: #0f2137;
+    --messages-muted: #5f7286;
+    --messages-line: #d6dde7;
     --messages-panel: #ffffff;
-    --messages-panel-alt: #f8fbff;
-    --messages-shadow: 0 18px 40px rgba(13, 31, 53, 0.08);
-    --messages-danger: #bf1e2e;
-    --messages-danger-dark: #971826;
+    --messages-panel-alt: #f4f7fb;
+    --messages-shadow: 0 18px 38px rgba(15, 33, 55, 0.08);
+    --messages-accent: #b71c2d;
+    --messages-accent-dark: #8f1624;
+    --messages-danger: #b71c2d;
+    --messages-danger-dark: #8f1624;
     display: grid;
     gap: 1rem;
   }
@@ -24,7 +27,7 @@
     border: 1px solid var(--messages-line);
     border-radius: 20px;
     background: var(--messages-panel);
-    box-shadow: var(--messages-shadow);
+    box-shadow: none;
   }
 
   .messages-chat-shell .panel-input,
@@ -33,6 +36,22 @@
   .messages-chat-shell .panel-btn {
     border-radius: 14px;
     background-color: #fff;
+  }
+
+  .messages-chat-shell .panel-btn-primary {
+    background: linear-gradient(135deg, var(--messages-accent) 0%, var(--messages-accent-dark) 100%);
+    border-color: transparent;
+    color: #ffffff;
+    box-shadow: none;
+  }
+
+  .messages-chat-shell .panel-btn-primary:hover {
+    filter: brightness(0.98);
+  }
+
+  .messages-chat-shell .panel-btn {
+    border-color: #cfd7e3;
+    color: var(--messages-ink);
   }
 
   .messages-chat-layout {
@@ -47,13 +66,13 @@
     display: grid;
     grid-template-rows: auto auto minmax(0, 1fr);
     gap: 0.9rem;
-    background: linear-gradient(180deg, #0f1d30 0%, #162841 100%);
-    color: #ffffff;
+    background: linear-gradient(180deg, #ffffff 0%, #f5f7fb 100%);
+    color: var(--messages-ink);
   }
 
   .messages-thread-panel .panel-kpi-label,
   .messages-thread-panel .panel-muted {
-    color: rgba(232, 238, 247, 0.72);
+    color: var(--messages-muted);
   }
 
   .messages-thread-top {
@@ -67,12 +86,12 @@
     margin: 0;
     font-size: 1.55rem;
     line-height: 1.1;
-    color: #ffffff;
+    color: var(--messages-ink);
   }
 
   .messages-thread-sub {
     margin: 0.3rem 0 0;
-    color: rgba(232, 238, 247, 0.74);
+    color: var(--messages-muted);
     font-size: 0.94rem;
   }
 
@@ -81,19 +100,74 @@
     gap: 0.7rem;
   }
 
+  .messages-chat-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+  }
+
+  .messages-chat-tab {
+    padding: 0.55rem 1rem;
+    border-radius: 12px;
+    border: 1px solid var(--messages-line);
+    background: #ffffff;
+    color: var(--messages-ink);
+    font-weight: 600;
+    font-size: 0.9rem;
+    text-decoration: none;
+    transition: border-color 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
+  }
+
+  .messages-chat-tab:hover {
+    border-color: #bfcad8;
+    box-shadow: none;
+  }
+
+  .messages-chat-tab.is-active {
+    background: linear-gradient(135deg, var(--messages-accent) 0%, var(--messages-accent-dark) 100%);
+    border-color: transparent;
+    color: #ffffff;
+    box-shadow: none;
+  }
+
+  .messages-thread-search .panel-form-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: 0.6rem;
+  }
+
+  .messages-thread-clear {
+    text-decoration: none;
+    padding: 0.65rem 1.1rem;
+    border-radius: 14px;
+    border: 1px solid #cfd7e3;
+    background: #ffffff;
+    color: var(--messages-ink);
+    font-weight: 600;
+    font-size: 0.9rem;
+    line-height: 1;
+    transition: border-color 0.18s ease, background-color 0.18s ease;
+  }
+
+  .messages-thread-clear:hover {
+    border-color: #bfcad8;
+    background: #f8fafc;
+  }
+
   .messages-thread-search .panel-input,
   .messages-thread-search .panel-select {
-    background: rgba(255, 255, 255, 0.08);
-    border-color: rgba(255, 255, 255, 0.16);
-    color: #ffffff;
+    background: #ffffff;
+    border-color: #d4dce8;
+    color: var(--messages-ink);
   }
 
   .messages-thread-search .panel-input::placeholder {
-    color: rgba(232, 238, 247, 0.48);
+    color: #8b98aa;
   }
 
   .messages-thread-search .panel-link {
-    color: rgba(232, 238, 247, 0.82);
+    color: var(--messages-muted);
   }
 
   .messages-thread-list {
@@ -101,45 +175,50 @@
     gap: 0.55rem;
     overflow-y: auto;
     padding-right: 0.2rem;
+    align-content: start;
+    grid-auto-rows: max-content;
   }
 
   .messages-thread-item {
     display: grid;
     grid-template-columns: 44px minmax(0, 1fr);
-    gap: 0.8rem;
-    padding: 0.82rem;
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    gap: 0.6rem;
+    padding: 0.65rem;
+    border: 1px solid #e2e8f1;
     border-radius: 16px;
-    background: rgba(255, 255, 255, 0.04);
-    transition: border-color 0.18s ease, background-color 0.18s ease, transform 0.18s ease;
+    background: #ffffff;
+    transition: border-color 0.18s ease, background-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
+    align-items: center;
+    min-height: auto;
   }
 
   .messages-thread-item:hover {
-    border-color: rgba(255, 255, 255, 0.18);
-    background: rgba(255, 255, 255, 0.08);
+    border-color: #c9d5e4;
+    background: #fbfdff;
     transform: translateY(-1px);
+    box-shadow: none;
   }
 
+  
   .messages-thread-item.is-active {
-    border-color: rgba(255, 255, 255, 0.24);
-    background: linear-gradient(135deg, rgba(191, 30, 46, 0.28), rgba(118, 24, 42, 0.24));
-    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
-  }
-
-  .messages-thread-avatar {
-    width: 44px;
-    height: 44px;
-    display: grid;
-    place-items: center;
-    border-radius: 14px;
-    background: rgba(255, 255, 255, 0.12);
+    border-color: #b71c2d;
+    background: #b71c2d;
     color: #ffffff;
-    font-weight: 700;
-    font-size: 0.95rem;
+    box-shadow: none;
   }
 
-  .messages-thread-main {
-    min-width: 0;
+  .messages-thread-item.is-active .messages-thread-name {
+    color: #ffffff;
+  }
+
+  .messages-thread-item.is-active .messages-thread-avatar {
+    background: rgba(255, 255, 255, 0.2);
+    color: #ffffff;
+    border-color: rgba(255, 255, 255, 0.35);
+  }
+
+  .messages-thread-item.is-active .messages-thread-main {
+    align-items: center;
   }
 
   .messages-thread-row {
@@ -147,18 +226,18 @@
     align-items: center;
     justify-content: space-between;
     gap: 0.65rem;
-    margin-bottom: 0.18rem;
+    margin-bottom: 0;
   }
 
   .messages-thread-name {
     margin: 0;
-    color: #ffffff;
-    font-size: 0.98rem;
-    line-height: 1.3;
+    color: var(--messages-ink);
+    font-size: 0.96rem;
+    line-height: 1.25;
   }
 
   .messages-thread-time {
-    color: rgba(232, 238, 247, 0.58);
+    color: #8a97a8;
     font-size: 0.75rem;
     white-space: nowrap;
   }
@@ -166,16 +245,16 @@
   .messages-thread-meta,
   .messages-thread-preview {
     margin: 0;
-    font-size: 0.84rem;
-    line-height: 1.45;
+    font-size: 0.82rem;
+    line-height: 1.35;
   }
 
   .messages-thread-meta {
-    color: rgba(232, 238, 247, 0.7);
+    color: var(--messages-muted);
   }
 
   .messages-thread-preview {
-    color: rgba(232, 238, 247, 0.84);
+    color: #2f3d4f;
   }
 
   .messages-chat-panel {
@@ -192,7 +271,7 @@
     gap: 1rem;
     padding: 1rem 1.1rem;
     border-bottom: 1px solid var(--messages-line);
-    background: linear-gradient(135deg, #ffffff 0%, #f5f8fc 100%);
+    background: #ffffff;
   }
 
   .messages-chat-head h2 {
@@ -219,85 +298,162 @@
 
   .messages-chat-stream {
     overflow-y: auto;
-    padding: 1.1rem;
+    padding: 1.2rem 1.6rem;
     display: grid;
-    gap: 0.85rem;
+    gap: 0.7rem;
     align-content: start;
+    justify-items: stretch;
+    background: linear-gradient(180deg, #f7f9fc 0%, #eef3f8 100%);
+    border-radius: 16px;
   }
 
   .messages-chat-date {
-    justify-self: center;
-    padding: 0.3rem 0.75rem;
-    border: 1px solid rgba(17, 38, 63, 0.08);
-    border-radius: 999px;
-    background: rgba(255, 255, 255, 0.86);
-    color: var(--messages-muted);
-    font-size: 0.76rem;
+    justify-self: stretch;
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    color: #7a8797;
+    font-size: 0.78rem;
     font-weight: 600;
   }
 
+  .messages-chat-date::before,
+  .messages-chat-date::after {
+    content: '';
+    height: 1px;
+    flex: 1;
+    background: #dfe6f1;
+  }
+
+  .messages-chat-date::before {
+    margin-right: 0.6rem;
+  }
+
+  .messages-chat-date::after {
+    margin-left: 0.6rem;
+  }
+
+  .messages-chat-date span {
+    background: #f4f7fb;
+    border: 1px solid #dfe6f1;
+    border-radius: 999px;
+    padding: 0.25rem 0.7rem;
+    color: #6c7a8c;
+  }
+
   .messages-chat-row {
-    display: grid;
-    gap: 0.3rem;
-    justify-items: start;
+    display: flex;
+    align-items: flex-end;
+    gap: 0.6rem;
+    justify-content: flex-start;
   }
 
   .messages-chat-row.is-admin {
-    justify-items: end;
+    flex-direction: row-reverse;
+    justify-content: flex-end;
   }
 
+  .messages-chat-body {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.25rem;
+    max-width: min(520px, 60%);
+  }
+
+  .messages-chat-row.is-admin .messages-chat-body {
+    align-items: flex-end;
+  }
+
+  
+
   .messages-chat-bubble {
-    max-width: min(700px, 82%);
-    padding: 0.9rem 1rem;
-    border-radius: 18px;
-    border: 1px solid #dbe4ef;
-    background: #ffffff;
+    display: inline-block;
+    width: auto;
+    max-width: 100%;
+    padding: 0.55rem 0.8rem;
+    border-radius: 12px;
+    border: 1px solid #dde5f0;
+    background: #f3f6fb;
     color: var(--messages-ink);
-    box-shadow: 0 8px 18px rgba(16, 35, 58, 0.05);
+    box-shadow: none;
     white-space: pre-wrap;
     word-break: break-word;
-    line-height: 1.55;
+    line-height: 1.4;
   }
 
   .messages-chat-row.is-admin .messages-chat-bubble {
-    border-color: rgba(191, 30, 46, 0.14);
-    background: linear-gradient(135deg, #b91e2f 0%, #8c1624 100%);
+    border-color: #991525;
+    background: #b71c2d;
     color: #ffffff;
+    box-shadow: none;
+  }
+
+  .messages-chat-column {
+    width: 100%;
+    max-width: 100%;
+    display: grid;
+    gap: 0.7rem;
   }
 
   .messages-chat-note {
-    display: flex;
+    display: inline-flex;
     align-items: center;
-    gap: 0.45rem;
-    color: var(--messages-muted);
-    font-size: 0.77rem;
+    gap: 0.4rem;
+    color: #8b93a5;
+    font-size: 0.72rem;
+    padding: 0 0.1rem;
   }
+
 
   .messages-chat-row.is-admin .messages-chat-note {
     justify-content: flex-end;
   }
 
   .messages-chat-compose {
-    padding: 1rem 1.1rem;
+    padding: 1.1rem 1.2rem 1.25rem;
     border-top: 1px solid var(--messages-line);
     background: #ffffff;
     display: grid;
-    gap: 0.8rem;
+    gap: 0.9rem;
   }
 
   .messages-chat-compose-top {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 220px auto;
-    gap: 0.7rem;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.9rem;
+    align-items: center;
+  }
+
+  .messages-compose-meta {
+    display: grid;
+    gap: 0.35rem;
+    padding: 0.6rem 0.75rem;
+    border-radius: 12px;
+    background: #f5f7fb;
+    border: 1px solid #dde5ef;
+    color: var(--messages-muted);
+    font-size: 0.84rem;
   }
 
   .messages-chat-compose .panel-textarea {
-    min-height: 112px;
+    min-height: 120px;
+    border-radius: 16px;
+    border-color: #d6dde7;
   }
 
   .messages-chat-compose-actions {
     display: flex;
     justify-content: flex-end;
+    align-items: center;
+  }
+
+  .messages-chat-compose .panel-btn {
+    min-width: 150px;
+    height: 44px;
+    padding: 0 1.2rem;
+    border-radius: 12px;
+    font-weight: 600;
   }
 
   .messages-empty-state {
@@ -342,19 +498,42 @@
     }
 
     .messages-chat-bubble {
-      max-width: 100%;
-    }
+    display: inline-block;
+    width: auto;
+    max-width: 100%;
+    padding: 0.55rem 0.8rem;
+    border-radius: 12px;
+    border: 1px solid #dde5f0;
+    background: #f3f6fb;
+    color: var(--messages-ink);
+    box-shadow: none;
+    white-space: pre-wrap;
+    word-break: break-word;
+    line-height: 1.4;
   }
-</style>
+  .messages-chat-row.is-admin .messages-chat-bubble {
+    border-color: #991525;
+    background: #b71c2d;
+    color: #ffffff;
+    box-shadow: none;
+  }
+
+}</style>
 
 <div class="messages-chat-shell">
+  <div class="messages-chat-tabs">
+    @if($can_view_all_chats ?? false)
+    <a class="messages-chat-tab{{ $mode === 'clients' ? ' is-active' : '' }}" href="{{ route('admin.messages.index', ['mode' => 'clients']) }}">Client Threads</a>
+    @endif
+    <a class="messages-chat-tab{{ $mode === 'users' ? ' is-active' : '' }}" href="{{ route('admin.messages.index', ['mode' => 'users']) }}">User Threads</a>
+  </div>
   <section class="panel-grid panel-grid-kpi-compact">
     <article class="client-portal-kpi">
       <span class="panel-kpi-label">Total Messages</span>
       <p class="client-portal-kpi-value">{{ number_format((int) ($messageStats['total_messages'] ?? 0)) }}</p>
     </article>
     <article class="client-portal-kpi">
-      <span class="panel-kpi-label">Client Threads</span>
+      <span class="panel-kpi-label">{{ $statsLabels['threads'] ?? 'Client Threads' }}</span>
       <p class="client-portal-kpi-value">{{ number_format((int) ($messageStats['client_threads'] ?? 0)) }}</p>
     </article>
     <article class="client-portal-kpi">
@@ -362,12 +541,12 @@
       <p class="client-portal-kpi-value">{{ number_format((int) ($messageStats['admin_sent'] ?? 0)) }}</p>
     </article>
     <article class="client-portal-kpi">
-      <span class="panel-kpi-label">Client Sent</span>
+      <span class="panel-kpi-label">{{ $statsLabels['client_sent'] ?? 'Client Sent' }}</span>
       <p class="client-portal-kpi-value">{{ number_format((int) ($messageStats['client_sent'] ?? 0)) }}</p>
     </article>
   </section>
 
-  <section class="panel-card messages-chat-layout">
+    <section class="panel-card messages-chat-layout">
     <aside class="messages-thread-panel">
       <div class="messages-thread-top">
         <div>
@@ -377,54 +556,124 @@
       </div>
 
       <form method="get" class="messages-thread-search">
-        <input class="panel-input" type="text" name="search" value="{{ $filters['search'] ?? '' }}" placeholder="Search client, project, or message text">
+        <input type="hidden" name="mode" value="{{ $mode }}">
+        <input class="panel-input" type="text" name="search" value="{{ $filters['search'] ?? '' }}" placeholder="{{ $mode === 'users' ? 'Search user name or email' : 'Search client, project, or message text' }}">
         <div class="panel-form-row" style="margin-bottom:0;">
-          <select class="panel-select" name="sender_role">
-            <option value="">All senders</option>
-            <option value="admin" @selected(($filters['sender_role'] ?? '') === 'admin')>Admin</option>
-            <option value="client" @selected(($filters['sender_role'] ?? '') === 'client')>Client</option>
-          </select>
+          @if($mode === 'clients')
+            <select class="panel-select" name="sender_role">
+              <option value="">All senders</option>
+              <option value="admin" @selected(($filters['sender_role'] ?? '') === 'admin')>Admin</option>
+              <option value="client" @selected(($filters['sender_role'] ?? '') === 'client')>Client</option>
+            </select>
+          @endif
           <button class="panel-btn panel-btn-primary" type="submit">Filter</button>
-          <a class="panel-link" href="{{ route('admin.messages.index') }}">Clear</a>
+          <a class="messages-thread-clear" href="{{ route('admin.messages.index', ['mode' => $mode]) }}">Clear</a>
         </div>
       </form>
 
       <div class="messages-thread-list">
-        @forelse($clients as $client)
-          @php($summary = $threadSummaries->firstWhere('client_id', $client->id))
-          <a
-            href="{{ route('admin.messages.index', ['client_id' => $client->id, 'search' => $filters['search'] ?? null, 'sender_role' => $filters['sender_role'] ?? null]) }}"
-            class="messages-thread-item{{ (int) ($activeClient?->id ?? 0) === (int) $client->id ? ' is-active' : '' }}"
-          >
-            <div class="messages-thread-avatar">{{ strtoupper(substr($client->name ?: 'C', 0, 2)) }}</div>
-            <div class="messages-thread-main">
-              <div class="messages-thread-row">
-                <h3 class="messages-thread-name">{{ $client->name ?: ('Client #' . $client->id) }}</h3>
-                <span class="messages-thread-time">{{ $summary?->sent_at?->diffForHumans() ?: 'No chat yet' }}</span>
+        @if($mode === 'users')
+          @forelse($users as $userItem)
+            <a
+              href="{{ route('admin.messages.index', ['mode' => 'users', 'user_id' => $userItem->id, 'search' => $filters['search'] ?? null]) }}"
+              class="messages-thread-item{{ (int) ($activeUser?->id ?? 0) === (int) $userItem->id ? ' is-active' : '' }}"
+            >
+              <div class="messages-thread-avatar">{{ strtoupper(substr($userItem->name ?: 'U', 0, 2)) }}</div>
+              <div class="messages-thread-main">
+                <h3 class="messages-thread-name">{{ $userItem->name ?: ('User #' . $userItem->id) }}</h3>
               </div>
-              <p class="messages-thread-meta">
-                {{ $client->email ?: 'No email on file' }}
-                @if($summary?->project?->title)
-                  &bull; {{ $summary->project->title }}
-                @endif
-              </p>
-              <p class="messages-thread-preview">
-                @if($summary)
-                  <strong>{{ strtoupper($summary->sender_role) }}:</strong> {{ mb_strimwidth((string) $summary->message, 0, 90, '...') }}
-                @else
-                  No direct conversation yet. Start the thread from CRM.
-                @endif
-              </p>
-            </div>
-          </a>
-        @empty
-          <p class="panel-muted">No clients available yet.</p>
-        @endforelse
+            </a>
+          @empty
+            <p class="panel-muted">No users available yet.</p>
+          @endforelse
+        @else
+          @forelse($clients as $client)
+            <a
+              href="{{ route('admin.messages.index', ['client_id' => $client->id, 'search' => $filters['search'] ?? null, 'sender_role' => $filters['sender_role'] ?? null]) }}"
+              class="messages-thread-item{{ (int) ($activeClient?->id ?? 0) === (int) $client->id ? ' is-active' : '' }}"
+            >
+              <div class="messages-thread-avatar">{{ strtoupper(substr($client->name ?: 'C', 0, 2)) }}</div>
+              <div class="messages-thread-main">
+                <h3 class="messages-thread-name">{{ $client->name ?: ('Client #' . $client->id) }}</h3>
+              </div>
+            </a>
+          @empty
+            <p class="panel-muted">No clients available yet.</p>
+          @endforelse
+        @endif
       </div>
     </aside>
 
     <section class="messages-chat-panel">
-      @if($activeClient)
+      @if($mode === 'users')
+        @if($activeUser)
+          <header class="messages-chat-head">
+            <div>
+              <h2>{{ $activeUser->name ?: ('User #' . $activeUser->id) }}</h2>
+              <p>
+                {{ $activeUser->email ?: 'No email on file' }}
+                @if($activeUser->role)
+                  &bull; {{ ucfirst($activeUser->role) }}
+                @endif
+              </p>
+            </div>
+            <div class="messages-chat-head-meta">
+              <span class="panel-badge">{{ ucfirst($activeUser->role ?: 'user') }}</span>
+            </div>
+          </header>
+
+          <div class="messages-chat-stream">
+            <div class="messages-chat-column">
+              @php($lastDate = null)
+              @forelse($activeMessages as $message)
+                @php($currentDate = optional($message->sent_at ?? $message->created_at)?->format('Y-m-d'))
+                @if($currentDate !== $lastDate)
+                  <div class="messages-chat-date"><span>{{ optional($message->sent_at ?? $message->created_at)?->format('M j, Y') }}</span></div>
+                  @php($lastDate = $currentDate)
+                @endif
+                <article class="messages-chat-row{{ (int) $message->sender_user_id === (int) auth()->id() ? ' is-admin' : '' }}">
+                  <div class="messages-chat-body">
+                    <div class="messages-chat-bubble">{{ $message->message }}</div>
+                    <div class="messages-chat-note">
+                      <span>{{ $message->sender?->name ?: 'User' }}</span>
+                      <span>&bull;</span>
+                      <span>{{ optional($message->sent_at ?? $message->created_at)?->format('M j, g:i A') }}</span>
+                    </div>
+                  </div>
+                </article>
+              @empty
+                <div class="messages-empty-state">
+                  <div>
+                    <strong>No messages yet</strong>
+                    Start the first direct conversation with this user from the composer below.
+                  </div>
+                </div>
+              @endforelse
+            </div>
+          </div>
+
+          <form method="post" action="{{ route('admin.user-messages.store') }}" class="messages-chat-compose">
+            @csrf
+            <input type="hidden" name="recipient_user_id" value="{{ $activeUser->id }}">
+            <div class="messages-chat-compose-top">
+              <div class="panel-muted" style="display:grid;align-items:center;padding:0 0.25rem;">
+                Send a direct message to this user. Keep it clear and actionable.
+              </div>
+              <div class="messages-chat-compose-actions">
+                <button class="panel-btn panel-btn-primary" type="submit">Send Message</button>
+              </div>
+            </div>
+            <textarea class="panel-textarea" name="message" placeholder="Write a clear message for this user" required>{{ old('message') }}</textarea>
+          </form>
+        @else
+          <div class="messages-empty-state">
+            <div>
+              <strong>No user selected</strong>
+              Pick a user from the left column to open the conversation workspace.
+            </div>
+          </div>
+        @endif
+      @elseif($activeClient)
         <header class="messages-chat-head">
           <div>
             <h2>{{ $activeClient->name ?: ('Client #' . $activeClient->id) }}</h2>
@@ -445,52 +694,57 @@
         </header>
 
         <div class="messages-chat-stream">
-          @php($lastDate = null)
-          @forelse($activeMessages as $message)
-            @php($currentDate = optional($message->sent_at ?? $message->created_at)?->format('Y-m-d'))
-            @if($currentDate !== $lastDate)
-              <div class="messages-chat-date">{{ optional($message->sent_at ?? $message->created_at)?->format('M j, Y') }}</div>
-              @php($lastDate = $currentDate)
-            @endif
-            <article class="messages-chat-row{{ $message->sender_role === 'admin' ? ' is-admin' : '' }}">
-              <div class="messages-chat-bubble">{{ $message->message }}</div>
-              <div class="messages-chat-note">
-                <span>{{ strtoupper($message->sender_role) }}</span>
-                @if($message->project?->title)
-                  <span>&bull;</span>
-                  <span>{{ $message->project->title }}</span>
-                @endif
-                <span>&bull;</span>
-                <span>{{ optional($message->sent_at ?? $message->created_at)?->format('M j, g:i A') }}</span>
+          <div class="messages-chat-column">
+            @php($lastDate = null)
+            @forelse($activeMessages as $message)
+              @php($currentDate = optional($message->sent_at ?? $message->created_at)?->format('Y-m-d'))
+              @if($currentDate !== $lastDate)
+                <div class="messages-chat-date"><span>{{ optional($message->sent_at ?? $message->created_at)?->format('M j, Y') }}</span></div>
+                @php($lastDate = $currentDate)
+              @endif
+              <article class="messages-chat-row{{ $message->sender_role === 'admin' ? ' is-admin' : '' }}">
+                <div class="messages-chat-body">
+                  <div class="messages-chat-bubble">{{ $message->message }}</div>
+                  <div class="messages-chat-note">
+                    <span>{{ $message->sender?->name ?: strtoupper($message->sender_role) }}</span>
+                    @if($message->project?->title)
+                      <span>&bull;</span>
+                      <span>{{ $message->project->title }}</span>
+                    @endif
+                    <span>&bull;</span>
+                    <span>{{ optional($message->sent_at ?? $message->created_at)?->format('M j, g:i A') }}</span>
+                  </div>
+                </div>
+              </article>
+            @empty
+              <div class="messages-empty-state">
+                <div>
+                  <strong>No messages yet</strong>
+                  Start the first direct conversation with this client from the composer below.
+                </div>
               </div>
-            </article>
-          @empty
-            <div class="messages-empty-state">
-              <div>
-                <strong>No messages yet</strong>
-                Start the first direct conversation with this client from the composer below.
-              </div>
-            </div>
-          @endforelse
+            @endforelse
+          </div>
         </div>
 
         <form method="post" action="{{ route('admin.messages.store') }}" class="messages-chat-compose">
           @csrf
           <input type="hidden" name="client_id" value="{{ $activeClient->id }}">
           <div class="messages-chat-compose-top">
-            <select class="panel-select" name="client_project_id">
-              <option value="">General client message</option>
-              @foreach($activeClient->projects as $project)
-                <option value="{{ $project->id }}" @selected((int) old('client_project_id', 0) === (int) $project->id)>{{ $project->title }} @if($project->status) - {{ ucfirst($project->status) }} @endif</option>
-              @endforeach
-            </select>
-            <div class="panel-muted" style="display:grid;align-items:center;padding:0 0.25rem;">
-              Send as a direct CRM message. Optional project context keeps the conversation organized.
+            <div class="messages-compose-meta">
+              <strong style="color: var(--messages-ink);">Message context</strong>
+              Optional project context helps keep threads organized.
             </div>
             <div class="messages-chat-compose-actions">
               <button class="panel-btn panel-btn-primary" type="submit">Send Message</button>
             </div>
           </div>
+          <select class="panel-select" name="client_project_id">
+            <option value="">General client message</option>
+            @foreach($activeClient->projects as $project)
+              <option value="{{ $project->id }}" @selected((int) old('client_project_id', 0) === (int) $project->id)>{{ $project->title }} @if($project->status) - {{ ucfirst($project->status) }} @endif</option>
+            @endforeach
+          </select>
           <textarea class="panel-textarea" name="message" placeholder="Write a clear message for the client thread" required>{{ old('message') }}</textarea>
         </form>
       @else
@@ -503,5 +757,65 @@
       @endif
     </section>
   </section>
-</div>
 @endsection
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

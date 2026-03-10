@@ -282,7 +282,7 @@
             <a class="panel-link" href="{{ route('admin.invoices.download', $invoice) }}">Download PDF</a>
             <form method="post" action="{{ route('admin.invoices.delete', $invoice) }}" data-app-confirm="1" data-confirm-message="Delete invoice {{ $invoice->invoice_number }}?" class="inline-delete-form">
               @csrf
-              <button class="panel-btn panel-btn-danger panel-btn-icon" type="submit" title="Delete invoice" aria-label="Delete invoice"><span class="panel-icon-trash" aria-hidden="true"><svg viewBox="0 0 20 20"><path d="M5 6h10M8 6V4h4v2m-6 0l.5 9h7L14 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span></button>
+              <button class="panel-btn panel-btn-danger panel-btn-icon" type="submit" title="Delete invoice" aria-label="Delete invoice"><span class="panel-icon-trash" aria-hidden="true"><x-panel-icon name="trash" /></span></button>
             </form>
           </td>
         </tr>
@@ -296,3 +296,4 @@
 </section>
 </div>
 @endsection
+

@@ -106,7 +106,7 @@
       render();
     });
 
-    deleteBtn.addEventListener('click', function () {
+    deleteBtn.addEventListener('click', async function () {
       if (deleteBtn.hidden || !currentItems.length) return;
 
       const item = currentItems[currentIndex];
@@ -114,7 +114,7 @@
         return;
       }
 
-      const confirmed = window.confirm('Delete this media file? This action cannot be undone.');
+      const confirmFn = window.panelConfirm || (msg => Promise.resolve(false));\n      const confirmed = await confirmFn('Delete this media file? This action cannot be undone.');
       if (!confirmed) {
         return;
       }
@@ -193,3 +193,6 @@
     });
   })();
 </script>
+
+
+

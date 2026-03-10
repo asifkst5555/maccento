@@ -5,17 +5,15 @@
 ])
 
 @section('content')
-<div class="client-portal-shell">
-  <section class="panel-card client-portal-hero">
-    <div class="client-portal-hero-head">
+<div class="corp-admin-shell panel-stack">
+  <section class="panel-card panel-stack">
+    <div class="panel-form-row" style="justify-content: space-between; align-items: center;">
       <div>
-        <span class="client-portal-eyebrow">Client CRM Portal</span>
+        <span class="panel-badge">Client CRM Portal</span>
         <h2 class="panel-section-title" style="margin-top: 12px;">Welcome{{ $client?->name ? ', ' . $client->name : '' }}</h2>
-        <p class="client-portal-summary">
-          Keep track of your active jobs, open invoices, quotations, and delivery progress from one professional workspace.
-        </p>
+        <p class="panel-muted">Keep track of your active jobs, open invoices, quotations, and delivery progress from one professional workspace.</p>
       </div>
-      <div class="client-portal-actions">
+      <div class="panel-form-row" style="margin-bottom: 0;">
         <a class="panel-btn panel-btn-primary" href="{{ route('user.projects.index') }}">View Projects</a>
         <a class="panel-btn" href="{{ route('user.invoices.index') }}">Billing Center</a>
         <a class="panel-btn" href="{{ route('user.messages.index') }}">Messages</a>
@@ -24,129 +22,160 @@
   </section>
 
   <section class="panel-grid panel-grid-kpi">
-    <article class="client-portal-kpi">
-      <span class="panel-kpi-label">Active Projects</span>
-      <p class="client-portal-kpi-value">{{ $portalStats['active_projects'] }}</p>
-      <p class="client-portal-kpi-note">Projects currently in production or delivery.</p>
-    </article>
-    <article class="client-portal-kpi">
-      <span class="panel-kpi-label">Unpaid Invoices</span>
-      <p class="client-portal-kpi-value">{{ $portalStats['unpaid_invoices'] }}</p>
-      <p class="client-portal-kpi-note">Open billing items awaiting payment or review.</p>
-    </article>
-    <article class="client-portal-kpi">
-      <span class="panel-kpi-label">Pending Quotes</span>
-      <p class="client-portal-kpi-value">{{ $portalStats['pending_quotes'] }}</p>
-      <p class="client-portal-kpi-note">Quotes still under review, follow-up, or revision.</p>
-    </article>
-    <article class="client-portal-kpi">
-      <span class="panel-kpi-label">Deliveries Ready</span>
-      <p class="client-portal-kpi-value">{{ $portalStats['deliveries_ready'] }}</p>
-      <p class="client-portal-kpi-note">Projects with a final ZIP ready in the portal.</p>
-    </article>
+    <article class="panel-card"><span class="panel-kpi-label">Active Projects</span><p class="panel-kpi-value">{{ $portalStats['active_projects'] }}</p></article>
+    <article class="panel-card"><span class="panel-kpi-label">Unpaid Invoices</span><p class="panel-kpi-value">{{ $portalStats['unpaid_invoices'] }}</p></article>
+    <article class="panel-card"><span class="panel-kpi-label">Pending Quotes</span><p class="panel-kpi-value">{{ $portalStats['pending_quotes'] }}</p></article>
+    <article class="panel-card"><span class="panel-kpi-label">Deliveries Ready</span><p class="panel-kpi-value">{{ $portalStats['deliveries_ready'] }}</p></article>
   </section>
 
-  <section class="client-portal-grid-two">
-    <article class="panel-card client-portal-stack">
+  <section class="panel-grid" style="grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 1rem;">
+    <article class="panel-card panel-stack">
       <div class="panel-form-row" style="justify-content: space-between; align-items: center;">
         <h2 class="panel-section-title" style="margin: 0;">Active Projects</h2>
         <a class="panel-link" href="{{ route('user.projects.index') }}">Open all</a>
       </div>
-      @forelse($recentProjects as $project)
-        <div class="client-portal-list-row">
-          <div class="client-portal-list-main">
-            <h3 class="client-portal-title">{{ $project->title }}</h3>
-            <p class="client-portal-meta">
-              {{ $project->service_type ?: 'Service pending' }}
-              @if(!blank($project->property_address))
-                &bull; {{ $project->property_address }}
-              @endif
-            </p>
-            <p class="client-portal-meta">
-              Schedule: {{ $project->scheduled_at?->format('Y-m-d H:i') ?: 'To be confirmed' }}
-            </p>
-          </div>
-          <div class="client-portal-side">
-            <span class="panel-badge">{{ $project->status }}</span>
-            <a class="panel-btn panel-btn-primary" href="{{ route('user.projects.show', $project) }}">Open Project</a>
-            <a class="panel-btn" href="{{ route('user.deliveries.index') }}#project-{{ $project->id }}">Delivery</a>
-          </div>
-        </div>
-      @empty
-        <div class="client-portal-empty">No projects are linked to your account yet.</div>
-      @endforelse
+      <div class="panel-table-wrap">
+        <table class="panel-table">
+          <thead>
+            <tr>
+              <th>Project</th>
+              <th>Schedule</th>
+              <th>Status</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            @forelse($recentProjects as $project)
+              <tr>
+                <td data-label="Project">
+                  {{ $project->title }}
+                  <div class="panel-muted">{{ $project->service_type ?: 'Service pending' }}</div>
+                  @if(!blank($project->property_address))
+                    <div class="panel-muted">{{ $project->property_address }}</div>
+                  @endif
+                </td>
+                <td data-label="Schedule">{{ $project->scheduled_at?->format('Y-m-d H:i') ?: 'To be confirmed' }}</td>
+                <td data-label="Status"><span class="panel-badge">{{ $project->status }}</span></td>
+                <td data-label="Action">
+                  <a class="panel-btn panel-btn-primary" href="{{ route('user.projects.show', $project) }}">Open</a>
+                </td>
+              </tr>
+            @empty
+              <tr><td colspan="4" class="panel-muted">No projects are linked to your account yet.</td></tr>
+            @endforelse
+          </tbody>
+        </table>
+      </div>
     </article>
 
-    <article class="panel-card client-portal-stack">
+    <article class="panel-card panel-stack">
       <div class="panel-form-row" style="justify-content: space-between; align-items: center;">
         <h2 class="panel-section-title" style="margin: 0;">Open Invoices</h2>
         <a class="panel-link" href="{{ route('user.invoices.index') }}">Open billing</a>
       </div>
-      @forelse($recentInvoices as $invoice)
-        <div class="client-portal-list-row">
-          <div class="client-portal-list-main">
-            <h3 class="client-portal-title">{{ $invoice->invoice_number }}</h3>
-            <p class="client-portal-meta">{{ $invoice->project?->title ?: 'General invoice' }}</p>
-            <p class="client-portal-meta">Due: {{ $invoice->due_date?->format('Y-m-d') ?: 'Not set' }}</p>
-          </div>
-          <div class="client-portal-side">
-            <span class="panel-badge">{{ $invoice->status }}</span>
-            <a class="panel-btn panel-btn-primary" href="{{ route('user.invoices.download', $invoice) }}">Download</a>
-          </div>
-        </div>
-      @empty
-        <div class="client-portal-empty">No invoices are available right now.</div>
-      @endforelse
+      <div class="panel-table-wrap">
+        <table class="panel-table">
+          <thead>
+            <tr>
+              <th>Invoice</th>
+              <th>Due</th>
+              <th>Status</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            @forelse($recentInvoices as $invoice)
+              <tr>
+                <td data-label="Invoice">
+                  {{ $invoice->invoice_number }}
+                  <div class="panel-muted">{{ $invoice->project?->title ?: 'General invoice' }}</div>
+                </td>
+                <td data-label="Due">{{ $invoice->due_date?->format('Y-m-d') ?: 'Not set' }}</td>
+                <td data-label="Status"><span class="panel-badge">{{ $invoice->status }}</span></td>
+                <td data-label="Action">
+                  <a class="panel-btn panel-btn-primary" href="{{ route('user.invoices.download', $invoice) }}">Download</a>
+                </td>
+              </tr>
+            @empty
+              <tr><td colspan="4" class="panel-muted">No invoices are available right now.</td></tr>
+            @endforelse
+          </tbody>
+        </table>
+      </div>
     </article>
   </section>
 
-  <section class="client-portal-grid-two">
-    <article class="panel-card client-portal-stack">
+  <section class="panel-grid" style="grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 1rem;">
+    <article class="panel-card panel-stack">
       <div class="panel-form-row" style="justify-content: space-between; align-items: center;">
         <h2 class="panel-section-title" style="margin: 0;">Recent Quotations</h2>
         <a class="panel-link" href="{{ route('user.quotes.index') }}">Open quotes</a>
       </div>
-      @forelse($quotes as $quote)
-        <div class="client-portal-list-row">
-          <div class="client-portal-list-main">
-            <h3 class="client-portal-title">{{ $quote->quote_id }}</h3>
-            <p class="client-portal-meta">{{ is_array($quote->services) ? implode(', ', $quote->services) : 'Services pending' }}</p>
-            <p class="client-portal-meta">Submitted: {{ $quote->submitted_at?->format('Y-m-d H:i') ?: '-' }}</p>
-          </div>
-          <div class="client-portal-side">
-            <span class="panel-badge">{{ $quote->status }}</span>
-            <a class="panel-btn" href="{{ route('user.quotes.show', $quote) }}">Open Quote</a>
-          </div>
-        </div>
-      @empty
-        <div class="client-portal-empty">No quotations have been created for your account yet.</div>
-      @endforelse
+      <div class="panel-table-wrap">
+        <table class="panel-table">
+          <thead>
+            <tr>
+              <th>Quote</th>
+              <th>Submitted</th>
+              <th>Status</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            @forelse($quotes as $quote)
+              <tr>
+                <td data-label="Quote">
+                  {{ $quote->quote_id }}
+                  <div class="panel-muted">{{ is_array($quote->services) ? implode(', ', $quote->services) : 'Services pending' }}</div>
+                </td>
+                <td data-label="Submitted">{{ $quote->submitted_at?->format('Y-m-d H:i') ?: '-' }}</td>
+                <td data-label="Status"><span class="panel-badge">{{ $quote->status }}</span></td>
+                <td data-label="Action">
+                  <a class="panel-btn" href="{{ route('user.quotes.show', $quote) }}">Open</a>
+                </td>
+              </tr>
+            @empty
+              <tr><td colspan="4" class="panel-muted">No quotations have been created for your account yet.</td></tr>
+            @endforelse
+          </tbody>
+        </table>
+      </div>
     </article>
 
-    <article class="panel-card client-portal-stack">
+    <article class="panel-card panel-stack">
       <div class="panel-form-row" style="justify-content: space-between; align-items: center;">
         <h2 class="panel-section-title" style="margin: 0;">Recent Messages</h2>
         <a class="panel-link" href="{{ route('user.messages.index') }}">Open messages</a>
       </div>
-      @forelse($recentMessages as $message)
-        <div class="client-portal-list-row">
-          <div class="client-portal-list-main">
-            <h3 class="client-portal-title">{{ $message->project?->title ?: 'General account message' }}</h3>
-            <p class="client-portal-meta">{{ \Illuminate\Support\Str::limit($message->message, 110) }}</p>
-            <p class="client-portal-meta">{{ $message->sent_at?->format('Y-m-d H:i') ?: $message->created_at?->format('Y-m-d H:i') }}</p>
-          </div>
-          <div class="client-portal-side">
-            <span class="panel-badge">{{ $message->sender_role }}</span>
-          </div>
-        </div>
-      @empty
-        <div class="client-portal-empty">No client communication has been logged yet.</div>
-      @endforelse
+      <div class="panel-table-wrap">
+        <table class="panel-table">
+          <thead>
+            <tr>
+              <th>Thread</th>
+              <th>Message</th>
+              <th>Date</th>
+              <th>Role</th>
+            </tr>
+          </thead>
+          <tbody>
+            @forelse($recentMessages as $message)
+              <tr>
+                <td data-label="Thread">{{ $message->project?->title ?: 'General account message' }}</td>
+                <td data-label="Message">{{ \Illuminate\Support\Str::limit($message->message, 90) }}</td>
+                <td data-label="Date">{{ $message->sent_at?->format('Y-m-d H:i') ?: $message->created_at?->format('Y-m-d H:i') }}</td>
+                <td data-label="Role"><span class="panel-badge">{{ strtoupper($message->sender_role) }}</span></td>
+              </tr>
+            @empty
+              <tr><td colspan="4" class="panel-muted">No client communication has been logged yet.</td></tr>
+            @endforelse
+          </tbody>
+        </table>
+      </div>
     </article>
   </section>
 
-  <section class="client-portal-grid-two">
-    <article class="panel-card client-portal-stack">
+  <section class="panel-grid" style="grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 1rem;">
+    <article class="panel-card panel-stack">
       <h2 class="panel-section-title">Request a New Service</h2>
       <p class="panel-muted">Send a new request directly to the team from your portal.</p>
       <form method="post" action="{{ route('user.service-requests.store') }}" class="panel-stack">
@@ -167,23 +196,34 @@
       </form>
     </article>
 
-    <article class="panel-card client-portal-stack">
+    <article class="panel-card panel-stack">
       <h2 class="panel-section-title">Recent Lead Activity</h2>
-      @forelse($leads as $lead)
-        <div class="client-portal-list-row">
-          <div class="client-portal-list-main">
-            <h3 class="client-portal-title">Lead #{{ $lead->id }}</h3>
-            <p class="client-portal-meta">{{ $lead->service_type ?: 'Service not specified' }}</p>
-            <p class="client-portal-meta">{{ $lead->location ?: 'Location pending' }}</p>
-          </div>
-          <div class="client-portal-side">
-            <span class="panel-badge">{{ $lead->status }}</span>
-            <span class="panel-muted">Score {{ $lead->score }}</span>
-          </div>
-        </div>
-      @empty
-        <div class="client-portal-empty">No website lead activity is linked to your account yet.</div>
-      @endforelse
+      <div class="panel-table-wrap">
+        <table class="panel-table">
+          <thead>
+            <tr>
+              <th>Lead</th>
+              <th>Service</th>
+              <th>Location</th>
+              <th>Status</th>
+              <th>Score</th>
+            </tr>
+          </thead>
+          <tbody>
+            @forelse($leads as $lead)
+              <tr>
+                <td data-label="Lead">Lead #{{ $lead->id }}</td>
+                <td data-label="Service">{{ $lead->service_type ?: 'Service not specified' }}</td>
+                <td data-label="Location">{{ $lead->location ?: 'Location pending' }}</td>
+                <td data-label="Status"><span class="panel-badge">{{ $lead->status }}</span></td>
+                <td data-label="Score">{{ $lead->score }}</td>
+              </tr>
+            @empty
+              <tr><td colspan="5" class="panel-muted">No website lead activity is linked to your account yet.</td></tr>
+            @endforelse
+          </tbody>
+        </table>
+      </div>
     </article>
   </section>
 </div>

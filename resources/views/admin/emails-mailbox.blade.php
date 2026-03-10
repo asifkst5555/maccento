@@ -67,7 +67,7 @@
                     <a class="panel-btn crm-btn-icon" href="{{ route('admin.emails.inbox', array_merge($baseQuery, ['open_id' => $item->id])) }}" title="View email" aria-label="View email"><span class="crm-ui-icon"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M2.5 10s2.8-4.5 7.5-4.5 7.5 4.5 7.5 4.5-2.8 4.5-7.5 4.5S2.5 10 2.5 10zm7.5 2.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></span></a>
                     <form method="post" action="{{ route('admin.emails.inbox.delete', $item) }}" data-app-confirm="1" data-confirm-message="Delete this inbox email?">
                       @csrf
-                      <button class="panel-btn panel-btn-danger crm-btn-icon" type="submit" title="Delete email" aria-label="Delete email"><span class="crm-ui-icon"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 6h10M8 6V4h4v2m-6 0l.5 9h7L14 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span></button>
+                      <button class="panel-btn panel-btn-danger crm-btn-icon" type="submit" title="Delete email" aria-label="Delete email"><span class="crm-ui-icon"><x-panel-icon name="trash" /></span></button>
                     </form>
                   </td>
                 </tr>
@@ -92,7 +92,7 @@
                     </form>
                     <form method="post" action="{{ route('admin.emails.drafts.delete', $item) }}" data-app-confirm="1" data-confirm-message="Delete this draft?">
                       @csrf
-                      <button class="panel-btn panel-btn-danger crm-btn-icon" type="submit" title="Delete draft" aria-label="Delete draft"><span class="crm-ui-icon"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 6h10M8 6V4h4v2m-6 0l.5 9h7L14 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span></button>
+                      <button class="panel-btn panel-btn-danger crm-btn-icon" type="submit" title="Delete draft" aria-label="Delete draft"><span class="crm-ui-icon"><x-panel-icon name="trash" /></span></button>
                     </form>
                   </td>
                 </tr>
@@ -127,7 +127,7 @@
                     <a class="panel-btn crm-btn-icon" href="{{ route('admin.emails.sent', array_merge($baseQuery, ['open_id' => $item->id])) }}" title="View sent email" aria-label="View sent email"><span class="crm-ui-icon"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M2.5 10s2.8-4.5 7.5-4.5 7.5 4.5 7.5 4.5-2.8 4.5-7.5 4.5S2.5 10 2.5 10zm7.5 2.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></span></a>
                     <form method="post" action="{{ route('admin.emails.sent.delete', $item) }}" data-app-confirm="1" data-confirm-message="Delete this sent email record?">
                       @csrf
-                      <button class="panel-btn panel-btn-danger crm-btn-icon" type="submit" title="Delete sent email" aria-label="Delete sent email"><span class="crm-ui-icon"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 6h10M8 6V4h4v2m-6 0l.5 9h7L14 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span></button>
+                      <button class="panel-btn panel-btn-danger crm-btn-icon" type="submit" title="Delete sent email" aria-label="Delete sent email"><span class="crm-ui-icon"><x-panel-icon name="trash" /></span></button>
                     </form>
                   </td>
                 </tr>
@@ -353,7 +353,7 @@
             <button id="manualSaveDraftBtn" class="panel-btn crm-btn-icon" formaction="{{ route('admin.emails.drafts.save') }}" formmethod="post" type="submit"><span class="crm-ui-icon"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 4h10l2 2v10H4V4zm2 0v4h8V5.2L12.8 4H6zm1 9h6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></span>Save Draft</button>
             <button class="panel-btn panel-btn-primary crm-btn-icon" type="submit"><span class="crm-ui-icon"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 10l13-6-3.4 12-3.1-4.1L6 14l-3-4z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></span>Send Email</button>
             @if((int) ($compose['draft_id'] ?? 0) > 0)
-            <button class="panel-btn panel-btn-danger panel-btn-icon crm-btn-icon" type="submit" form="draftDeleteForm" title="Delete draft" aria-label="Delete draft"><span class="crm-ui-icon"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 6h10M8 6V4h4v2m-6 0l.5 9h7L14 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span></button>
+            <button class="panel-btn panel-btn-danger panel-btn-icon crm-btn-icon" type="submit" form="draftDeleteForm" title="Delete draft" aria-label="Delete draft"><span class="crm-ui-icon"><x-panel-icon name="trash" /></span></button>
             @endif
           </div>
           <span id="autosaveStatus" class="panel-muted">Lead ID: {{ $compose['lead_id'] !== '' ? $compose['lead_id'] : 'n/a' }}</span>
@@ -377,7 +377,7 @@
       <p id="appConfirmMessage" class="panel-muted" style="margin:0;">Are you sure?</p>
       <div class="panel-form-row" style="justify-content:flex-end; gap:8px; margin-top:8px;">
         <button id="appConfirmCancel" class="panel-btn" type="button" data-confirm-close>Cancel</button>
-        <button id="appConfirmOk" class="panel-btn panel-btn-danger panel-btn-icon" type="button" title="Confirm delete" aria-label="Confirm delete"><span class="panel-icon-trash" aria-hidden="true"><svg viewBox="0 0 20 20"><path d="M5 6h10M8 6V4h4v2m-6 0l.5 9h7L14 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span></button>
+        <button id="appConfirmOk" class="panel-btn panel-btn-danger panel-btn-icon" type="button" title="Confirm delete" aria-label="Confirm delete"><span class="panel-icon-trash" aria-hidden="true"><x-panel-icon name="trash" /></span></button>
       </div>
     </article>
   </div>
@@ -1685,3 +1685,5 @@ body.crm-compose-modal-open {
 }
 </style>
 @endsection
+
+

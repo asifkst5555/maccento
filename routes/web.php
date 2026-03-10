@@ -52,8 +52,9 @@ Route::middleware('auth')->group(function (): void {
         Route::post('/admin/projects/{project}/media', [DashboardController::class, 'adminProjectMediaStore'])->name('admin.projects.media.store');
         Route::post('/admin/projects/{project}/raw-zip', [DashboardController::class, 'adminProjectRawZipStore'])->name('admin.projects.raw-zip.store');
         Route::post('/admin/projects/{project}/delivery-zip', [DashboardController::class, 'adminProjectDeliveryZipStore'])->name('admin.projects.delivery-zip.store');
-        Route::get('/admin/clients', [DashboardController::class, 'adminClientsIndex'])->name('admin.clients.index');
-        Route::get('/admin/clients/{client}', [DashboardController::class, 'adminClientShow'])->name('admin.clients.show');
+        Route::get('/admin/messages', [DashboardController::class, 'adminClientMessagesIndex'])->name('admin.messages.index');
+        Route::post('/admin/messages', [DashboardController::class, 'adminClientMessagesCenterStore'])->name('admin.messages.store');
+        Route::post('/admin/messages/users', [DashboardController::class, 'adminUserMessagesStore'])->name('admin.user-messages.store');
     });
 
     Route::middleware('role:admin,owner,manager')->group(function (): void {
@@ -62,7 +63,8 @@ Route::middleware('auth')->group(function (): void {
         Route::get('/admin/leads-packages', [DashboardController::class, 'adminPackageLeadsIndex'])->name('admin.leads.packages.index');
         Route::get('/admin/quotes', [DashboardController::class, 'adminQuotesIndex'])->name('admin.quotes.index');
         Route::get('/admin/invoices', [DashboardController::class, 'adminInvoicesIndex'])->name('admin.invoices.index');
-        Route::get('/admin/messages', [DashboardController::class, 'adminClientMessagesIndex'])->name('admin.messages.index');
+        Route::get('/admin/clients', [DashboardController::class, 'adminClientsIndex'])->name('admin.clients.index');
+        Route::get('/admin/clients/{client}', [DashboardController::class, 'adminClientShow'])->name('admin.clients.show');
         Route::get('/admin/emails', [DashboardController::class, 'adminEmailsIndex'])->name('admin.emails.index');
         Route::get('/admin/emails/inbox', [DashboardController::class, 'adminEmailsInbox'])->name('admin.emails.inbox');
         Route::get('/admin/emails/sent', [DashboardController::class, 'adminEmailsSent'])->name('admin.emails.sent');
@@ -84,7 +86,6 @@ Route::middleware('auth')->group(function (): void {
         Route::get('/admin/form-submissions', [DashboardController::class, 'adminFormSubmissions'])->name('admin.form-submissions');
         Route::get('/admin/form-submissions/{submission}', [DashboardController::class, 'adminFormSubmissionShow'])->name('admin.form-submissions.show');
         Route::post('/admin/form-submissions/{submission}/status', [DashboardController::class, 'adminFormSubmissionStatusUpdate'])->name('admin.form-submissions.status');
-        Route::post('/admin/clients', [DashboardController::class, 'adminClientStore'])->name('admin.clients.store');
         Route::post('/admin/clients/{client}/projects', [DashboardController::class, 'adminClientProjectStore'])->name('admin.clients.projects.store');
         Route::post('/admin/projects/{project}/status', [DashboardController::class, 'adminClientProjectStatusUpdate'])->name('admin.projects.status');
         Route::post('/admin/projects/{project}/assignments', [DashboardController::class, 'adminProjectAssignmentsUpdate'])->name('admin.projects.assignments.update');
@@ -96,7 +97,6 @@ Route::middleware('auth')->group(function (): void {
         Route::post('/admin/media-delivery/folders/migrate', [DashboardController::class, 'adminMediaFolderMigrationRun'])->name('admin.media-delivery.folders.migrate');
         Route::post('/admin/clients/{client}/invoices', [DashboardController::class, 'adminClientInvoiceStore'])->name('admin.clients.invoices.store');
         Route::post('/admin/clients/{client}/messages', [DashboardController::class, 'adminClientMessageStore'])->name('admin.clients.messages.store');
-        Route::post('/admin/messages', [DashboardController::class, 'adminClientMessagesCenterStore'])->name('admin.messages.store');
         Route::post('/admin/invoices/{invoice}/status', [DashboardController::class, 'adminInvoiceStatusUpdate'])->name('admin.invoices.status');
         Route::post('/admin/invoices/{invoice}/delete', [DashboardController::class, 'adminInvoiceDestroy'])->name('admin.invoices.delete');
         Route::get('/admin/invoices/{invoice}/download', [DashboardController::class, 'adminInvoicePdfDownload'])->name('admin.invoices.download');
@@ -120,7 +120,9 @@ Route::middleware('auth')->group(function (): void {
         Route::get('/admin/users', [DashboardController::class, 'adminUsersIndex'])->name('admin.users.index');
         Route::post('/admin/users', [DashboardController::class, 'adminUserStore'])->name('admin.users.store');
         Route::post('/admin/users/{user}/delete', [DashboardController::class, 'adminUserDestroy'])->name('admin.users.delete');
+        Route::post('/admin/clients', [DashboardController::class, 'adminClientStore'])->name('admin.clients.store');
         Route::post('/admin/clients/{client}/delete', [DashboardController::class, 'adminClientDestroy'])->name('admin.clients.delete');
+        Route::post('/admin/projects/{project}/delete', [DashboardController::class, 'adminProjectDestroy'])->name('admin.projects.delete');
     });
 
     Route::middleware('role:user,client,agent')->group(function (): void {
@@ -130,6 +132,7 @@ Route::middleware('auth')->group(function (): void {
         Route::get('/user/invoices', [DashboardController::class, 'userInvoicesIndex'])->name('user.invoices.index');
         Route::get('/user/quotes', [DashboardController::class, 'userQuotesIndex'])->name('user.quotes.index');
         Route::get('/user/messages', [DashboardController::class, 'userMessagesIndex'])->name('user.messages.index');
+        Route::post('/user/messages', [DashboardController::class, 'userAdminMessageStore'])->name('user.messages.store');
         Route::get('/user/deliveries', [DashboardController::class, 'userDeliveriesIndex'])->name('user.deliveries.index');
         Route::get('/user/account', [DashboardController::class, 'userAccountIndex'])->name('user.account.index');
         Route::post('/user/service-requests', [DashboardController::class, 'userServiceRequestStore'])->name('user.service-requests.store');
@@ -149,5 +152,12 @@ Route::middleware('auth')->group(function (): void {
 });
 
 Route::post('/logout', [AuthOtpController::class, 'logout'])->middleware('auth')->name('logout');
+
+
+
+
+
+
+
 
 

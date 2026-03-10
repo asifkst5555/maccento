@@ -50,7 +50,7 @@
             @if(!blank($lead->email))
             <a class="panel-link panel-btn-icon" style="margin-left:8px;" href="{{ route('admin.emails.inbox', ['compose_to' => $lead->email, 'compose_subject' => 'Follow-up from Maccento CRM', 'compose_message' => 'Hi ' . ($lead->name ?: 'there') . ",\n\nThanks for your interest in Maccento. We would love to help you move forward.\n\nBest regards,\nAlessio Battista\nMaccento Real Estate Media", 'lead_id' => $lead->id, 'recipient_name' => $lead->name, 'compose_template' => 'cold_followup', 'compose_goal' => 'Send a short warm follow-up and ask for a 10-minute call this week.']) }}" title="Email lead" aria-label="Email lead"><span class="panel-icon" aria-hidden="true"><x-panel-icon name="mail" /></span></a>
             @endif
-            <form method="post" action="{{ route('admin.leads.delete', $lead) }}" style="display:inline-block; margin-left:8px;" onsubmit="return confirm('Delete this lead?');">
+            <form method="post" action="{{ route('admin.leads.delete', $lead) }}" style="display:inline-block; margin-left:8px;" data-confirm="Delete this lead?">
               @csrf
               <button class="panel-btn panel-btn-danger panel-btn-icon" type="submit" title="Delete lead" aria-label="Delete lead"><span class="panel-icon-trash" aria-hidden="true"><x-panel-icon name="trash" /></span></button>
             </form>
@@ -65,3 +65,4 @@
   <x-panel-pagination :paginator="$leads" />
 </section>
 @endsection
+

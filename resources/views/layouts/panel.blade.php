@@ -629,6 +629,798 @@
         margin-bottom: 0.65rem;
       }
     }
+  
+    .panel-modal {
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background: rgba(12, 21, 33, 0.45);
+      z-index: 2000;
+      padding: 1.5rem;
+    }
+
+    .panel-modal.is-open {
+      display: flex;
+    }
+
+    .panel-modal-card {
+      width: min(520px, 92vw);
+      background: #ffffff;
+      border-radius: 16px;
+      border: 1px solid #d7e2ef;
+      box-shadow: 0 24px 60px rgba(12, 21, 33, 0.18);
+      padding: 1.2rem 1.35rem;
+      display: grid;
+      gap: 0.85rem;
+    }
+
+    .panel-modal-title {
+      margin: 0;
+      font-size: 1.15rem;
+      color: #10233a;
+    }
+
+    .panel-modal-body {
+      margin: 0;
+      color: #5f738d;
+      line-height: 1.5;
+    }
+
+    .panel-modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 0.6rem;
+    }
+
+    .panel-btn-danger {
+      background: #b71d34;
+      border-color: #9f162b;
+      color: #ffffff;
+    }
+
+    /* Responsive fixes for laptop widths */
+    .panel-main {
+      min-width: 0;
+    }
+
+    body.panel-page .panel-shell {
+      min-width: 0;
+      width: 100%;
+    }
+
+    body.panel-page .panel-table-wrap {
+      overflow-x: auto;
+    }
+
+    body.panel-page .panel-table {
+      min-width: 100%;
+    }
+
+    @media (max-width: 1366px) {
+      body.panel-page .panel-form-row {
+        flex-wrap: wrap;
+      }
+
+      body.panel-page .panel-form-row > * {
+        flex: 1 1 220px;
+        min-width: 220px;
+      }
+
+      body.panel-page .panel-actions {
+        flex-wrap: wrap;
+        justify-content: flex-end;
+      }
+    }
+
+    /* Shared corporate shell styling for admin + user workspaces */
+    .corp-admin-shell {
+      --corp-ink: #10233a;
+      --corp-ink-soft: #586b83;
+      --corp-line: #d6e0ec;
+      --corp-surface: #ffffff;
+      --corp-soft: #f3f7fc;
+      --corp-accent: #c11f37;
+      --corp-shadow: 0 14px 30px rgba(16, 35, 58, 0.08);
+    }
+
+    .corp-admin-shell .panel-card {
+      border: 1px solid var(--corp-line);
+      border-radius: 14px;
+      background: var(--corp-surface);
+      box-shadow: var(--corp-shadow);
+    }
+
+    .corp-admin-shell .panel-section-title,
+    .corp-admin-shell .panel-kanban-col-head h3,
+    .corp-admin-shell .panel-kanban-title {
+      color: var(--corp-ink);
+    }
+
+    .corp-admin-shell .panel-kpi-label,
+    .corp-admin-shell .panel-muted {
+      color: var(--corp-ink-soft);
+    }
+
+    .corp-admin-shell .panel-kpi-label {
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      font-size: 0.72rem;
+    }
+
+    .corp-admin-shell .panel-link {
+      color: #143557;
+      font-weight: 600;
+      text-decoration: none;
+    }
+
+    .corp-admin-shell .panel-link:hover {
+      color: var(--corp-accent);
+    }
+
+    .corp-admin-shell .panel-input,
+    .corp-admin-shell .panel-select,
+    .corp-admin-shell .panel-textarea {
+      border-radius: 10px;
+      border: 1px solid #c9d6e5;
+      background-color: #fff;
+    }
+
+    .corp-admin-shell .panel-select {
+      background-position: right 19px center !important;
+      padding-right: 42px !important;
+      background-size: 18px 18px !important;
+    }
+
+    .corp-admin-shell .panel-multi {
+      border: 1px solid #c9d6e5;
+      border-radius: 10px;
+      padding: 0.65rem;
+      background: #ffffff;
+      display: grid;
+      gap: 0.45rem;
+      max-height: 220px;
+      overflow: auto;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .corp-admin-shell .panel-multi label {
+      display: grid;
+      grid-template-columns: 18px minmax(0, 1fr);
+      gap: 0.55rem;
+      align-items: center;
+      padding: 0.4rem 0.55rem;
+      border-radius: 8px;
+      border: 1px solid transparent;
+      background: #f8fbff;
+      color: var(--corp-ink);
+      font-weight: 600;
+      font-size: 0.88rem;
+    }
+
+    @media (max-width: 960px) {
+      .corp-admin-shell .panel-multi {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+
+    .corp-admin-shell .project-dates-row {
+      align-items: flex-end;
+    }
+
+    .corp-admin-shell .project-dates-row > .panel-stack {
+      flex: 1 1 0;
+    }
+
+    .corp-admin-shell .panel-multi label:hover {
+      border-color: #cfd9e6;
+    }
+
+    .corp-admin-shell .panel-multi input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      accent-color: var(--corp-accent);
+    }
+
+    .corp-admin-shell .panel-btn {
+      border-radius: 10px;
+      border: 1px solid #bfcfe0;
+      font-weight: 600;
+    }
+
+    .corp-admin-shell .panel-btn-primary {
+      background: linear-gradient(90deg, #b71d34 0%, #cc2741 100%);
+      border-color: #a5172d;
+    }
+
+    .corp-admin-shell .panel-btn-icon {
+      width: 48px;
+      height: 48px;
+      padding: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 10px;
+      border: 1px solid #f0c7cd;
+      background: #fff5f6;
+      color: #b71d34;
+    }
+
+    .corp-admin-shell .panel-btn-icon svg {
+      width: 32px !important;
+      height: 32px !important;
+    }
+
+    .corp-admin-shell .panel-btn-icon:hover {
+      background: #fdecee;
+      border-color: #e7aeb8;
+    }
+
+    .corp-admin-shell .panel-btn-danger {
+      background: #b71d34;
+      border-color: #9f162b;
+      color: #ffffff;
+    }
+
+    .corp-admin-shell .panel-sticky-filters {
+      background: linear-gradient(180deg, #f8fbff 0%, #eef4fb 100%);
+      border: 1px solid #d9e3ef;
+      border-radius: 14px;
+      padding: 0.8rem;
+    }
+
+    .corp-admin-shell .panel-table-wrap {
+      border: 1px solid var(--corp-line);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .corp-admin-shell .panel-table {
+      min-width: 100%;
+    }
+
+    .corp-admin-shell .panel-table thead th {
+      background: var(--corp-soft);
+      color: #324963;
+    }
+
+    .corp-admin-shell .panel-table tbody tr:nth-child(even) {
+      background: #fbfdff;
+    }
+
+    .corp-admin-shell .panel-badge {
+      border-radius: 999px;
+      border: 1px solid #c5d3e3;
+      padding: 2px 10px;
+    }
+
+    .corp-admin-shell .panel-row-overdue {
+      background: #fff7f8;
+    }
+
+    /* Messages / Chats shared styles */
+    .messages-chat-shell {
+      --messages-bg: radial-gradient(circle at top, #f7f8fb 0%, #eef2f7 55%, #e9eef5 100%);
+      --messages-ink: #0f2137;
+      --messages-muted: #5f7286;
+      --messages-line: #d6dde7;
+      --messages-panel: #ffffff;
+      --messages-panel-alt: #f4f7fb;
+      --messages-shadow: 0 18px 38px rgba(15, 33, 55, 0.08);
+      --messages-accent: #b71c2d;
+      --messages-accent-dark: #8f1624;
+      --messages-danger: #b71c2d;
+      --messages-danger-dark: #8f1624;
+      display: grid;
+      gap: 1rem;
+    }
+
+    .messages-chat-shell .panel-card {
+      border: 1px solid var(--messages-line);
+      border-radius: 20px;
+      background: var(--messages-panel);
+      box-shadow: var(--messages-shadow);
+    }
+
+    .messages-chat-shell .panel-input,
+    .messages-chat-shell .panel-select,
+    .messages-chat-shell .panel-textarea,
+    .messages-chat-shell .panel-btn {
+      border-radius: 14px;
+      background-color: #fff;
+    }
+
+    .messages-chat-shell .panel-btn-primary {
+      background: linear-gradient(135deg, var(--messages-accent) 0%, var(--messages-accent-dark) 100%);
+      border-color: transparent;
+      color: #ffffff;
+      box-shadow: 0 14px 24px rgba(11, 61, 145, 0.2);
+    }
+
+    .messages-chat-shell .panel-btn-primary:hover {
+      filter: brightness(0.98);
+    }
+
+    .messages-chat-shell .panel-btn {
+      border-color: #cfd7e3;
+      color: var(--messages-ink);
+    }
+
+    .messages-chat-layout {
+      display: grid;
+      grid-template-columns: minmax(300px, 360px) minmax(0, 1fr);
+      gap: 1rem;
+      min-height: 72vh;
+    }
+
+    .messages-thread-panel {
+      padding: 1rem;
+      display: grid;
+      grid-template-rows: auto auto minmax(0, 1fr);
+      gap: 0.9rem;
+      background: linear-gradient(180deg, #ffffff 0%, #f5f7fb 100%);
+      color: var(--messages-ink);
+    }
+
+    .messages-thread-panel .panel-kpi-label,
+    .messages-thread-panel .panel-muted {
+      color: var(--messages-muted);
+    }
+
+    .messages-thread-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+
+    .messages-thread-title {
+      margin: 0;
+      font-size: 1.55rem;
+      line-height: 1.1;
+      color: var(--messages-ink);
+    }
+
+    .messages-thread-sub {
+      margin: 0.3rem 0 0;
+      color: var(--messages-muted);
+      font-size: 0.94rem;
+    }
+
+    .messages-thread-search {
+      display: grid;
+      gap: 0.7rem;
+    }
+
+    .messages-chat-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.6rem;
+    }
+
+    .messages-chat-tab {
+      padding: 0.55rem 1rem;
+      border-radius: 12px;
+      border: 1px solid var(--messages-line);
+      background: #ffffff;
+      color: var(--messages-ink);
+      font-weight: 600;
+      font-size: 0.9rem;
+      text-decoration: none;
+      transition: border-color 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
+    }
+
+    .messages-chat-tab:hover {
+      border-color: #bfcad8;
+      box-shadow: 0 10px 18px rgba(15, 33, 55, 0.08);
+    }
+
+    .messages-chat-tab.is-active {
+      background: linear-gradient(135deg, var(--messages-accent) 0%, var(--messages-accent-dark) 100%);
+      border-color: transparent;
+      color: #ffffff;
+      box-shadow: 0 14px 24px rgba(183, 28, 45, 0.2);
+    }
+
+    .messages-thread-search .panel-form-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto auto;
+      align-items: center;
+      gap: 0.6rem;
+    }
+
+    .messages-thread-clear {
+      text-decoration: none;
+      padding: 0.65rem 1.1rem;
+      border-radius: 14px;
+      border: 1px solid #cfd7e3;
+      background: #ffffff;
+      color: var(--messages-ink);
+      font-weight: 600;
+      font-size: 0.9rem;
+      line-height: 1;
+      transition: border-color 0.18s ease, background-color 0.18s ease;
+    }
+
+    .messages-thread-clear:hover {
+      border-color: #bfcad8;
+      background: #f8fafc;
+    }
+
+    .messages-thread-list {
+      display: grid;
+      gap: 0.7rem;
+      overflow: auto;
+      padding-right: 4px;
+    }
+
+    .messages-thread-divider {
+      margin-top: 0.2rem;
+      padding-top: 0.6rem;
+      border-top: 1px dashed #d7dfeb;
+      color: var(--messages-muted);
+      font-size: 0.74rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .messages-thread-item {
+      display: flex;
+      gap: 0.8rem;
+      padding: 0.7rem;
+      border-radius: 16px;
+      border: 1px solid #e0e7f1;
+      background: #ffffff;
+      text-decoration: none;
+      color: inherit;
+      transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+    }
+
+    .messages-thread-item:hover {
+      border-color: #c5d2e4;
+      box-shadow: 0 16px 28px rgba(16, 33, 55, 0.08);
+      transform: translateY(-1px);
+    }
+
+    .messages-thread-item.is-active {
+      border-color: transparent;
+      background: linear-gradient(135deg, rgba(183, 28, 45, 0.12) 0%, rgba(183, 28, 45, 0.08) 100%);
+      box-shadow: 0 16px 28px rgba(183, 28, 45, 0.15);
+    }
+
+    .messages-thread-avatar {
+      width: 38px;
+      height: 38px;
+      border-radius: 12px;
+      background: #edf2f8;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      color: #344a65;
+    }
+
+    .messages-thread-main {
+      display: grid;
+      gap: 0.35rem;
+      min-width: 0;
+    }
+
+    .messages-thread-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.6rem;
+    }
+
+    .messages-thread-name {
+      margin: 0;
+      font-size: 0.98rem;
+      font-weight: 700;
+      color: var(--messages-ink);
+    }
+
+    .messages-thread-time {
+      font-size: 0.75rem;
+      color: var(--messages-muted);
+    }
+
+    .messages-thread-meta {
+      margin: 0;
+      font-size: 0.82rem;
+      color: var(--messages-muted);
+    }
+
+    .messages-thread-preview {
+      margin: 0;
+      font-size: 0.82rem;
+      color: var(--messages-ink);
+    }
+
+    .messages-chat-panel {
+      padding: 1.2rem 1.3rem;
+      display: grid;
+      gap: 1rem;
+      min-height: 100%;
+      background: var(--messages-bg);
+    }
+
+    .messages-chat-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 1rem 1.1rem;
+      border-radius: 16px;
+      border: 1px solid #d9e2ef;
+      background: #ffffff;
+    }
+
+    .messages-chat-head h2 {
+      margin: 0;
+      font-size: 1.2rem;
+      color: var(--messages-ink);
+    }
+
+    .messages-chat-head p {
+      margin: 0.25rem 0 0;
+      color: var(--messages-muted);
+    }
+
+    .messages-chat-head-meta {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .messages-chat-stream {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      max-height: 48vh;
+      overflow: auto;
+      padding: 0.2rem 0.2rem 0.2rem 0.6rem;
+    }
+
+    .messages-chat-date {
+      align-self: center;
+      padding: 0.3rem 0.7rem;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.85);
+      border: 1px solid #dbe3ef;
+      color: var(--messages-muted);
+      font-size: 0.78rem;
+      font-weight: 600;
+    }
+
+    .messages-chat-row {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      max-width: min(75%, 460px);
+    }
+
+    .messages-chat-row.is-admin {
+      align-self: flex-end;
+      text-align: right;
+    }
+
+    .messages-chat-bubble {
+      padding: 0.7rem 0.9rem;
+      border-radius: 14px;
+      background: #ffffff;
+      border: 1px solid #dfe7f1;
+      color: var(--messages-ink);
+      font-weight: 500;
+      line-height: 1.45;
+    }
+
+    .messages-chat-row.is-admin .messages-chat-bubble {
+      background: #b71c2d;
+      color: #ffffff;
+      border-color: #b71c2d;
+      box-shadow: 0 12px 20px rgba(183, 28, 45, 0.2);
+    }
+
+    .messages-chat-note {
+      display: inline-flex;
+      gap: 0.35rem;
+      align-items: center;
+      color: var(--messages-muted);
+      font-size: 0.75rem;
+    }
+
+    .messages-empty-state {
+      display: grid;
+      place-items: center;
+      padding: 2rem 1rem;
+      text-align: center;
+      color: var(--messages-muted);
+      font-size: 0.9rem;
+    }
+
+    .messages-chat-compose {
+      display: grid;
+      gap: 0.65rem;
+      padding: 0.9rem 1rem;
+      border-radius: 16px;
+      border: 1px solid #d9e2ef;
+      background: #ffffff;
+    }
+
+    .messages-chat-compose-top {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 0.8rem;
+      align-items: center;
+    }
+
+    .messages-chat-compose .panel-textarea {
+      min-height: 120px;
+    }
+
+    @media (max-width: 1100px) {
+      .messages-chat-layout {
+        grid-template-columns: 320px minmax(0, 1fr);
+      }
+    }
+
+    @media (max-width: 960px) {
+      .messages-chat-layout {
+        grid-template-columns: 1fr;
+        min-height: auto;
+      }
+
+      .messages-thread-panel,
+      .messages-chat-panel {
+        min-height: auto;
+      }
+
+      .messages-chat-stream {
+        max-height: 40vh;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .messages-thread-search .panel-form-row {
+        grid-template-columns: 1fr;
+      }
+
+      .messages-chat-head {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .messages-chat-compose-top {
+        grid-template-columns: 1fr;
+      }
+
+      .messages-chat-row {
+        max-width: 100%;
+      }
+    }
+
+    /* Media delivery shared styles */
+    .media-delivery-upload-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 12px;
+    }
+
+    .media-delivery-upload-card {
+      border: 1px solid #d8e1ec;
+      border-radius: 12px;
+      background: #f9fbff;
+      padding: 12px;
+    }
+
+    .media-delivery-upload-card .panel-section-title {
+      margin-bottom: 8px;
+      font-size: 1rem;
+    }
+
+    .media-delivery-upload-card .panel-stack {
+      margin-bottom: 0;
+    }
+
+    .media-delivery-files-grid {
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      margin-top: 12px;
+      gap: 12px;
+    }
+
+    .media-file-list-card {
+      margin: 0;
+      border: 1px solid #d8e2ef;
+      background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+    }
+
+    .media-file-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .media-file-row {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 10px 12px;
+      border: 1px solid #e1e9f4;
+      border-radius: 10px;
+      background: #fff;
+    }
+
+    .media-file-meta {
+      min-width: 0;
+      display: grid;
+      gap: 4px;
+    }
+
+    .media-file-kind {
+      display: inline-flex;
+      align-items: center;
+      width: fit-content;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 11px;
+      letter-spacing: 0.04em;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: #28415f;
+      background: #eef4fb;
+      border: 1px solid #d0dced;
+    }
+
+    .media-file-name {
+      color: #1e3450;
+      font-weight: 600;
+      word-break: break-word;
+    }
+
+    .media-file-actions {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: nowrap;
+    }
+
+    .media-file-list-cta {
+      margin-top: 4px;
+      justify-content: flex-end;
+    }
+
+    .media-file-list-cta-group {
+      justify-content: flex-end;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .media-file-row.is-hidden-by-default {
+      display: none;
+    }
+
+    @media (max-width: 960px) {
+      .media-delivery-upload-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .media-file-row {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .media-file-actions {
+        width: 100%;
+        justify-content: flex-start;
+        flex-wrap: wrap;
+      }
+    }
   </style>
 </head>
 <body class="panel-page{{ auth()->check() ? (in_array(strtolower((string) auth()->user()->role), ['admin', 'owner', 'manager', 'photographer', 'editor'], true) ? ' panel-page-admin' : ' panel-page-client') : '' }}">
@@ -644,7 +1436,7 @@
         'manager' => 'Manager Access',
         'photographer' => 'Photographer Access',
         'editor' => 'Editor Access',
-        'agent' => 'Agent Access',
+        
         'client' => 'Client Access',
         default => 'User Access',
       };
@@ -723,11 +1515,7 @@
             <span class="panel-nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h9l5 5v13a1 1 0 0 1-1 1H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zm8 1.5V9h4.5M8 13h8m-8 3h8m-8-6h5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
             <span class="panel-nav-text">Invoices</span>
           </a>
-          <p class="panel-nav-group-title">Communication</p>
-          <a class="panel-nav-link @if(request()->routeIs('admin.messages.*')) is-active @endif" href="{{ route('admin.messages.index') }}" title="User Messages">
-            <span class="panel-nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v7A2.5 2.5 0 0 1 17.5 14H10l-4.5 4v-4H6.5A2.5 2.5 0 0 1 4 11.5v-5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg></span>
-            <span class="panel-nav-text">User Messages</span>
-          </a>
+
           @php
             $composeActive = request()->routeIs('admin.emails.inbox') && (string) request()->query('compose') === '1';
             $automationActive = request()->routeIs('admin.emails.automation.*');
@@ -779,7 +1567,11 @@
           </div>
           @endif
 
-          <p class="panel-nav-group-title">Delivery</p>
+          <p class="panel-nav-group-title">Communication</p>
+          <a class="panel-nav-link @if(request()->routeIs('admin.messages.*')) is-active @endif" href="{{ route('admin.messages.index') }}" title="Messages/Chats">
+            <span class="panel-nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v7A2.5 2.5 0 0 1 17.5 14H10l-4.5 4v-4H6.5A2.5 2.5 0 0 1 4 11.5v-5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg></span>
+            <span class="panel-nav-text">Messages/Chats</span>
+          </a>\r\n          <p class="panel-nav-group-title">Delivery</p>
           @php
             $projectCreateActive = request()->routeIs('admin.projects.index') && (string) request()->query('project_action') === 'create';
             $projectCompletedActive = request()->routeIs('admin.projects.index') && (string) request()->query('project_scope', 'ongoing') === 'past';
@@ -1641,8 +2433,89 @@
       }
     })();
   </script>
+  <div class="panel-modal" id="panelConfirmModal" aria-hidden="true">
+    <div class="panel-modal-card" role="dialog" aria-modal="true" aria-labelledby="panelConfirmTitle">
+      <h3 class="panel-modal-title" id="panelConfirmTitle">Confirm action</h3>
+      <p class="panel-modal-body" id="panelConfirmMessage">Are you sure?</p>
+      <div class="panel-modal-actions">
+        <button class="panel-btn" type="button" data-confirm-cancel>Cancel</button>
+        <button class="panel-btn panel-btn-danger" type="button" data-confirm-ok>Confirm</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      const modal = document.getElementById('panelConfirmModal');
+      if (!modal) return;
+      const titleEl = document.getElementById('panelConfirmTitle');
+      const messageEl = document.getElementById('panelConfirmMessage');
+      const cancelBtn = modal.querySelector('[data-confirm-cancel]');
+      const okBtn = modal.querySelector('[data-confirm-ok]');
+      let resolveConfirm = null;
+
+      const closeModal = () => {
+        modal.classList.remove('is-open');
+        modal.setAttribute('aria-hidden', 'true');
+        if (resolveConfirm) {
+          resolveConfirm(false);
+          resolveConfirm = null;
+        }
+      };
+
+      window.panelConfirm = function (message, title) {
+        return new Promise((resolve) => {
+          resolveConfirm = resolve;
+          if (titleEl) titleEl.textContent = title || 'Confirm action';
+          if (messageEl) messageEl.textContent = message || 'Are you sure?';
+          modal.classList.add('is-open');
+          modal.setAttribute('aria-hidden', 'false');
+        });
+      };
+
+      if (cancelBtn) cancelBtn.addEventListener('click', closeModal);
+      if (okBtn) okBtn.addEventListener('click', () => {
+        if (resolveConfirm) {
+          resolveConfirm(true);
+          resolveConfirm = null;
+        }
+        modal.classList.remove('is-open');
+        modal.setAttribute('aria-hidden', 'true');
+      });
+
+      modal.addEventListener('click', (event) => {
+        if (event.target === modal) closeModal();
+      });
+
+      document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') closeModal();
+      });
+
+      document.addEventListener('submit', async (event) => {
+        const form = event.target;
+        if (!(form instanceof HTMLFormElement)) return;
+        const message = form.getAttribute('data-confirm');
+        if (!message) return;
+        if (form.dataset.confirming === 'true') return;
+        event.preventDefault();
+        const title = form.getAttribute('data-confirm-title') || 'Confirm action';
+        form.dataset.confirming = 'true';
+        const ok = await window.panelConfirm(message, title);
+        form.dataset.confirming = 'false';
+        if (ok) form.submit();
+      });
+    })();
+  </script>
 </body>
 </html>
+
+
+
+
+
+
+
+
 
 
 

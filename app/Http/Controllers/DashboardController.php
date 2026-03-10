@@ -25,6 +25,7 @@ use App\Models\QuoteEvent;
 use App\Models\QuoteBuild;
 use App\Models\SendgridWebhookEvent;
 use App\Models\User;
+use App\Models\UserMessage;
 use App\Models\WatermarkSetting;
 use App\Models\WebsiteFormSubmission;
 use App\Services\PanelNotificationService;
@@ -599,6 +600,7 @@ class DashboardController extends Controller
             ->count();
 
         $canManageProjects = in_array(strtolower(trim((string) $request->user()?->role)), ['owner', 'admin', 'manager'], true);
+        $canDeleteProjects = $this->isOwnerRole((string) $request->user()?->role);
         $projectClients = Client::query()
             ->select(['id', 'name', 'email', 'status'])
             ->orderBy('name')
@@ -623,6 +625,7 @@ class DashboardController extends Controller
             ],
             'projectStatuses' => $allowedStatuses,
             'canManageProjects' => $canManageProjects,
+            'canDeleteProjects' => $canDeleteProjects,
             'projectClients' => $projectClients,
             'assignableUsers' => $this->assignableProjectUsers(),
         ]);
@@ -679,6 +682,17 @@ class DashboardController extends Controller
         return redirect()
             ->route('admin.clients.show', ['client' => (int) $validated['client_id'], 'project_id' => $project->id])
             ->with('status', 'Project created successfully.');
+    }
+
+    public function adminProjectDestroy(Request $request, ClientProject $project): RedirectResponse
+    {
+        $this->ensureOwnerAdminAccess($request);
+
+        $project->delete();
+
+        return redirect()
+            ->route('admin.projects.index')
+            ->with('status', 'Project deleted successfully.');
     }
 
     public function adminMediaDeliveryIndex(Request $request): View
@@ -1973,7 +1987,7 @@ class DashboardController extends Controller
         return back()->with('status', 'Submission status updated.');
     }
 
-    public function adminClientsIndex(Request $request): View
+        public function adminClientsIndex(Request $request): View
     {
         $status = trim((string) $request->string('status'));
         $search = trim((string) $request->string('search'));
@@ -1997,7 +2011,7 @@ class DashboardController extends Controller
                 });
             })
             ->latest('id')
-            ->paginate(20)
+            ->paginate(12)
             ->withQueryString();
 
         $recentRequests = ClientServiceRequest::query()
@@ -2015,8 +2029,7 @@ class DashboardController extends Controller
             ],
         ]);
     }
-
-    public function adminClientStore(Request $request): RedirectResponse
+public function adminClientStore(Request $request): RedirectResponse
     {
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
@@ -2024,7 +2037,7 @@ class DashboardController extends Controller
             'password' => ['required', 'string', 'min:8', 'max:100'],
             'phone' => ['nullable', 'string', 'max:30'],
             'company' => ['nullable', 'string', 'max:255'],
-            'role' => ['required', 'in:client,agent'],
+            'role' => ['required', 'in:client'],
             'status' => ['required', 'in:active,vip,inactive'],
             'notes' => ['nullable', 'string', 'max:1500'],
         ]);
@@ -2042,7 +2055,7 @@ class DashboardController extends Controller
                 $linkedUser->phone = (string) $validated['phone'];
             }
             $linkedUser->password = $passwordForAdmin;
-            if ($this->tableHasColumn('users', 'role') && !in_array((string) $linkedUser->role, ['client', 'agent'], true)) {
+            if ($this->tableHasColumn('users', 'role') && !in_array((string) $linkedUser->role, ['client'], true)) {
                 $linkedUser->role = $validated['role'];
             }
             $linkedUser->save();
@@ -2058,7 +2071,7 @@ class DashboardController extends Controller
             $accountMessage = 'Login created.';
         }
 
-        if ($this->tableHasColumn('users', 'role') && !in_array((string) $linkedUser->role, ['client', 'agent'], true)) {
+        if ($this->tableHasColumn('users', 'role') && !in_array((string) $linkedUser->role, ['client'], true)) {
             $linkedUser->role = $validated['role'];
             $linkedUser->save();
         }
@@ -2129,7 +2142,7 @@ class DashboardController extends Controller
                 'role' => $roleFilter,
                 'search' => $search,
             ],
-            'roles' => ['admin', 'manager', 'photographer', 'editor', 'client', 'agent'],
+            'roles' => ['admin', 'manager', 'photographer', 'editor', 'client'],
         ]);
     }
 
@@ -2139,7 +2152,7 @@ class DashboardController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', 'unique:users,email'],
             'phone' => ['nullable', 'string', 'max:30'],
-            'role' => ['required', 'in:admin,manager,photographer,editor,client,agent'],
+            'role' => ['required', 'in:admin,manager,photographer,editor,client'],
             'password' => ['nullable', 'string', 'min:8', 'max:100'],
             'company' => ['nullable', 'string', 'max:255'],
             'notes' => ['nullable', 'string', 'max:1500'],
@@ -2159,7 +2172,7 @@ class DashboardController extends Controller
             'password' => $passwordForAdmin,
         ]);
 
-        if (in_array($validated['role'], ['client', 'agent'], true)) {
+        if (in_array($validated['role'], ['client'], true)) {
             Client::updateOrCreate(
                 ['user_id' => $user->id],
                 [
@@ -2252,8 +2265,148 @@ class DashboardController extends Controller
         ]);
     }
 
-    public function adminClientMessagesIndex(Request $request): View
+        public function adminClientMessagesIndex(Request $request): View
     {
+        $mode = strtolower(trim((string) $request->string('mode', 'clients')));
+        $mode = in_array($mode, ['clients', 'users'], true) ? $mode : 'clients';
+        $role = strtolower(trim((string) $request->user()?->role));
+        $canViewAllChats = in_array($role, ['admin', 'owner'], true);
+        if (!$canViewAllChats) {
+            $mode = 'users';
+        }
+
+        if ($mode === 'users') {
+            $search = trim((string) $request->string('search'));
+            $userId = $request->filled('user_id') ? (int) $request->input('user_id') : null;
+            $adminId = (int) ($request->user()?->id ?? 0);
+
+            $users = User::query()
+                ->when(!$canViewAllChats, function ($query): void {
+                    $query->whereIn('role', $this->adminRoles());
+                }, function ($query): void {
+                    $query->where(function ($inner): void {
+                        $inner->whereNull('role')
+                            ->orWhereRaw('lower(role) != ?', ['client']);
+                    });
+                })
+                ->when($search !== '', function ($query) use ($search): void {
+                    $query->where(function ($inner) use ($search): void {
+                        $inner->where('name', 'like', "%{$search}%")
+                            ->orWhere('email', 'like', "%{$search}%");
+                    });
+                })
+                ->orderBy('name')
+                ->get();
+
+            $userIds = $users->pluck('id')->map(static fn ($id): int => (int) $id)->all();
+            $adminIds = $userIds;
+
+            $threadMessages = UserMessage::query()
+                ->with([
+                    'sender:id,name,email,role',
+                    'recipient:id,name,email,role',
+                ])
+                ->where(function ($query) use ($adminId, $adminIds, $canViewAllChats): void {
+                    if ($canViewAllChats) {
+                        $query->where('sender_user_id', $adminId)
+                            ->orWhere('recipient_user_id', $adminId);
+                        return;
+                    }
+                    $query->where(function ($inner) use ($adminId, $adminIds): void {
+                        $inner->where('sender_user_id', $adminId)
+                            ->whereIn('recipient_user_id', $adminIds);
+                    })->orWhere(function ($inner) use ($adminId, $adminIds): void {
+                        $inner->where('recipient_user_id', $adminId)
+                            ->whereIn('sender_user_id', $adminIds);
+                    });
+                })
+                ->latest('sent_at')
+                ->latest('id')
+                ->get();
+
+            $threadSummaries = collect(array_values($threadMessages->reduce(function (array $carry, UserMessage $message) use ($adminId, $userIds): array {
+                $otherId = (int) ($message->sender_user_id === $adminId ? $message->recipient_user_id : $message->sender_user_id);
+                if (!in_array($otherId, $userIds, true)) {
+                    return $carry;
+                }
+                if (!isset($carry[$otherId])) {
+                    $message->thread_user_id = $otherId;
+                    $carry[$otherId] = $message;
+                }
+                return $carry;
+            }, [])));
+
+            if ($userId === null || $userId <= 0) {
+                $userId = (int) ($threadSummaries->first()?->thread_user_id ?: 0);
+            }
+
+            if ($userId <= 0) {
+                $userId = (int) ($users->first()?->id ?: 0);
+            }
+
+            $activeUser = $userId > 0 ? User::query()->find($userId) : null;
+            $activeMessages = collect();
+            if ($activeUser) {
+                $activeMessages = UserMessage::query()
+                    ->with([
+                        'sender:id,name,email,role',
+                        'recipient:id,name,email,role',
+                    ])
+                    ->where(function ($query) use ($adminId, $activeUser): void {
+                        $query->where('sender_user_id', $adminId)
+                            ->where('recipient_user_id', $activeUser->id);
+                    })
+                    ->orWhere(function ($query) use ($adminId, $activeUser): void {
+                        $query->where('sender_user_id', $activeUser->id)
+                            ->where('recipient_user_id', $adminId);
+                    })
+                    ->latest('sent_at')
+                    ->latest('id')
+                    ->limit(200)
+                    ->get()
+                    ->sortBy(function (UserMessage $message): array {
+                        return [
+                            optional($message->sent_at)->timestamp ?? optional($message->created_at)->timestamp ?? 0,
+                            $message->id,
+                        ];
+                    })
+                    ->values();
+            }
+
+            $totalMessages = UserMessage::query()
+                ->where(function ($query) use ($adminId): void {
+                    $query->where('sender_user_id', $adminId)
+                        ->orWhere('recipient_user_id', $adminId);
+                })
+                ->count();
+
+            return view('admin.client-messages-index', [
+                'can_view_all_chats' => $canViewAllChats,
+                'mode' => 'users',
+                'clients' => collect(),
+                'users' => $users,
+                'threadSummaries' => $threadSummaries,
+                'activeClient' => null,
+                'activeUser' => $activeUser,
+                'activeMessages' => $activeMessages,
+                'messageStats' => [
+                    'total_messages' => $totalMessages,
+                    'client_threads' => $threadSummaries->count(),
+                    'admin_sent' => UserMessage::query()->where('sender_user_id', $adminId)->count(),
+                    'client_sent' => UserMessage::query()->where('recipient_user_id', $adminId)->count(),
+                ],
+                'statsLabels' => [
+                    'threads' => 'User Threads',
+                    'client_sent' => 'User Sent',
+                ],
+                'filters' => [
+                    'search' => $search,
+                    'user_id' => $activeUser?->id,
+                    'sender_role' => '',
+                ],
+            ]);
+        }
+
         $search = trim((string) $request->string('search'));
         $clientId = $request->filled('client_id') ? (int) $request->input('client_id') : null;
         $senderRole = trim((string) $request->string('sender_role'));
@@ -2334,15 +2487,23 @@ class DashboardController extends Controller
             ->get();
 
         return view('admin.client-messages-index', [
+            'can_view_all_chats' => $canViewAllChats,
+            'mode' => 'clients',
             'clients' => $clients,
+            'users' => collect(),
             'threadSummaries' => $threadSummaries,
             'activeClient' => $activeClient,
+            'activeUser' => null,
             'activeMessages' => $activeMessages,
             'messageStats' => [
                 'total_messages' => ClientMessage::query()->count(),
                 'client_threads' => ClientMessage::query()->distinct('client_id')->count('client_id'),
                 'admin_sent' => ClientMessage::query()->where('sender_role', 'admin')->count(),
                 'client_sent' => ClientMessage::query()->where('sender_role', 'client')->count(),
+            ],
+            'statsLabels' => [
+                'threads' => 'Client Threads',
+                'client_sent' => 'Client Sent',
             ],
             'filters' => [
                 'search' => $search,
@@ -2351,8 +2512,7 @@ class DashboardController extends Controller
             ],
         ]);
     }
-
-    public function adminClientMessagesCenterStore(Request $request): RedirectResponse
+public function adminClientMessagesCenterStore(Request $request): RedirectResponse
     {
         $validated = $request->validate([
             'client_id' => ['required', 'integer', 'exists:clients,id'],
@@ -2393,6 +2553,35 @@ class DashboardController extends Controller
         );
 
         return redirect()->route('admin.messages.index', ['client_id' => $client->id])->with('status', 'Message sent successfully.');
+    }
+
+    public function adminUserMessagesStore(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'recipient_user_id' => ['required', 'integer', 'exists:users,id'],
+            'message' => ['required', 'string', 'max:3000'],
+        ]);
+
+        $adminId = (int) ($request->user()?->id ?? 0);
+        $recipientId = (int) $validated['recipient_user_id'];
+
+        if ($recipientId === $adminId) {
+            return back()->withErrors([
+                'recipient_user_id' => 'Please choose a different user.',
+            ])->withInput();
+        }
+
+        UserMessage::create([
+            'sender_user_id' => $adminId,
+            'recipient_user_id' => $recipientId,
+            'message' => $validated['message'],
+            'sent_at' => now(),
+        ]);
+
+        return redirect()->route('admin.messages.index', [
+            'mode' => 'users',
+            'user_id' => $recipientId,
+        ])->with('status', 'Message sent successfully.');
     }
 
     public function adminClientProjectStore(Request $request, Client $client): RedirectResponse
@@ -3507,6 +3696,66 @@ class DashboardController extends Controller
     public function userMessagesIndex(Request $request): View
     {
         $user = $request->user();
+        $adminUsers = User::query()
+            ->whereIn('role', $this->adminRoles())
+            ->orderBy('name')
+            ->get(['id', 'name', 'email', 'role']);
+        $adminIds = $adminUsers->pluck('id')->map(static fn ($id): int => (int) $id)->all();
+        $activeAdminId = $request->filled('admin_id') ? (int) $request->input('admin_id') : null;
+        if ($activeAdminId === null || $activeAdminId <= 0) {
+            $activeAdminId = (int) ($adminUsers->first()?->id ?: 0);
+        }
+        $activeAdmin = $activeAdminId > 0 ? $adminUsers->firstWhere('id', $activeAdminId) : null;
+        $adminThreadMessages = UserMessage::query()
+            ->with([
+                'sender:id,name,email,role',
+                'recipient:id,name,email,role',
+            ])
+            ->where(function ($query) use ($user): void {
+                $query->where('sender_user_id', $user?->id)
+                    ->orWhere('recipient_user_id', $user?->id);
+            })
+            ->latest('sent_at')
+            ->latest('id')
+            ->get();
+        $adminThreadSummaries = collect(array_values($adminThreadMessages->reduce(function (array $carry, UserMessage $message) use ($user, $adminIds): array {
+            $otherId = (int) ($message->sender_user_id === (int) ($user?->id ?? 0) ? $message->recipient_user_id : $message->sender_user_id);
+            if (!in_array($otherId, $adminIds, true)) {
+                return $carry;
+            }
+            if (!isset($carry[$otherId])) {
+                $message->thread_admin_id = $otherId;
+                $carry[$otherId] = $message;
+            }
+            return $carry;
+        }, [])));
+        $adminMessages = collect();
+        if ($activeAdmin) {
+            $adminMessages = UserMessage::query()
+                ->with([
+                    'sender:id,name,email,role',
+                    'recipient:id,name,email,role',
+                ])
+                ->where(function ($query) use ($user, $activeAdmin): void {
+                    $query->where('sender_user_id', $user?->id)
+                        ->where('recipient_user_id', $activeAdmin->id);
+                })
+                ->orWhere(function ($query) use ($user, $activeAdmin): void {
+                    $query->where('sender_user_id', $activeAdmin->id)
+                        ->where('recipient_user_id', $user?->id);
+                })
+                ->latest('sent_at')
+                ->latest('id')
+                ->limit(200)
+                ->get()
+                ->sortBy(function (UserMessage $message): array {
+                    return [
+                        optional($message->sent_at)->timestamp ?? optional($message->created_at)->timestamp ?? 0,
+                        $message->id,
+                    ];
+                })
+                ->values();
+        }
         $client = $this->resolvePortalClient($user);
         $portalStats = $this->buildUserPortalStats($client, $this->userLeadQuery($user), $this->userQuoteQuery($user));
         $messages = $client
@@ -3539,12 +3788,47 @@ class DashboardController extends Controller
             : collect();
 
         return view('user.messages-index', [
+            'currentUser' => $user,
             'client' => $client,
             'portalStats' => $portalStats,
             'messages' => $messages,
             'serviceRequests' => $serviceRequests,
             'projects' => $projects,
+            'adminUsers' => $adminUsers,
+            'adminThreadSummaries' => $adminThreadSummaries,
+            'activeAdmin' => $activeAdmin,
+            'adminMessages' => $adminMessages,
         ]);
+    }
+
+    public function userAdminMessageStore(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'admin_user_id' => ['required', 'integer', 'exists:users,id'],
+            'message' => ['required', 'string', 'max:3000'],
+        ]);
+
+        $admin = User::query()
+            ->whereIn('role', $this->adminRoles())
+            ->where('id', (int) $validated['admin_user_id'])
+            ->first();
+
+        if (!$admin) {
+            return back()->withErrors([
+                'admin_user_id' => 'Selected admin is not available.',
+            ])->withInput();
+        }
+
+        UserMessage::create([
+            'sender_user_id' => $request->user()?->id,
+            'recipient_user_id' => $admin->id,
+            'message' => $validated['message'],
+            'sent_at' => now(),
+        ]);
+
+        return redirect()->route('user.messages.index', [
+            'admin_id' => $admin->id,
+        ])->with('status', 'Message sent successfully.');
     }
 
     public function userDeliveriesIndex(Request $request): View
@@ -4822,6 +5106,11 @@ class DashboardController extends Controller
         return in_array($role, ['owner', 'admin'], true);
     }
 
+    private function adminRoles(): array
+    {
+        return ['owner', 'admin', 'manager'];
+    }
+
     private function isManagerRole(string $role): bool
     {
         return strtolower(trim($role)) === 'manager';
@@ -5400,6 +5689,16 @@ class DashboardController extends Controller
         return 'INV-' . $date . '-' . strtoupper(uniqid());
     }
 }
+
+
+
+
+
+
+
+
+
+
 
 
 

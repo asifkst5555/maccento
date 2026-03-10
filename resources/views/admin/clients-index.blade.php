@@ -216,7 +216,7 @@
       <input class="panel-input" type="text" name="phone" placeholder="Phone">
       <select class="panel-select" name="role" required>
         <option value="client">Client</option>
-        <option value="agent">Agent</option>
+        
       </select>
       <input class="panel-input" type="text" name="company" placeholder="Company/Team">
       <select class="panel-select" name="status" required>
@@ -264,9 +264,9 @@
           <td class="clients-action-cell">
             <a class="panel-link panel-btn-icon" href="{{ route('admin.clients.show', $client) }}" title="Open client" aria-label="Open client"><span class="panel-icon" aria-hidden="true"><svg viewBox="0 0 20 20"><path d="M4 10h12M10 4l6 6-6 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span></a>
             @if($canDeleteClients)
-            <form method="post" action="{{ route('admin.clients.delete', $client) }}" onsubmit="return confirm('Delete this client? This will remove related projects, invoices, messages, and requests.');">
+            <form method="post" action="{{ route('admin.clients.delete', $client) }}" data-confirm="Delete this client? This will remove related projects, invoices, messages, and requests.">
               @csrf
-              <button class="panel-btn panel-btn-danger panel-btn-icon" type="submit" title="Delete client" aria-label="Delete client"><span class="panel-icon-trash" aria-hidden="true"><svg viewBox="0 0 20 20"><path d="M5 6h10M8 6V4h4v2m-6 0l.5 9h7L14 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span></button>
+              <button class="panel-btn panel-btn-danger panel-btn-icon" type="submit" title="Delete client" aria-label="Delete client"><span class="panel-icon-trash" aria-hidden="true"><x-panel-icon name="trash" /></span></button>
             </form>
             @endif
           </td>
@@ -314,3 +314,6 @@
 </section>
 </div>
 @endsection
+
+
+

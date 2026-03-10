@@ -120,7 +120,7 @@
             <input type="hidden" name="mode" value="dry-run">
             <button class="panel-btn" type="submit">Run Dry Run</button>
           </form>
-          <form method="post" action="{{ route('admin.emails.automation.backfill') }}" onsubmit="return confirm('Run live backfill now? This can send welcome emails to eligible historical leads.');">
+          <form method="post" action="{{ route('admin.emails.automation.backfill') }}" data-confirm="Run live backfill now? This can send welcome emails to eligible historical leads.">
             @csrf
             <input type="hidden" name="mode" value="live">
             <button class="panel-btn panel-btn-danger" type="submit">Run Live</button>
@@ -150,3 +150,4 @@
   </datalist>
 </section>
 @endsection
+

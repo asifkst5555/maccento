@@ -472,6 +472,65 @@
       width: 100%;
     }
   }
+
+  .client-corporate-shell .project-assign-dropdown {
+    position: relative;
+  }
+
+  .client-corporate-shell .project-assign-dropdown summary {
+    list-style: none;
+    cursor: pointer;
+  }
+
+  .client-corporate-shell .project-assign-dropdown summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .client-corporate-shell .project-assign-menu {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 8px);
+    width: min(260px, 60vw);
+    max-height: 260px;
+    overflow: auto;
+    background: #ffffff;
+    border: 1px solid #d2ddeb;
+    border-radius: 12px;
+    padding: 0.6rem;
+    box-shadow: 0 18px 30px rgba(16, 35, 58, 0.16);
+    z-index: 30;
+    display: grid;
+    gap: 0.45rem;
+  }
+
+  .client-corporate-shell .project-assign-menu label {
+    display: grid;
+    grid-template-columns: 18px minmax(0, 1fr);
+    gap: 0.5rem;
+    align-items: center;
+    padding: 0.35rem 0.45rem;
+    border-radius: 8px;
+    background: #f8fbff;
+    font-size: 0.86rem;
+    font-weight: 600;
+    color: var(--corp-ink);
+  }
+
+  .client-corporate-shell .project-assign-menu input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--corp-accent);
+  }
+
+  .client-corporate-shell .project-assign-save {
+    width: 42px;
+    height: 42px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+  }
 </style>
 <section class="panel-two-col client-corporate-shell">
   <div class="panel-main-col">
@@ -536,6 +595,28 @@
                   </select>
                   <button class="panel-btn" type="submit" style="flex: 0 0 auto;">Save</button>
                 </form>
+                @if($canManagePipeline)
+                @php
+                  $assignmentIds = $project->assignments->pluck('user_id')->map(static fn ($id): int => (int) $id)->all();
+                @endphp
+                <form method="post" action="{{ route('admin.projects.assignments.update', $project) }}" class="project-action-form" style="display: inline-flex; align-items: center; gap: 8px; flex-wrap: nowrap; white-space: nowrap; width: auto; margin: 0;">
+                  @csrf
+                  <details class="project-assign-dropdown">
+                    <summary class="panel-btn">Assign team</summary>
+                    <div class="project-assign-menu">
+                      @foreach($assignableUsers as $assignableUser)
+                        <label>
+                          <input type="checkbox" name="assigned_user_ids[]" value="{{ $assignableUser->id }}" @checked(in_array((int) $assignableUser->id, $assignmentIds, true))>
+                          <span>{{ $assignableUser->name }} @if($assignableUser->role) - {{ ucfirst($assignableUser->role) }} @endif</span>
+                        </label>
+                      @endforeach
+                    </div>
+                  </details>
+                  <button class="panel-btn panel-btn-primary project-assign-save" type="submit" title="Save assignments" aria-label="Save assignments">
+                    <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 10.5l3 3 7-7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  </button>
+                </form>
+                @endif
                 @else
                 <span class="panel-muted">Read only</span>
                 @endif
@@ -616,7 +697,7 @@
                 @else
                 <button class="panel-btn panel-btn-primary" type="button" disabled>View Media</button>
                 @endif
-                <a class="panel-link" href="{{ route('admin.clients.show', $client) }}">Open Client</a>
+<a class="panel-link" href="{{ route('admin.clients.show', $client) }}">Open Client</a>
                 @if($canManagePipeline)
                 <a class="panel-link" href="{{ route('admin.invoices.index', ['invoice_project' => $project->id]) }}">Project Invoice</a>
                 @endif
@@ -624,7 +705,6 @@
             </div>
 
             <div class="media-project-details" data-project-details>
-              @if($canUploadProjectMedia)
               <div class="media-stage-section">
                 <div class="media-delivery-upload-grid">
                   <article class="media-delivery-upload-card">
@@ -662,7 +742,7 @@
                             @if($canManagePipeline)
                             <form method="post" action="{{ route('admin.projects.media.delete', ['project' => $project, 'media' => $mediaItem]) }}" data-delete-form data-delete-name="{{ $mediaItem->original_name }}">
                               @csrf
-                              <button class="panel-btn panel-btn-danger panel-btn-icon" type="button" data-delete-trigger title="Delete media" aria-label="Delete media"><span class="panel-icon-trash" aria-hidden="true"><svg viewBox="0 0 20 20"><path d="M5 6h10M8 6V4h4v2m-6 0l.5 9h7L14 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span></button>
+                              <button class="panel-btn panel-btn-danger panel-btn-icon" type="button" data-delete-trigger title="Delete media" aria-label="Delete media"><span class="panel-icon-trash" aria-hidden="true"><x-panel-icon name="trash" /></span></button>
                             </form>
                             @endif
                           </div>
@@ -683,7 +763,7 @@
                             @if($canManagePipeline)
                             <form method="post" action="{{ route('admin.projects.media.delete', ['project' => $project, 'media' => $rawZipItem]) }}" data-delete-form data-delete-name="{{ $rawZipItem->original_name }}">
                               @csrf
-                              <button class="panel-btn panel-btn-danger panel-btn-icon" type="button" data-delete-trigger title="Delete raw ZIP" aria-label="Delete raw ZIP"><span class="panel-icon-trash" aria-hidden="true"><svg viewBox="0 0 20 20"><path d="M5 6h10M8 6V4h4v2m-6 0l.5 9h7L14 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span></button>
+                              <button class="panel-btn panel-btn-danger panel-btn-icon" type="button" data-delete-trigger title="Delete raw ZIP" aria-label="Delete raw ZIP"><span class="panel-icon-trash" aria-hidden="true"><x-panel-icon name="trash" /></span></button>
                             </form>
                             @endif
                           </div>
@@ -700,7 +780,7 @@
                   </section>
                 </div>
               </div>
-              @endif
+
 
               <div class="media-stage-section">
                 <div class="media-delivery-upload-grid">
@@ -735,7 +815,7 @@
                             @if($canManagePipeline)
                             <form method="post" action="{{ route('admin.projects.media.delete', ['project' => $project, 'media' => $mediaItem]) }}" data-delete-form data-delete-name="{{ $mediaItem->original_name }}">
                               @csrf
-                              <button class="panel-btn panel-btn-danger panel-btn-icon" type="button" data-delete-trigger title="Delete media" aria-label="Delete media"><span class="panel-icon-trash" aria-hidden="true"><svg viewBox="0 0 20 20"><path d="M5 6h10M8 6V4h4v2m-6 0l.5 9h7L14 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span></button>
+                              <button class="panel-btn panel-btn-danger panel-btn-icon" type="button" data-delete-trigger title="Delete media" aria-label="Delete media"><span class="panel-icon-trash" aria-hidden="true"><x-panel-icon name="trash" /></span></button>
                             </form>
                             @endif
                           </div>
@@ -786,7 +866,7 @@
                             @if($canManagePipeline)
                             <form method="post" action="{{ route('admin.projects.media.delete', ['project' => $project, 'media' => $zipItem]) }}" data-delete-form data-delete-name="{{ $zipItem->original_name }}">
                               @csrf
-                              <button class="panel-btn panel-btn-danger panel-btn-icon" type="button" data-delete-trigger title="Delete ZIP" aria-label="Delete ZIP"><span class="panel-icon-trash" aria-hidden="true"><svg viewBox="0 0 20 20"><path d="M5 6h10M8 6V4h4v2m-6 0l.5 9h7L14 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span></button>
+                              <button class="panel-btn panel-btn-danger panel-btn-icon" type="button" data-delete-trigger title="Delete ZIP" aria-label="Delete ZIP"><span class="panel-icon-trash" aria-hidden="true"><x-panel-icon name="trash" /></span></button>
                             </form>
                             @endif
                           </div>
@@ -862,7 +942,7 @@
                 <a class="panel-link" href="{{ route('admin.invoices.download', $invoice) }}">Download PDF</a>
                 <form method="post" action="{{ route('admin.invoices.delete', $invoice) }}" data-app-confirm="1" data-confirm-message="Delete invoice {{ $invoice->invoice_number }}?" class="inline-delete-form">
                   @csrf
-                  <button class="panel-btn panel-btn-danger panel-btn-icon" type="submit" title="Delete invoice" aria-label="Delete invoice"><span class="panel-icon-trash" aria-hidden="true"><svg viewBox="0 0 20 20"><path d="M5 6h10M8 6V4h4v2m-6 0l.5 9h7L14 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span></button>
+                  <button class="panel-btn panel-btn-danger panel-btn-icon" type="submit" title="Delete invoice" aria-label="Delete invoice"><span class="panel-icon-trash" aria-hidden="true"><x-panel-icon name="trash" /></span></button>
                 </form>
                 @else
                 <span class="panel-muted">No actions</span>
@@ -1075,3 +1155,8 @@
   </aside>
 </section>
 @endsection
+
+
+
+
+

@@ -5,23 +5,23 @@
 ])
 
 @section('content')
-<div class="client-portal-shell client-media-workspace">
-  <section class="panel-grid panel-grid-kpi-compact">
-    <article class="client-portal-kpi">
+<div class="corp-admin-shell client-media-workspace panel-stack">
+  <section class="panel-grid panel-grid-kpi">
+    <article class="panel-card">
       <span class="panel-kpi-label">Deliveries Ready</span>
-      <p class="client-portal-kpi-value">{{ $portalStats['deliveries_ready'] }}</p>
+      <p class="panel-kpi-value">{{ $portalStats['deliveries_ready'] }}</p>
     </article>
-    <article class="client-portal-kpi">
+    <article class="panel-card">
       <span class="panel-kpi-label">Active Projects</span>
-      <p class="client-portal-kpi-value">{{ $portalStats['active_projects'] }}</p>
+      <p class="panel-kpi-value">{{ $portalStats['active_projects'] }}</p>
     </article>
-    <article class="client-portal-kpi">
+    <article class="panel-card">
       <span class="panel-kpi-label">Unpaid Invoices</span>
-      <p class="client-portal-kpi-value">{{ $portalStats['unpaid_invoices'] }}</p>
+      <p class="panel-kpi-value">{{ $portalStats['unpaid_invoices'] }}</p>
     </article>
   </section>
 
-  <section class="panel-card client-portal-stack">
+  <section class="panel-card panel-stack">
     <h2 class="panel-section-title">Delivery Workspace</h2>
 
     @forelse($projects as $project)
@@ -36,7 +36,7 @@
         <div class="panel-form-row media-project-header">
           <div class="media-project-meta">
             <h3 class="media-project-title">{{ $project->title }}</h3>
-            <p class="client-portal-meta">
+            <p class="panel-muted">
               {{ $project->service_type ?: 'Service pending' }}
               @if(!blank($project->property_address))
                 &bull; {{ $project->property_address }}
@@ -140,7 +140,7 @@
         </div>
       </article>
     @empty
-      <div class="client-portal-empty">No project delivery records are available yet.</div>
+      <div class="panel-muted">No project delivery records are available yet.</div>
     @endforelse
 
     <x-panel-pagination :paginator="$projects" />
@@ -196,3 +196,8 @@
   })();
 </script>
 @endsection
+
+
+
+
+
