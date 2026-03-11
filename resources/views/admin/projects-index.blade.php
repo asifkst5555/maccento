@@ -505,8 +505,12 @@
             <span class="panel-muted">Read only</span>
             @endif
             @if($project->client)
+              @if($canManageProjects)
             <a class="panel-link" href="{{ route('admin.clients.show', ['client' => $project->client, 'project_id' => $project->id]) }}">Open project</a>
             <a class="panel-link" href="{{ route('admin.clients.show', $project->client) }}">Open client</a>
+              @else
+            <a class="panel-link" href="{{ route('admin.media-delivery.index', ['media_search' => $project->title]) }}#project-{{ $project->id }}">Open project</a>
+              @endif
             @endif
             @if($canManageProjects)
             <a class="panel-link" href="{{ route('admin.invoices.index', ['invoice_project' => $project->id]) }}">Project Invoice</a>

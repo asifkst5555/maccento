@@ -1615,11 +1615,13 @@
           </a>
           @endif
 
+          @if($canManagePipeline)
           <p class="panel-nav-group-title">Accounts</p>
           <a class="panel-nav-link @if(request()->routeIs('admin.clients.*')) is-active @endif" href="{{ route('admin.clients.index') }}" title="Clients">
             <span class="panel-nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 11c1.66 0 2.99-1.57 2.99-3.5S17.66 4 16 4s-3 1.57-3 3.5S14.34 11 16 11zM8 11c1.66 0 3-1.57 3-3.5S9.66 4 8 4 5 5.57 5 7.5 6.34 11 8 11zm0 2c-2.33 0-7 1.17-7 3.5V20h14v-3.5C15 14.17 10.33 13 8 13zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.98 1.97 3.45V20h7v-3.5c0-2.33-4.67-3.5-7-3.5z" fill="currentColor"/></svg></span>
             <span class="panel-nav-text">Clients</span>
           </a>
+          @endif
           @if($canManageUsers)
           <a class="panel-nav-link @if(request()->routeIs('admin.users.*')) is-active @endif" href="{{ route('admin.users.index') }}" title="User Accounts">
             <span class="panel-nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5zm-7 8a7 7 0 0 1 14 0H5zm12.5-9.5h4m-2-2v4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>
@@ -1850,14 +1852,26 @@
       const sidebarOverlay = document.querySelector('[data-panel-overlay]');
       if (!app) return;
 
+      const setTopbarVars = function () {
+        if (!topbar) return;
+        const height = Math.ceil(topbar.getBoundingClientRect().height || 0);
+        if (height > 0) {
+          document.documentElement.style.setProperty('--panel-topbar-fixed-height', height + 'px');
+          document.documentElement.style.setProperty('--panel-topbar-sticky-height', height + 'px');
+        }
+      };
+
       const syncTopbarState = function () {
         if (!topbar) return;
         const condensed = window.scrollY > 20;
         topbar.classList.toggle('is-condensed', condensed);
+        window.requestAnimationFrame(setTopbarVars);
       };
 
       syncTopbarState();
       window.addEventListener('scroll', syncTopbarState, { passive: true });
+      window.addEventListener('resize', setTopbarVars);
+      window.requestAnimationFrame(setTopbarVars);
 
       const storageKey = 'maccento_panel_sidebar_collapsed';
       const media = window.matchMedia('(max-width: 1100px)');

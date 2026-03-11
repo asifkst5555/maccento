@@ -22,6 +22,9 @@
     --corp-line: #d8e1ec;
     --corp-accent: #c21f37;
     --corp-shadow: 0 14px 32px rgba(16, 35, 58, 0.08);
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 340px;
+    align-items: start;
     background: linear-gradient(180deg, #f8fbff 0%, #edf3fa 100%);
     border: 1px solid #dde6f2;
     border-radius: 16px;
@@ -498,6 +501,7 @@
     .client-corporate-shell {
       border-radius: 12px;
       padding: 0.75rem;
+      grid-template-columns: 1fr;
     }
 
     .client-corporate-shell .panel-side-col {
@@ -589,8 +593,29 @@
     }
   }
 
+  .client-corporate-shell .panel-table-wrap,
+  .client-corporate-shell .panel-table,
+  .client-corporate-shell .panel-table tbody {
+    overflow: visible;
+  }
+
+  .client-corporate-shell .project-action-cell {
+    position: relative;
+    z-index: 10;
+  }
+
   .client-corporate-shell .project-assign-dropdown {
     position: relative;
+    z-index: 12;
+  }
+
+  .client-corporate-shell .project-assign-dropdown[open] {
+    z-index: 20;
+  }
+
+  .client-corporate-shell .panel-card.projects-card {
+    position: relative;
+    z-index: 1;
   }
 
   .client-corporate-shell .project-assign-dropdown summary {
@@ -603,20 +628,24 @@
   }
 
   .client-corporate-shell .project-assign-menu {
-    position: absolute;
-    right: 0;
-    top: calc(100% + 8px);
-    width: min(260px, 60vw);
-    max-height: 260px;
+    position: fixed;
+    top: var(--assign-top, 0px);
+    left: var(--assign-left, 0px);
+    width: min(260px, 70vw);
+    max-height: min(320px, calc(100vh - 24px));
     overflow: auto;
     background: #ffffff;
     border: 1px solid #d2ddeb;
     border-radius: 12px;
     padding: 0.6rem;
     box-shadow: 0 18px 30px rgba(16, 35, 58, 0.16);
-    z-index: 30;
-    display: grid;
+    z-index: 400;
+    display: none;
     gap: 0.45rem;
+  }
+
+  .client-corporate-shell .project-assign-dropdown[open] .project-assign-menu {
+    display: grid;
   }
 
   .client-corporate-shell .project-assign-menu label {
@@ -661,7 +690,7 @@
     </article>
     @endif
 
-    <article class="panel-card">
+    <article class="panel-card projects-card">
       <h2 class="panel-section-title">Projects</h2>
       @if(!$focusedProject && $canManagePipeline)
       <form method="post" action="{{ route('admin.clients.projects.store', $client) }}" class="panel-stack">
@@ -717,7 +746,7 @@
                 @endphp
                 <form method="post" action="{{ route('admin.projects.assignments.update', $project) }}" class="project-action-form" style="display: inline-flex; align-items: center; gap: 8px; flex-wrap: nowrap; white-space: nowrap; width: auto; margin: 0;">
                   @csrf
-                  <details class="project-assign-dropdown">
+                  <details class="project-assign-dropdown" data-assign-dropdown>
                     <summary class="panel-btn">Assign team</summary>
                     <div class="project-assign-menu">
                       @foreach($assignableUsers as $assignableUser)
@@ -1251,6 +1280,90 @@
                       form.hidden = true;
                       var body = card ? card.querySelector('[data-comment-body]') : null;
                       if (body) body.hidden = false;
+                    });
+                  });
+                })();
+              </script>
+              <script>
+                (function () {
+                  var dropdowns = document.querySelectorAll('[data-assign-dropdown]');
+                  if (!dropdowns.length) return;
+
+                  function positionMenu(details) {
+                    var summary = details.querySelector('summary');
+                    var menu = details.querySelector('.project-assign-menu');
+                    if (!summary || !menu) return;
+
+                    var rect = summary.getBoundingClientRect();
+                    var menuWidth = menu.offsetWidth || 260;
+                    var viewportWidth = window.innerWidth;
+                    var viewportHeight = window.innerHeight;
+                    var padding = 8;
+                    var spaceBelow = viewportHeight - rect.bottom;
+                    var openUpwards = spaceBelow < 220 && rect.top > 220;
+
+                    var top = openUpwards ? (rect.top - menu.offsetHeight - padding) : (rect.bottom + padding);
+                    if (openUpwards && top < padding) {
+                      top = padding;
+                    }
+
+                    var left = rect.right - menuWidth;
+                    if (left < padding) left = padding;
+                    if (left + menuWidth > viewportWidth - padding) {
+                      left = Math.max(padding, viewportWidth - menuWidth - padding);
+                    }
+
+                    menu.style.maxHeight = openUpwards
+                      ? Math.max(160, rect.top - padding * 2) + 'px'
+                      : Math.max(160, viewportHeight - rect.bottom - padding * 2) + 'px';
+
+                    details.style.setProperty('--assign-top', top + 'px');
+                    details.style.setProperty('--assign-left', left + 'px');
+                  }
+
+                  function closeOthers(current) {
+                    dropdowns.forEach(function (item) {
+                      if (item !== current) {
+                        item.removeAttribute('open');
+                      }
+                    });
+                  }
+
+                  dropdowns.forEach(function (details) {
+                    var summary = details.querySelector('summary');
+                    if (!summary) return;
+
+                    summary.addEventListener('click', function () {
+                      setTimeout(function () {
+                        if (details.hasAttribute('open')) {
+                          closeOthers(details);
+                          positionMenu(details);
+                        }
+                      }, 0);
+                    });
+                  });
+
+                  window.addEventListener('resize', function () {
+                    dropdowns.forEach(function (details) {
+                      if (details.hasAttribute('open')) {
+                        positionMenu(details);
+                      }
+                    });
+                  });
+
+                  window.addEventListener('scroll', function () {
+                    dropdowns.forEach(function (details) {
+                      if (details.hasAttribute('open')) {
+                        positionMenu(details);
+                      }
+                    });
+                  }, true);
+
+                  document.addEventListener('click', function (event) {
+                    dropdowns.forEach(function (details) {
+                      if (!details.hasAttribute('open')) return;
+                      if (details.contains(event.target)) return;
+                      details.removeAttribute('open');
                     });
                   });
                 })();

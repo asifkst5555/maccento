@@ -709,6 +709,8 @@ class DashboardController extends Controller
                 },
                 'assignments.user:id,name,email,role',
                 'invoices:id,client_project_id,status',
+                'comments.user:id,name,email,role',
+                'comments.parent.user:id,name,email,role',
             ])
             ->when($search !== '', function ($query) use ($search): void {
                 $query->where(function ($inner) use ($search): void {
