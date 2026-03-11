@@ -679,6 +679,30 @@ class DashboardController extends Controller
             ClientProjectAssignment::query()->insert($assignmentRows);
         }
 
+        $internalActionUrl = $this->projectInternalActionUrl($project);
+        $this->notifyProjectAssignees(
+            $project,
+            'project_assigned',
+            'New project assigned',
+            "Project \"{$project->title}\" has been created and assigned.",
+            $internalActionUrl,
+            ['project_id' => $project->id, 'client_id' => $project->client_id],
+            (int) ($request->user()?->id ?? 0),
+            true
+        );
+
+        $client = Client::query()->find((int) $project->client_id);
+        if ($client) {
+            $this->notifyClientUser(
+                $client,
+                'project_created',
+                'New project created',
+                "Your project \"{$project->title}\" has been created.",
+                route('user.projects.show', $project),
+                ['project_id' => $project->id]
+            );
+        }
+
         return redirect()
             ->route('admin.clients.show', ['client' => (int) $validated['client_id'], 'project_id' => $project->id])
             ->with('status', 'Project created successfully.');
@@ -2590,6 +2614,17 @@ public function adminClientMessagesCenterStore(Request $request): RedirectRespon
             'sent_at' => now(),
         ]);
 
+        $senderName = (string) ($request->user()?->name ?? 'Admin');
+        $messagePreview = mb_strimwidth($validated['message'], 0, 140, '...');
+        $this->notificationService()->notifyUser(
+            $recipientId,
+            'direct_message_received',
+            "New message from {$senderName}",
+            $messagePreview,
+            route('admin.messages.index', ['mode' => 'users', 'user_id' => $adminId]),
+            ['sender_id' => $adminId]
+        );
+
         return redirect()->route('admin.messages.index', [
             'mode' => 'users',
             'user_id' => $recipientId,
@@ -2629,6 +2664,27 @@ public function adminClientMessagesCenterStore(Request $request): RedirectRespon
             ]);
         }
 
+        $internalActionUrl = $this->projectInternalActionUrl($project);
+        $this->notifyProjectAssignees(
+            $project,
+            'project_assigned',
+            'New project assigned',
+            "Project \"{$project->title}\" has been created and assigned.",
+            $internalActionUrl,
+            ['project_id' => $project->id, 'client_id' => $project->client_id],
+            (int) ($request->user()?->id ?? 0),
+            true
+        );
+
+        $this->notifyClientUser(
+            $client,
+            'project_created',
+            'New project created',
+            "Your project \"{$project->title}\" has been created.",
+            route('user.projects.show', $project),
+            ['project_id' => $project->id]
+        );
+
         return back()->with('status', 'Project created.');
     }
 
@@ -2656,6 +2712,18 @@ public function adminClientMessagesCenterStore(Request $request): RedirectRespon
             }
         }
 
+        $internalActionUrl = $this->projectInternalActionUrl($project);
+        $this->notifyProjectAssignees(
+            $project,
+            'project_status_updated_internal',
+            'Project status updated',
+            "Project \"{$project->title}\" is now {$project->status}.",
+            $internalActionUrl,
+            ['project_id' => $project->id, 'status' => $project->status],
+            (int) ($request->user()?->id ?? 0),
+            true
+        );
+
         return back()->with('status', 'Project status updated.');
     }
 
@@ -2668,10 +2736,44 @@ public function adminClientMessagesCenterStore(Request $request): RedirectRespon
             'assigned_user_ids.*' => ['integer', 'exists:users,id'],
         ]);
 
+        $previousAssignmentIds = $project->assignedUsers()
+            ->pluck('users.id')
+            ->map(static fn ($id): int => (int) $id)
+            ->all();
+
         $assignmentIds = $this->sanitizeAssignableUserIds((array) ($validated['assigned_user_ids'] ?? []));
         $project->assignedUsers()->syncWithPivotValues($assignmentIds, [
             'assigned_by' => $request->user()?->id,
         ]);
+
+        $newAssigneeIds = array_values(array_diff($assignmentIds, $previousAssignmentIds));
+        if ($newAssigneeIds !== []) {
+            $actorId = (int) ($request->user()?->id ?? 0);
+            $internalActionUrl = $this->projectInternalActionUrl($project);
+            $messageBody = "You have been assigned to project \"{$project->title}\".";
+
+            $managerIds = User::query()
+                ->whereIn('role', ['owner', 'admin', 'manager'])
+                ->pluck('id')
+                ->map(static fn ($id): int => (int) $id)
+                ->all();
+
+            $recipientIds = array_values(array_unique(array_merge($newAssigneeIds, $managerIds)));
+            if ($actorId > 0) {
+                $recipientIds = array_values(array_filter($recipientIds, static fn ($id): bool => (int) $id !== $actorId));
+            }
+
+            foreach ($recipientIds as $userId) {
+                $this->notificationService()->notifyUser(
+                    (int) $userId,
+                    'project_assigned',
+                    'Project assigned',
+                    $messageBody,
+                    $internalActionUrl,
+                    ['project_id' => $project->id, 'client_id' => $project->client_id]
+                );
+            }
+        }
 
         return back()->with('status', 'Assigned team updated.');
     }
@@ -2696,7 +2798,7 @@ public function adminClientMessagesCenterStore(Request $request): RedirectRespon
             }
         }
 
-        ClientProjectComment::query()->create([
+        $comment = ClientProjectComment::query()->create([
             'client_project_id' => $project->id,
             'parent_comment_id' => $parentCommentId,
             'user_id' => $request->user()?->id,
@@ -2713,6 +2815,20 @@ public function adminClientMessagesCenterStore(Request $request): RedirectRespon
                 route('user.projects.show', $project)
             );
         }
+
+        $internalActionUrl = $this->projectInternalActionUrl($project);
+        $commentAuthor = (string) ($request->user()?->name ?? 'Team member');
+        $commentPreview = mb_strimwidth($validated['body'], 0, 140, '...');
+        $this->notifyProjectAssignees(
+            $project,
+            'project_comment_added_internal',
+            'New project comment',
+            "{$commentAuthor}: {$commentPreview}",
+            $internalActionUrl,
+            ['project_id' => $project->id, 'comment_id' => $comment->id],
+            (int) ($request->user()?->id ?? 0),
+            true
+        );
 
         return back()->with('status', 'Project comment posted.');
     }
@@ -3774,13 +3890,27 @@ public function userProjectCommentStore(Request $request, ClientProject $project
             }
         }
 
-        ClientProjectComment::query()->create([
+        $comment = ClientProjectComment::query()->create([
             'client_project_id' => $project->id,
             'parent_comment_id' => $parentCommentId,
             'user_id' => $request->user()?->id,
             'sender_role' => 'client',
             'body' => $validated['body'],
         ]);
+
+        $internalActionUrl = $this->projectInternalActionUrl($project);
+        $commentAuthor = (string) ($request->user()?->name ?? 'Client');
+        $commentPreview = mb_strimwidth($validated['body'], 0, 140, '...');
+        $this->notifyProjectAssignees(
+            $project,
+            'project_comment_added_internal',
+            'Client comment added',
+            "{$commentAuthor}: {$commentPreview}",
+            $internalActionUrl,
+            ['project_id' => $project->id, 'comment_id' => $comment->id],
+            null,
+            true
+        );
 
         return back()->with('status', 'Project comment posted.');
     }
@@ -3996,6 +4126,17 @@ public function userProjectCommentStore(Request $request, ClientProject $project
             'message' => $validated['message'],
             'sent_at' => now(),
         ]);
+
+        $senderName = (string) ($request->user()?->name ?? 'Client');
+        $messagePreview = mb_strimwidth($validated['message'], 0, 140, '...');
+        $this->notificationService()->notifyUser(
+            $admin->id,
+            'direct_message_received',
+            "New message from {$senderName}",
+            $messagePreview,
+            route('admin.messages.index', ['mode' => 'users', 'user_id' => (int) ($request->user()?->id ?? 0)]),
+            ['sender_id' => (int) ($request->user()?->id ?? 0)]
+        );
 
         return redirect()->route('user.messages.index', [
             'admin_id' => $admin->id,
@@ -4456,6 +4597,39 @@ public function userProjectCommentStore(Request $request, ClientProject $project
             'unread_count' => $unreadCount,
             'notifications' => $notifications,
         ]);
+    }
+
+    private function projectInternalActionUrl(ClientProject $project): string
+    {
+        return route('admin.media-delivery.index', ['media_search' => $project->title]) . '#project-' . $project->id;
+    }
+
+    private function notifyProjectAssignees(ClientProject $project, string $type, string $title, ?string $body = null, ?string $actionUrl = null, array $data = [], ?int $actorId = null, bool $includeManagers = true): void
+    {
+        $project->loadMissing('assignments');
+        $assigneeIds = $project->assignments
+            ->pluck('user_id')
+            ->map(static fn ($id): int => (int) $id)
+            ->all();
+
+        $recipientIds = $assigneeIds;
+        if ($includeManagers) {
+            $managerIds = User::query()
+                ->whereIn('role', ['owner', 'admin', 'manager'])
+                ->pluck('id')
+                ->map(static fn ($id): int => (int) $id)
+                ->all();
+            $recipientIds = array_merge($recipientIds, $managerIds);
+        }
+
+        $recipientIds = array_values(array_unique(array_filter($recipientIds, static fn ($id): bool => (int) $id > 0)));
+        if ($actorId) {
+            $recipientIds = array_values(array_filter($recipientIds, static fn ($id): bool => (int) $id !== (int) $actorId));
+        }
+
+        foreach ($recipientIds as $userId) {
+            $this->notificationService()->notifyUser((int) $userId, $type, $title, $body, $actionUrl, $data);
+        }
     }
 
     /**

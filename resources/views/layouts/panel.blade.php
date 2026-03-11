@@ -1732,6 +1732,14 @@
                       'new_service_request' => 'messages',
                       'service_request_status_updated' => 'messages',
                       'project_status_updated' => 'messages',
+                      'project_status_updated_internal' => 'messages',
+                      'project_created' => 'messages',
+                      'project_assigned' => 'messages',
+                      'project_comment_added' => 'messages',
+                      'project_comment_added_internal' => 'messages',
+                      'direct_message_received' => 'messages',
+                      'admin_email_sent' => 'messages',
+                      'client_email_reply_received' => 'messages',
                     ];
                   @endphp
                   @forelse(($panelNotifications ?? collect()) as $notification)
