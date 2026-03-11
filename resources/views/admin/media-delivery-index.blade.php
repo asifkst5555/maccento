@@ -302,13 +302,22 @@
   }
 
   .project-comment-edit-form {
-    display: grid;
+    display: none;
     gap: 8px;
+  }
+
+  .project-comment-edit-form.is-open {
+    display: grid;
   }
 
   .project-comment-edit-actions {
     display: flex;
     gap: 8px;
+  }
+
+  .project-comment-edit-form[hidden],
+  .project-comment-reply-banner[hidden] {
+    display: none !important;
   }
 
 
@@ -843,6 +852,11 @@
     if (!scopes.length) return;
 
     scopes.forEach(function (scope) {
+      scope.querySelectorAll('[data-edit-form]').forEach(function (editForm) {
+        editForm.hidden = true;
+        editForm.classList.remove('is-open');
+      });
+
       var form = scope.querySelector('[data-comment-form]');
       if (!form) return;
 
@@ -884,6 +898,7 @@
           if (body) body.hidden = true;
           if (editForm) {
             editForm.hidden = false;
+            editForm.classList.add('is-open');
             var textarea = editForm.querySelector('textarea');
             if (textarea) textarea.focus();
           }
@@ -896,6 +911,7 @@
           if (!formEl) return;
           var card = btn.closest('[data-comment-card]');
           formEl.hidden = true;
+          formEl.classList.remove('is-open');
           var body = card ? card.querySelector('[data-comment-body]') : null;
           if (body) body.hidden = false;
         });
