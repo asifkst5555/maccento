@@ -14,7 +14,7 @@
   <div class="panel-modal-dialog" style="max-width: 560px;">
     <div class="panel-modal-head">
       <h3 class="panel-modal-title">{{ $title }}</h3>
-      <button class="panel-modal-close" type="button" data-delete-close aria-label="Close delete confirmation">ÃƒÆ’Ã¢â‚¬â€</button>
+      <button class="panel-modal-close" type="button" data-delete-close aria-label="Close delete confirmation">&times;</button>
     </div>
 
     <div class="panel-modal-body">
@@ -25,7 +25,7 @@
 
     <div class="panel-modal-foot" style="gap:10px;">
       <button class="panel-btn" type="button" data-delete-close>Cancel</button>
-      <button class="panel-btn panel-btn-danger panel-btn-icon" type="button" id="{{ $confirmId }}" title="Confirm delete" aria-label="Confirm delete"><span class="panel-icon-trash" aria-hidden="true"><x-panel-icon name="trash" /></span></button>
+      <button class="panel-btn panel-btn-danger" type="button" id="{{ $confirmId }}" title="Confirm delete" aria-label="Confirm delete">Confirm</button>
     </div>
   </div>
 </div>
@@ -44,26 +44,33 @@
 
     const closeModal = function () {
       modal.hidden = true;
+      modal.classList.remove('is-open');
       document.body.classList.remove('panel-modal-open');
       activeForm = null;
       nameEl.textContent = '-';
     };
+    const triggerSelector = @json($triggerSelector);
 
-    document.querySelectorAll(@json($triggerSelector)).forEach(function (button) {
-      button.addEventListener('click', function (event) {
-        event.preventDefault();
-        const form = button.closest('form[data-delete-form]');
-        if (!form) {
-          return;
-        }
+    document.addEventListener('click', function (event) {
+      const button = event.target.closest(triggerSelector);
+      if (!button) {
+        return;
+      }
 
-        activeForm = form;
-        const fileName = form.getAttribute('data-delete-name') || 'Selected file';
-        nameEl.textContent = fileName;
-        modal.hidden = false;
-        document.body.classList.add('panel-modal-open');
-      });
+      event.preventDefault();
+      const form = button.closest('form[data-delete-form]');
+      if (!form) {
+        return;
+      }
+
+      activeForm = form;
+      const fileName = form.getAttribute('data-delete-name') || 'Selected file';
+      nameEl.textContent = fileName;
+      modal.hidden = false;
+      modal.classList.add('is-open');
+      document.body.classList.add('panel-modal-open');
     });
+
 
     modal.querySelectorAll('[data-delete-close]').forEach(function (button) {
       button.addEventListener('click', closeModal);
@@ -91,3 +98,13 @@
     });
   })();
 </script>
+
+
+
+
+
+
+
+
+
+

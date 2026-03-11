@@ -82,6 +82,122 @@
     background: linear-gradient(90deg, #b71d34 0%, #cc2741 100%);
   }
 
+  .project-discussion-card {
+    display: grid;
+    gap: 0.9rem;
+  }
+
+  .project-discussion-stream {
+    display: grid;
+    gap: 0.85rem;
+    max-height: 420px;
+    overflow-y: auto;
+    padding-right: 0.25rem;
+  }
+
+  .project-comment-card {
+    border: 1px solid #dbe3ee;
+    border-radius: 18px;
+    padding: 0.95rem 1.05rem;
+    background: #ffffff;
+    box-shadow: 0 10px 24px rgba(18, 35, 58, 0.08);
+  }
+
+  .project-comment-card.is-internal {
+    border-color: rgba(194, 31, 55, 0.28);
+    background: #fff8f9;
+  }
+
+  .project-comment-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.75rem;
+    align-items: flex-start;
+  }
+
+  .project-comment-author {
+    display: flex;
+    gap: 0.7rem;
+    align-items: center;
+  }
+
+  .project-comment-avatar {
+    width: 42px;
+    height: 42px;
+    border-radius: 999px;
+    background: linear-gradient(140deg, #b71c2d, #d23b4f);
+    color: #ffffff;
+    display: grid;
+    place-items: center;
+    font-weight: 700;
+    font-size: 0.85rem;
+    box-shadow: 0 6px 14px rgba(183, 28, 45, 0.25);
+  }
+
+  .project-comment-name {
+    margin: 0;
+    font-weight: 700;
+    color: var(--corp-ink);
+  }
+
+  .project-comment-meta {
+    margin: 0;
+    font-size: 0.75rem;
+    color: var(--corp-ink-soft);
+  }
+
+  .project-comment-time {
+    font-size: 0.75rem;
+    color: var(--corp-ink-soft);
+    white-space: nowrap;
+  }
+
+  .project-comment-body {
+    margin: 0.65rem 0;
+    color: var(--corp-ink);
+    white-space: pre-wrap;
+    padding: 0.7rem 0;
+    border-top: 1px solid #e4e9f2;
+    border-bottom: 1px solid #e4e9f2;
+    line-height: 1.55;
+  }
+
+  .project-comment-actions {
+    display: flex;
+    align-items: center;
+    gap: 1.1rem;
+    padding-top: 0.35rem;
+  }
+
+  .project-comment-action {
+    border: 0;
+    background: transparent;
+    color: #55657b;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0;
+    cursor: pointer;
+  }
+
+  .project-comment-action:hover {
+    color: #2c3f57;
+  }
+
+  .project-comment-action.is-danger {
+    color: #b21f34;
+  }
+
+  .project-comment-action.is-danger:hover {
+    color: #8f1628;
+  }
+
+  .project-discussion-form {
+    display: grid;
+    gap: 0.6rem;
+  }
+
   .client-corporate-shell .panel-table-wrap {
     border: 1px solid var(--corp-line);
     border-radius: 12px;
@@ -730,6 +846,7 @@
                       @forelse($rawItems as $index => $mediaItem)
                         @php
                 $mediaName = $mediaItem->original_name;
+                $canDeleteMediaItem = $canManagePipeline || (int) ($mediaItem->uploaded_by ?? 0) === (int) auth()->id();
               @endphp
                         <article class="media-file-row @if($index >= 2) is-hidden-by-default @endif" data-gallery-row>
                           <div class="media-file-meta">
@@ -739,8 +856,8 @@
                           </div>
                           <div class="media-file-actions">
                             <a class="panel-link" href="{{ route('admin.projects.media.view', ['project' => $project, 'media' => $mediaItem]) }}" target="_blank" rel="noopener">View</a>
-                            @if($canManagePipeline)
-                            <form method="post" action="{{ route('admin.projects.media.delete', ['project' => $project, 'media' => $mediaItem]) }}" data-delete-form data-delete-name="{{ $mediaItem->original_name }}">
+                            @if($canDeleteMediaItem)
+                            <form method="post" action="{{ route('admin.projects.media.delete', ['project' => $project, 'media' => $mediaItem], false) }}" data-delete-form data-delete-name="{{ $mediaItem->original_name }}">
                               @csrf
                               <button class="panel-btn panel-btn-danger panel-btn-icon" type="button" data-delete-trigger title="Delete media" aria-label="Delete media"><span class="panel-icon-trash" aria-hidden="true"><x-panel-icon name="trash" /></span></button>
                             </form>
@@ -752,6 +869,9 @@
                       @endforelse
                       @if($rawZipItems->isNotEmpty())
                         @foreach($rawZipItems as $rawZipItem)
+                        @php
+                          $canDeleteRawZip = $canManagePipeline || (int) ($rawZipItem->uploaded_by ?? 0) === (int) auth()->id();
+                        @endphp
                         <article class="media-file-row">
                           <div class="media-file-meta">
                             <span class="media-file-kind">RAW ZIP</span>
@@ -759,9 +879,9 @@
                             <span class="panel-muted">Uploaded by {{ $rawZipItem->uploader?->name ?: 'System' }} @if($rawZipItem->uploader?->role)&bull; {{ ucfirst($rawZipItem->uploader->role) }} @endif</span>
                           </div>
                           <div class="media-file-actions">
-                            <a class="panel-link" href="{{ route('admin.projects.media.view', ['project' => $project, 'media' => $rawZipItem]) }}" target="_blank" rel="noopener">View ZIP</a>
-                            @if($canManagePipeline)
-                            <form method="post" action="{{ route('admin.projects.media.delete', ['project' => $project, 'media' => $rawZipItem]) }}" data-delete-form data-delete-name="{{ $rawZipItem->original_name }}">
+                            <a class="panel-link" href="{{ route('admin.projects.media.view', ['project' => $project, 'media' => $rawZipItem]) }}" target="_blank" rel="noopener">Download ZIP</a>
+                            @if($canDeleteRawZip)
+                            <form method="post" action="{{ route('admin.projects.media.delete', ['project' => $project, 'media' => $rawZipItem], false) }}" data-delete-form data-delete-name="{{ $rawZipItem->original_name }}">
                               @csrf
                               <button class="panel-btn panel-btn-danger panel-btn-icon" type="button" data-delete-trigger title="Delete raw ZIP" aria-label="Delete raw ZIP"><span class="panel-icon-trash" aria-hidden="true"><x-panel-icon name="trash" /></span></button>
                             </form>
@@ -803,6 +923,7 @@
                       @forelse($editedItems as $index => $mediaItem)
                         @php
                 $mediaName = $mediaItem->original_name;
+                $canDeleteMediaItem = $canManagePipeline || (int) ($mediaItem->uploaded_by ?? 0) === (int) auth()->id();
               @endphp
                         <article class="media-file-row @if($index >= 2) is-hidden-by-default @endif" data-gallery-row>
                           <div class="media-file-meta">
@@ -812,8 +933,8 @@
                           </div>
                           <div class="media-file-actions">
                             <a class="panel-link" href="{{ route('admin.projects.media.view', ['project' => $project, 'media' => $mediaItem]) }}" target="_blank" rel="noopener">View</a>
-                            @if($canManagePipeline)
-                            <form method="post" action="{{ route('admin.projects.media.delete', ['project' => $project, 'media' => $mediaItem]) }}" data-delete-form data-delete-name="{{ $mediaItem->original_name }}">
+                            @if($canDeleteMediaItem)
+                            <form method="post" action="{{ route('admin.projects.media.delete', ['project' => $project, 'media' => $mediaItem], false) }}" data-delete-form data-delete-name="{{ $mediaItem->original_name }}">
                               @csrf
                               <button class="panel-btn panel-btn-danger panel-btn-icon" type="button" data-delete-trigger title="Delete media" aria-label="Delete media"><span class="panel-icon-trash" aria-hidden="true"><x-panel-icon name="trash" /></span></button>
                             </form>
@@ -854,6 +975,7 @@
                       @forelse($zipItems as $zipItem)
                         @php
                 $zipName = $zipItem->original_name;
+                $canDeleteFinalZip = $canManagePipeline || (int) ($zipItem->uploaded_by ?? 0) === (int) auth()->id();
               @endphp
                         <article class="media-file-row">
                           <div class="media-file-meta">
@@ -862,9 +984,9 @@
                             <span class="panel-muted">Uploaded by {{ $zipItem->uploader?->name ?: 'System' }} @if($zipItem->uploader?->role)&bull; {{ ucfirst($zipItem->uploader->role) }} @endif</span>
                           </div>
                           <div class="media-file-actions">
-                            <a class="panel-link" href="{{ route('admin.projects.media.view', ['project' => $project, 'media' => $zipItem]) }}" target="_blank" rel="noopener">View ZIP</a>
-                            @if($canManagePipeline)
-                            <form method="post" action="{{ route('admin.projects.media.delete', ['project' => $project, 'media' => $zipItem]) }}" data-delete-form data-delete-name="{{ $zipItem->original_name }}">
+                            <a class="panel-link" href="{{ route('admin.projects.media.view', ['project' => $project, 'media' => $zipItem]) }}" target="_blank" rel="noopener">Download ZIP</a>
+                            @if($canDeleteFinalZip)
+                            <form method="post" action="{{ route('admin.projects.media.delete', ['project' => $project, 'media' => $zipItem], false) }}" data-delete-form data-delete-name="{{ $zipItem->original_name }}">
                               @csrf
                               <button class="panel-btn panel-btn-danger panel-btn-icon" type="button" data-delete-trigger title="Delete ZIP" aria-label="Delete ZIP"><span class="panel-icon-trash" aria-hidden="true"><x-panel-icon name="trash" /></span></button>
                             </form>
@@ -891,11 +1013,12 @@
       modal-id="client-media-gallery-viewer"
       open-selector="[data-gallery-open]"
       title-default="Gallery Viewer"
-      :delete-enabled="true"
-      delete-url-template="{{ url('/admin/projects/__PROJECT__/media/__MEDIA__/delete') }}"
+      :delete-enabled="$canManagePipeline"
+      delete-url-template="{{ '/admin/projects/__PROJECT__/media/__MEDIA__/delete' }}"
       csrf-token="{{ csrf_token() }}"
     />
 
+@if($canManagePipeline)
     <article class="panel-card">
       <h2 class="panel-section-title">Invoices</h2>
       @if($canManagePipeline)
@@ -956,54 +1079,190 @@
         </table>
       </div>
     </article>
+@endif
   </div>
 
   <aside class="panel-side-col">
     <div class="panel-side-sticky">
       <article class="panel-card js-collapsible-card" data-collapsible-card>
         <div class="panel-card-head">
-          <h2 class="panel-section-title">Send Message</h2>
+          <h2 class="panel-section-title">Project Comments</h2>
           <button class="panel-card-toggle" type="button" data-collapsible-toggle>Minimize</button>
         </div>
-        <div class="panel-card-body">
-          @if($canManagePipeline)
-          <form method="post" action="{{ route('admin.clients.messages.store', $client) }}" class="panel-stack">
-            @csrf
-            <select class="panel-select" name="client_project_id">
-              <option value="">General message</option>
-              @foreach($visibleProjects as $project)
-              <option value="{{ $project->id }}" @selected($focusedProjectId === (int) $project->id)>{{ $project->title }}</option>
-              @endforeach
-            </select>
-            <textarea class="panel-textarea" name="message" placeholder="Write a message to client..." required></textarea>
-            <button class="panel-btn panel-btn-primary" type="submit">Send Message</button>
-          </form>
+        <div class="panel-card-body project-discussion-card">
+          @php
+            $commentProject = $focusedProject ?? $client->projects->first();
+            $commentProjectId = $commentProject?->id;
+            $assignmentIds = $commentProject ? $commentProject->assignments->pluck('user_id')->map(static fn ($id): int => (int) $id)->all() : [];
+            $canCommentProject = $commentProject && ($canManagePipeline || (in_array($crmRole, ['photographer', 'editor'], true) && in_array((int) auth()->id(), $assignmentIds, true)));
+          @endphp
+
+          @if(!$commentProject)
+            <p class="panel-muted">Select a project to view and add comments.</p>
           @else
-          <p class="panel-muted">Message sending is available for manager-level roles.</p>
+            <div class="panel-stack">
+              <label class="panel-muted">Project</label>
+              @if($focusedProject || $client->projects->count() <= 1)
+                <div class="panel-input" style="display:flex;align-items:center;min-height:42px;">{{ $commentProject?->title }}</div>
+              @else
+                <form method="get" action="{{ route('admin.clients.show', $client) }}">
+                  <select class="panel-select" name="project_id" onchange="this.form.submit()">
+                    @foreach($client->projects as $projectOption)
+                      <option value="{{ $projectOption->id }}" @selected((int) $projectOption->id === (int) $commentProjectId)>{{ $projectOption->title }}</option>
+                    @endforeach
+                  </select>
+                </form>
+              @endif
+            </div>
+
+            <div class="project-discussion-stream">
+              @forelse($commentProject->comments->sortBy('id') as $comment)
+                <article class="project-comment-card {{ $comment->sender_role === 'client' ? '' : 'is-internal' }}" data-comment-card>
+                  <div class="project-comment-head">
+                    <div class="project-comment-author">
+                      <span class="project-comment-avatar">{{ \Illuminate\Support\Str::upper(\Illuminate\Support\Str::substr($comment->user?->name ?: ($comment->sender_role ?: 'U'), 0, 2)) }}</span>
+                      <div class="project-comment-author-text">
+                        <p class="project-comment-name">{{ $comment->user?->name ?: ucfirst($comment->sender_role) }}</p>
+                        <p class="project-comment-meta">{{ ucfirst(str_replace('_', ' ', $comment->sender_role)) }}</p>
+                      </div>
+                    </div>
+                    <div class="project-comment-meta-right">
+                      <span class="project-comment-time">{{ $comment->created_at?->format('M j, Y g:i A') }}</span>
+                      @if($comment->edited_at)
+                        <span class="project-comment-edited">Edited</span>
+                      @endif
+                    </div>
+                  </div>
+                  @if($comment->parent)
+                    <div class="project-comment-reply">
+                      <span class="project-comment-reply-label">Replying to {{ $comment->parent->user?->name ?: ucfirst($comment->parent->sender_role) }}</span>
+                      <span class="project-comment-reply-body">{{ \Illuminate\Support\Str::limit($comment->parent->body, 140) }}</span>
+                    </div>
+                  @endif
+                  <div class="project-comment-body" data-comment-body>{{ $comment->body }}</div>
+                  @php
+                    $canDeleteComment = $canManagePipeline || (int) $comment->user_id === (int) auth()->id();
+                    $canEditComment = $canDeleteComment;
+                  @endphp
+                  <form method="post" action="{{ route('admin.projects.comments.update', ['project' => $commentProject, 'comment' => $comment]) }}" class="project-comment-edit-form" data-edit-form hidden>
+                    @csrf
+                    <textarea class="panel-textarea" name="body" required>{{ old('body', $comment->body) }}</textarea>
+                    <div class="project-comment-edit-actions">
+                      <button class="panel-btn panel-btn-primary" type="submit">Save</button>
+                      <button class="panel-btn" type="button" data-edit-cancel>Cancel</button>
+                    </div>
+                  </form>
+                  <div class="project-comment-actions">
+                    @if($canCommentProject)
+                      <button class="project-comment-action" type="button" data-reply-button data-reply-id="{{ $comment->id }}" data-reply-author="{{ $comment->user?->name ?: ucfirst($comment->sender_role) }}" data-reply-body="{{ \Illuminate\Support\Str::limit($comment->body, 160) }}">
+                        <span class="panel-icon" aria-hidden="true"><x-panel-icon name="reply" /></span>
+                        <span>Reply</span>
+                      </button>
+                    @endif
+                    @if($canEditComment)
+                      <button class="project-comment-action" type="button" data-edit-open>
+                        <span class="panel-icon" aria-hidden="true"><x-panel-icon name="pencil" /></span>
+                        <span>Edit</span>
+                      </button>
+                    @endif
+                    @if($canDeleteComment)
+                      <form method="post" action="{{ route('admin.projects.comments.delete', ['project' => $commentProject, 'comment' => $comment]) }}" data-app-confirm="1" data-confirm-message="Delete this comment?" style="margin:0;">
+                        @csrf
+                        <button class="project-comment-action is-danger" type="submit" title="Delete comment" aria-label="Delete comment">
+                          <span class="panel-icon-trash" aria-hidden="true"><x-panel-icon name="trash" /></span>
+                          <span>Delete</span>
+                        </button>
+                      </form>
+                    @endif
+                  </div>
+                </article>
+              @empty
+                <div class="panel-muted">No comments yet.</div>
+              @endforelse
+            </div>
+
+            @if($canCommentProject)
+              <form method="post" action="{{ route('admin.projects.comments.store', $commentProject) }}" class="project-discussion-form">
+                @csrf
+                <input type="hidden" name="parent_comment_id" value="" data-reply-input>
+                <div class="project-comment-reply-banner" data-reply-banner hidden>
+                  <div>
+                    <strong>Replying to <span data-reply-author></span></strong>
+                    <div class="project-comment-reply-preview" data-reply-preview></div>
+                  </div>
+                  <button class="project-comment-reply-cancel" type="button" data-reply-cancel>Cancel</button>
+                </div>
+                <textarea class="panel-textarea" name="body" placeholder="Write a comment for the project team" required>{{ old('body') }}</textarea>
+                <button class="panel-btn panel-btn-primary" type="submit">Post Comment</button>
+              </form>
+
+              <script>
+                (function () {
+                  var commentForm = document.querySelector('.project-discussion-form');
+                  if (!commentForm) return;
+
+                  var replyInput = commentForm.querySelector('[data-reply-input]');
+                  var replyBanner = commentForm.querySelector('[data-reply-banner]');
+                  var replyAuthor = commentForm.querySelector('[data-reply-author]');
+                  var replyPreview = commentForm.querySelector('[data-reply-preview]');
+                  var replyCancel = commentForm.querySelector('[data-reply-cancel]');
+                  var commentTextarea = commentForm.querySelector('textarea[name="body"]');
+
+                  document.querySelectorAll('[data-reply-button]').forEach(function (btn) {
+                    btn.addEventListener('click', function () {
+                      var id = btn.getAttribute('data-reply-id') || '';
+                      if (replyInput) replyInput.value = id;
+                      if (replyBanner) replyBanner.hidden = false;
+                      if (replyAuthor) replyAuthor.textContent = btn.getAttribute('data-reply-author') || '';
+                      if (replyPreview) replyPreview.textContent = btn.getAttribute('data-reply-body') || '';
+                      if (commentTextarea) commentTextarea.focus();
+                    });
+                  });
+
+                  if (replyCancel) {
+                    replyCancel.addEventListener('click', function () {
+                      if (replyInput) replyInput.value = '';
+                      if (replyBanner) replyBanner.hidden = true;
+                      if (replyAuthor) replyAuthor.textContent = '';
+                      if (replyPreview) replyPreview.textContent = '';
+                    });
+                  }
+
+                  document.querySelectorAll('[data-edit-open]').forEach(function (btn) {
+                    btn.addEventListener('click', function () {
+                      var card = btn.closest('[data-comment-card]');
+                      if (!card) return;
+                      var body = card.querySelector('[data-comment-body]');
+                      var form = card.querySelector('[data-edit-form]');
+                      if (body) body.hidden = true;
+                      if (form) {
+                        form.hidden = false;
+                        var textarea = form.querySelector('textarea');
+                        if (textarea) textarea.focus();
+                      }
+                    });
+                  });
+
+                  document.querySelectorAll('[data-edit-cancel]').forEach(function (btn) {
+                    btn.addEventListener('click', function () {
+                      var form = btn.closest('[data-edit-form]');
+                      if (!form) return;
+                      var card = btn.closest('[data-comment-card]');
+                      form.hidden = true;
+                      var body = card ? card.querySelector('[data-comment-body]') : null;
+                      if (body) body.hidden = false;
+                    });
+                  });
+                })();
+              </script>
+            @else
+              <p class="panel-muted">You do not have permission to comment on this project.</p>
+            @endif
           @endif
         </div>
       </article>
 
-      <article class="panel-card js-collapsible-card" data-collapsible-card>
-        <div class="panel-card-head">
-          <h2 class="panel-section-title">Message Timeline</h2>
-          <button class="panel-card-toggle" type="button" data-collapsible-toggle>Minimize</button>
-        </div>
-        <div class="panel-card-body">
-          <div class="panel-chat-list">
-            @forelse($visibleMessages as $message)
-            <div class="panel-chat-item {{ $message->sender_role === 'client' ? 'is-user' : 'is-assistant' }}">
-              <p class="panel-chat-role">{{ strtoupper($message->sender_role) }}</p>
-              <p class="panel-chat-text">{{ $message->message }}</p>
-              <p class="panel-muted">{{ $message->sent_at?->format('Y-m-d H:i') ?: $message->created_at?->format('Y-m-d H:i') }}</p>
-            </div>
-            @empty
-            <p class="panel-muted">No messages yet.</p>
-            @endforelse
-          </div>
-        </div>
-      </article>
-
+@if($canManagePipeline)
       <article class="panel-card js-collapsible-card" data-collapsible-card>
         <div class="panel-card-head">
           <h2 class="panel-section-title">Service Requests</h2>
@@ -1151,10 +1410,35 @@
           })();
         </script>
       </article>
+@endif
     </div>
   </aside>
 </section>
 @endsection
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

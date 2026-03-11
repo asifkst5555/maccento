@@ -2227,8 +2227,8 @@ public function adminClientStore(Request $request): RedirectResponse
                     'messages' => function ($messageQuery): void {
                         $messageQuery->latest('id')->with('sender:id,name,email');
                     },
-                    'comments' => function ($commentQuery): void {
-                        $commentQuery->latest('id')->with('user:id,name,email,role');
+                    'comments' => function ($query): void {
+                        $query->latest('id')->with(['user:id,name,email,role', 'parent.user:id,name,email,role']);
                     },
                     'assignments.user:id,name,email,role',
                     'serviceRequests' => function ($requestQuery): void {
@@ -2622,6 +2622,8 @@ public function adminClientMessagesCenterStore(Request $request): RedirectRespon
 
     public function adminClientProjectStatusUpdate(Request $request, ClientProject $project): RedirectResponse
     {
+        $this->ensurePipelineWriteAccess($request);
+
         $validated = $request->validate([
             'status' => ['required', 'in:accepted,shooting,editing,complete'],
         ]);
@@ -2668,10 +2670,23 @@ public function adminClientMessagesCenterStore(Request $request): RedirectRespon
 
         $validated = $request->validate([
             'body' => ['required', 'string', 'max:4000'],
+            'parent_comment_id' => ['nullable', 'integer', 'exists:client_project_comments,id'],
         ]);
+
+        $parentCommentId = $validated['parent_comment_id'] ?? null;
+        if ($parentCommentId) {
+            $parentComment = ClientProjectComment::query()
+                ->where('id', $parentCommentId)
+                ->where('client_project_id', $project->id)
+                ->first();
+            if (!$parentComment) {
+                abort(404);
+            }
+        }
 
         ClientProjectComment::query()->create([
             'client_project_id' => $project->id,
+            'parent_comment_id' => $parentCommentId,
             'user_id' => $request->user()?->id,
             'sender_role' => strtolower(trim((string) ($request->user()?->role ?: 'admin'))),
             'body' => $validated['body'],
@@ -2690,6 +2705,52 @@ public function adminClientMessagesCenterStore(Request $request): RedirectRespon
         return back()->with('status', 'Project comment posted.');
     }
 
+    public function adminProjectCommentDestroy(Request $request, ClientProject $project, ClientProjectComment $comment): RedirectResponse
+    {
+        $this->ensureInternalUserCanCommentOnProject($request, $project);
+
+        if ((int) $comment->client_project_id !== (int) $project->id) {
+            abort(404);
+        }
+
+        $role = strtolower(trim((string) $request->user()?->role));
+        $canDeleteAny = in_array($role, ['owner', 'admin', 'manager'], true);
+
+        if (!$canDeleteAny && (int) $comment->user_id !== (int) ($request->user()?->id ?? 0)) {
+            abort(403);
+        }
+
+        $comment->delete();
+
+        return back()->with('status', 'Project comment deleted.');
+    }
+
+    public function adminProjectCommentUpdate(Request $request, ClientProject $project, ClientProjectComment $comment): RedirectResponse
+    {
+        $this->ensureInternalUserCanCommentOnProject($request, $project);
+
+        if ((int) $comment->client_project_id !== (int) $project->id) {
+            abort(404);
+        }
+
+        $role = strtolower(trim((string) $request->user()?->role));
+        $canEditAny = in_array($role, ['owner', 'admin', 'manager'], true);
+
+        if (!$canEditAny && (int) $comment->user_id !== (int) ($request->user()?->id ?? 0)) {
+            abort(403);
+        }
+
+        $validated = $request->validate([
+            'body' => ['required', 'string', 'max:4000'],
+        ]);
+
+        $comment->update([
+            'body' => $validated['body'],
+            'edited_at' => now(),
+        ]);
+
+        return back()->with('status', 'Project comment updated.');
+    }
     public function adminProjectMediaStore(Request $request, ClientProject $project): RedirectResponse
     {
         $this->ensureInternalUserCanUploadProjectMedia($request, $project);
@@ -2870,6 +2931,19 @@ public function adminClientMessagesCenterStore(Request $request): RedirectRespon
         $absolutePath = Storage::disk($disk)->path($path);
         $mimeType = $media->mime_type ?: 'application/octet-stream';
 
+        $isZip = in_array((string) $media->type, ['raw_zip', 'final_zip'], true)
+            || Str::endsWith(strtolower((string) $media->original_name), '.zip');
+
+        if ($isZip) {
+            $downloadName = trim((string) $media->original_name) !== ''
+                ? (string) $media->original_name
+                : basename($path);
+
+            return response()->download($absolutePath, $downloadName, [
+                'Content-Type' => $mimeType,
+            ]);
+        }
+
         return response()->file($absolutePath, [
             'Content-Type' => $mimeType,
             'Content-Disposition' => 'inline; filename="' . addslashes((string) $media->original_name) . '"',
@@ -2944,10 +3018,15 @@ public function adminClientMessagesCenterStore(Request $request): RedirectRespon
 
     public function adminProjectMediaDestroy(Request $request, ClientProject $project, ClientProjectMedia $media): RedirectResponse
     {
-        $this->ensurePipelineWriteAccess($request);
-
         if ((int) $media->client_project_id !== (int) $project->id) {
             abort(404);
+        }
+
+        $role = strtolower(trim((string) $request->user()?->role));
+        if (!in_array($role, ['owner', 'admin', 'manager'], true)) {
+            abort_unless(in_array($role, ['photographer', 'editor'], true), 403);
+            $this->ensureInternalUserCanAccessAssignedProject($request, $project);
+            abort_unless((int) ($media->uploaded_by ?? 0) === (int) ($request->user()?->id ?? 0), 403);
         }
 
         $displayName = trim((string) $media->original_name) !== ''
@@ -3073,6 +3152,8 @@ public function adminClientMessagesCenterStore(Request $request): RedirectRespon
 
     public function adminClientInvoiceStore(Request $request, Client $client): RedirectResponse
     {
+        $this->ensurePipelineWriteAccess($request);
+
         $validated = $request->validate([
             'client_project_id' => ['nullable', 'integer'],
             'amount' => ['required', 'numeric', 'min:0.01'],
@@ -3264,6 +3345,8 @@ public function adminClientMessagesCenterStore(Request $request): RedirectRespon
 
     public function adminServiceRequestStatusUpdate(Request $request, ClientServiceRequest $serviceRequest): RedirectResponse
     {
+        $this->ensurePipelineWriteAccess($request);
+
         $validated = $request->validate([
             'status' => ['required', 'in:new,accepted,in_progress,completed,closed'],
             'create_invoice' => ['nullable', 'in:0,1'],
@@ -3567,8 +3650,9 @@ public function adminClientMessagesCenterStore(Request $request): RedirectRespon
         $user = $request->user();
         $client = $this->resolvePortalClient($user);
         $portalStats = $this->buildUserPortalStats($client, $this->userLeadQuery($user), $this->userQuoteQuery($user));
-        $projects = $client
-            ? ClientProject::query()
+
+        if ($client) {
+            $projects = ClientProject::query()
                 ->where('client_id', $client->id)
                 ->withCount([
                     'media as gallery_media_count' => function ($mediaQuery): void {
@@ -3586,8 +3670,30 @@ public function adminClientMessagesCenterStore(Request $request): RedirectRespon
                 ])
                 ->latest('scheduled_at')
                 ->latest('id')
-                ->paginate(8)
-            : $this->emptyPaginator(8);
+                ->paginate(8);
+        } else {
+            $projects = ClientProject::query()
+                ->whereHas('assignments', function ($assignmentQuery) use ($user): void {
+                    $assignmentQuery->where('user_id', $user?->id);
+                })
+                ->withCount([
+                    'media as gallery_media_count' => function ($mediaQuery): void {
+                        $mediaQuery->whereIn('type', ['image', 'video']);
+                    },
+                    'media as final_zip_count' => function ($mediaQuery): void {
+                        $mediaQuery->where('type', 'final_zip');
+                    },
+                    'messages',
+                    'serviceRequests',
+                ])
+                ->with([
+                    'quoteBuild:id,quote_id,status',
+                    'client:id,name,email',
+                ])
+                ->latest('scheduled_at')
+                ->latest('id')
+                ->paginate(8);
+        }
 
         return view('user.projects-index', [
             'client' => $client,
@@ -3595,8 +3701,7 @@ public function adminClientMessagesCenterStore(Request $request): RedirectRespon
             'projects' => $projects,
         ]);
     }
-
-    public function userProjectShow(Request $request, ClientProject $project): View
+public function userProjectShow(Request $request, ClientProject $project): View
     {
         $this->ensureUserCanAccessProject($request, $project);
 
@@ -3617,7 +3722,7 @@ public function adminClientMessagesCenterStore(Request $request): RedirectRespon
                 $query->latest('id')->with('sender:id,name,email');
             },
             'comments' => function ($query): void {
-                $query->latest('id')->with('user:id,name,email,role');
+                $query->latest('id')->with(['user:id,name,email,role', 'parent.user:id,name,email,role']);
             },
             'assignments.user:id,name,email,role',
             'serviceRequests' => function ($query): void {
@@ -3625,6 +3730,7 @@ public function adminClientMessagesCenterStore(Request $request): RedirectRespon
             },
         ]);
 
+        $canViewBilling = $this->userMatchesClient($user, $project->client);
         $galleryPayload = $this->buildProjectGalleryPayload($project, true, false, true);
 
         return view('user.project-show', [
@@ -3632,20 +3738,33 @@ public function adminClientMessagesCenterStore(Request $request): RedirectRespon
             'portalStats' => $portalStats,
             'project' => $project,
             'galleryPayload' => $galleryPayload,
+            'canViewBilling' => $canViewBilling,
             'isPaid' => $this->projectIsPaid($project),
         ]);
     }
-
-    public function userProjectCommentStore(Request $request, ClientProject $project): RedirectResponse
+public function userProjectCommentStore(Request $request, ClientProject $project): RedirectResponse
     {
         $this->ensureUserCanAccessProject($request, $project);
 
         $validated = $request->validate([
             'body' => ['required', 'string', 'max:4000'],
+            'parent_comment_id' => ['nullable', 'integer', 'exists:client_project_comments,id'],
         ]);
+
+        $parentCommentId = $validated['parent_comment_id'] ?? null;
+        if ($parentCommentId) {
+            $parentComment = ClientProjectComment::query()
+                ->where('id', $parentCommentId)
+                ->where('client_project_id', $project->id)
+                ->first();
+            if (!$parentComment) {
+                abort(404);
+            }
+        }
 
         ClientProjectComment::query()->create([
             'client_project_id' => $project->id,
+            'parent_comment_id' => $parentCommentId,
             'user_id' => $request->user()?->id,
             'sender_role' => 'client',
             'body' => $validated['body'],
@@ -3654,6 +3773,46 @@ public function adminClientMessagesCenterStore(Request $request): RedirectRespon
         return back()->with('status', 'Project comment posted.');
     }
 
+    public function userProjectCommentDestroy(Request $request, ClientProject $project, ClientProjectComment $comment): RedirectResponse
+    {
+        $this->ensureUserCanAccessProject($request, $project);
+
+        if ((int) $comment->client_project_id !== (int) $project->id) {
+            abort(404);
+        }
+
+        if ((int) $comment->user_id !== (int) ($request->user()?->id ?? 0)) {
+            abort(403);
+        }
+
+        $comment->delete();
+
+        return back()->with('status', 'Project comment deleted.');
+    }
+
+    public function userProjectCommentUpdate(Request $request, ClientProject $project, ClientProjectComment $comment): RedirectResponse
+    {
+        $this->ensureUserCanAccessProject($request, $project);
+
+        if ((int) $comment->client_project_id !== (int) $project->id) {
+            abort(404);
+        }
+
+        if ((int) $comment->user_id !== (int) ($request->user()?->id ?? 0)) {
+            abort(403);
+        }
+
+        $validated = $request->validate([
+            'body' => ['required', 'string', 'max:4000'],
+        ]);
+
+        $comment->update([
+            'body' => $validated['body'],
+            'edited_at' => now(),
+        ]);
+
+        return back()->with('status', 'Project comment updated.');
+    }
     public function userInvoicesIndex(Request $request): View
     {
         $user = $request->user();
@@ -5195,15 +5354,16 @@ public function adminClientMessagesCenterStore(Request $request): RedirectRespon
         }
 
         $user = $request->user();
-        $project->loadMissing('client:id,user_id,email,phone');
+        $project->loadMissing('client:id,user_id,email,phone', 'assignments:user_id');
         $client = $project->client;
 
-        $allowed = $client !== null
-            && (
-                (int) ($client->user_id ?? 0) === (int) ($user?->id ?? 0)
-                || (!blank($client->email) && !blank($user?->email) && strcasecmp((string) $client->email, (string) $user->email) === 0)
-                || (!blank($client->phone) && !blank($user?->phone) && (string) $client->phone === (string) $user->phone)
-            );
+        $assignedUserIds = $project->assignments
+            ->pluck('user_id')
+            ->map(static fn ($id): int => (int) $id)
+            ->all();
+        $isAssigned = in_array((int) ($user?->id ?? 0), $assignedUserIds, true);
+
+        $allowed = $this->userMatchesClient($user, $client) || $isAssigned;
 
         abort_unless($allowed, 403);
     }
@@ -5218,15 +5378,20 @@ public function adminClientMessagesCenterStore(Request $request): RedirectRespon
         $user = $request->user();
         $invoice->loadMissing('client:id,user_id,email,phone');
         $client = $invoice->client;
-
-        $allowed = $client !== null
-            && (
-                (int) ($client->user_id ?? 0) === (int) ($user?->id ?? 0)
-                || (!blank($client->email) && !blank($user?->email) && strcasecmp((string) $client->email, (string) $user->email) === 0)
-                || (!blank($client->phone) && !blank($user?->phone) && (string) $client->phone === (string) $user->phone)
-            );
+        $allowed = $this->userMatchesClient($user, $client);
 
         abort_unless($allowed, 403);
+    }
+
+    private function userMatchesClient(?User $user, ?Client $client): bool
+    {
+        if (!$user || !$client) {
+            return false;
+        }
+
+        return (int) ($client->user_id ?? 0) === (int) $user->id
+            || (!blank($client->email) && !blank($user->email) && strcasecmp((string) $client->email, (string) $user->email) === 0)
+            || (!blank($client->phone) && !blank($user->phone) && (string) $client->phone === (string) $user->phone);
     }
 
     private function projectIsPaid(ClientProject $project): bool
@@ -5689,6 +5854,41 @@ public function adminClientMessagesCenterStore(Request $request): RedirectRespon
         return 'INV-' . $date . '-' . strtoupper(uniqid());
     }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

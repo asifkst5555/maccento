@@ -279,6 +279,7 @@
               @forelse($rawItems as $index => $mediaItem)
               @php
                 $mediaName = $mediaItem->original_name;
+                $canDeleteMediaItem = $canDeleteMedia || (int) ($mediaItem->uploaded_by ?? 0) === (int) auth()->id();
               @endphp
               <article class="media-file-row @if($index >= 2) is-hidden-by-default @endif" data-gallery-row>
                 <div class="media-file-meta">
@@ -288,8 +289,8 @@
                 </div>
                 <div class="media-file-actions">
                   <a class="panel-link" href="{{ route('admin.projects.media.view', ['project' => $project, 'media' => $mediaItem]) }}" target="_blank" rel="noopener">View</a>
-                  @if($canDeleteMedia)
-                  <form method="post" action="{{ route('admin.projects.media.delete', ['project' => $project, 'media' => $mediaItem]) }}" data-delete-form data-delete-name="{{ $mediaItem->original_name }}">
+                  @if($canDeleteMediaItem)
+                  <form method="post" action="{{ route('admin.projects.media.delete', ['project' => $project, 'media' => $mediaItem], false) }}" data-delete-form data-delete-name="{{ $mediaItem->original_name }}">
                     @csrf
                     <button class="panel-btn panel-btn-danger panel-btn-icon" type="button" data-delete-trigger title="Delete media" aria-label="Delete media"><span class="panel-icon-trash" aria-hidden="true"><x-panel-icon name="trash" /></span></button>
                   </form>
@@ -301,6 +302,9 @@
               @endforelse
               @if($rawZipItems->isNotEmpty())
                 @foreach($rawZipItems as $rawZipItem)
+                @php
+                  $canDeleteRawZip = $canDeleteMedia || (int) ($rawZipItem->uploaded_by ?? 0) === (int) auth()->id();
+                @endphp
                 <article class="media-file-row">
                   <div class="media-file-meta">
                     <span class="media-file-kind">RAW ZIP</span>
@@ -308,9 +312,9 @@
                     <span class="panel-muted">Uploaded by {{ $rawZipItem->uploader?->name ?: 'System' }} @if($rawZipItem->uploader?->role)&bull; {{ ucfirst($rawZipItem->uploader->role) }} @endif</span>
                   </div>
                   <div class="media-file-actions">
-                    <a class="panel-link" href="{{ route('admin.projects.media.view', ['project' => $project, 'media' => $rawZipItem]) }}" target="_blank" rel="noopener">View ZIP</a>
-                    @if($canDeleteMedia)
-                    <form method="post" action="{{ route('admin.projects.media.delete', ['project' => $project, 'media' => $rawZipItem]) }}" data-delete-form data-delete-name="{{ $rawZipItem->original_name }}">
+                    <a class="panel-link" href="{{ route('admin.projects.media.view', ['project' => $project, 'media' => $rawZipItem]) }}" target="_blank" rel="noopener">Download ZIP</a>
+                    @if($canDeleteRawZip)
+                    <form method="post" action="{{ route('admin.projects.media.delete', ['project' => $project, 'media' => $rawZipItem], false) }}" data-delete-form data-delete-name="{{ $rawZipItem->original_name }}">
                       @csrf
                       <button class="panel-btn panel-btn-danger panel-btn-icon" type="button" data-delete-trigger title="Delete raw ZIP" aria-label="Delete raw ZIP"><span class="panel-icon-trash" aria-hidden="true"><x-panel-icon name="trash" /></span></button>
                     </form>
@@ -352,6 +356,7 @@
               @forelse($editedItems as $index => $mediaItem)
               @php
                 $mediaName = $mediaItem->original_name;
+                $canDeleteMediaItem = $canDeleteMedia || (int) ($mediaItem->uploaded_by ?? 0) === (int) auth()->id();
               @endphp
               <article class="media-file-row @if($index >= 2) is-hidden-by-default @endif" data-gallery-row>
                 <div class="media-file-meta">
@@ -361,8 +366,8 @@
                 </div>
                 <div class="media-file-actions">
                   <a class="panel-link" href="{{ route('admin.projects.media.view', ['project' => $project, 'media' => $mediaItem]) }}" target="_blank" rel="noopener">View</a>
-                  @if($canDeleteMedia)
-                  <form method="post" action="{{ route('admin.projects.media.delete', ['project' => $project, 'media' => $mediaItem]) }}" data-delete-form data-delete-name="{{ $mediaItem->original_name }}">
+                  @if($canDeleteMediaItem)
+                  <form method="post" action="{{ route('admin.projects.media.delete', ['project' => $project, 'media' => $mediaItem], false) }}" data-delete-form data-delete-name="{{ $mediaItem->original_name }}">
                     @csrf
                     <button class="panel-btn panel-btn-danger panel-btn-icon" type="button" data-delete-trigger title="Delete media" aria-label="Delete media"><span class="panel-icon-trash" aria-hidden="true"><x-panel-icon name="trash" /></span></button>
                   </form>
@@ -403,6 +408,7 @@
               @forelse($zipItems as $zipItem)
               @php
                 $zipName = $zipItem->original_name;
+                $canDeleteFinalZip = $canDeleteMedia || (int) ($zipItem->uploaded_by ?? 0) === (int) auth()->id();
               @endphp
               <article class="media-file-row">
                 <div class="media-file-meta">
@@ -411,9 +417,9 @@
                   <span class="panel-muted">Uploaded by {{ $zipItem->uploader?->name ?: 'System' }} @if($zipItem->uploader?->role)&bull; {{ ucfirst($zipItem->uploader->role) }} @endif</span>
                 </div>
                 <div class="media-file-actions">
-                  <a class="panel-link" href="{{ route('admin.projects.media.view', ['project' => $project, 'media' => $zipItem]) }}" target="_blank" rel="noopener">View ZIP</a>
-                  @if($canDeleteMedia)
-                  <form method="post" action="{{ route('admin.projects.media.delete', ['project' => $project, 'media' => $zipItem]) }}" data-delete-form data-delete-name="{{ $zipItem->original_name }}">
+                  <a class="panel-link" href="{{ route('admin.projects.media.view', ['project' => $project, 'media' => $zipItem]) }}" target="_blank" rel="noopener">Download ZIP</a>
+                  @if($canDeleteFinalZip)
+                  <form method="post" action="{{ route('admin.projects.media.delete', ['project' => $project, 'media' => $zipItem], false) }}" data-delete-form data-delete-name="{{ $zipItem->original_name }}">
                     @csrf
                     <button class="panel-btn panel-btn-danger panel-btn-icon" type="button" data-delete-trigger title="Delete ZIP" aria-label="Delete ZIP"><span class="panel-icon-trash" aria-hidden="true"><x-panel-icon name="trash" /></span></button>
                   </form>
@@ -514,10 +520,14 @@
   modal-id="media-delivery-viewer"
   open-selector="[data-gallery-open]"
   title-default="Gallery Viewer"
-  :delete-enabled="true"
-  delete-url-template="{{ url('/admin/projects/__PROJECT__/media/__MEDIA__/delete') }}"
+  :delete-enabled="$canDeleteMedia"
+  delete-url-template="{{ '/admin/projects/__PROJECT__/media/__MEDIA__/delete' }}"
   csrf-token="{{ csrf_token() }}"
 />
 <x-panel-delete-confirm-modal modal-id="media-delete-confirm-modal" trigger-selector="[data-delete-trigger]" title="Delete Media File" />
 @endsection
+
+
+
+
 

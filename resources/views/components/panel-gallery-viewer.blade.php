@@ -63,6 +63,7 @@
 
     const closeViewer = function () {
       modal.hidden = true;
+      modal.classList.remove('is-open');
       document.body.classList.remove('panel-modal-open');
       mediaWrap.innerHTML = '';
       currentItems = [];
@@ -114,7 +115,8 @@
         return;
       }
 
-      const confirmFn = window.panelConfirm || (msg => Promise.resolve(false));\n      const confirmed = await confirmFn('Delete this media file? This action cannot be undone.');
+      const confirmFn = window.panelConfirm || (msg => Promise.resolve(false));
+      const confirmed = await confirmFn('Delete this media file? This action cannot be undone.');
       if (!confirmed) {
         return;
       }
@@ -169,6 +171,7 @@
           currentItems = parsed;
           currentIndex = 0;
           modal.hidden = false;
+          modal.classList.add('is-open');
           document.body.classList.add('panel-modal-open');
           render();
         } catch (error) {
@@ -193,6 +196,11 @@
     });
   })();
 </script>
+
+
+
+
+
 
 
 
