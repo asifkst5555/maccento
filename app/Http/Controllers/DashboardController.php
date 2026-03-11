@@ -1989,6 +1989,16 @@ class DashboardController extends Controller
         return back()->with('status', 'Submission status updated.');
     }
 
+    public function adminFormSubmissionDestroy(Request $request, WebsiteFormSubmission $submission): RedirectResponse
+    {
+        $this->ensurePipelineWriteAccess($request);
+
+        $submission->delete();
+
+        return back()->with('status', 'Submission deleted.');
+    }
+
+
         public function adminClientsIndex(Request $request): View
     {
         $status = trim((string) $request->string('status'));

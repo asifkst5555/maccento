@@ -89,6 +89,7 @@ Route::middleware('auth')->group(function (): void {
         Route::get('/admin/form-submissions', [DashboardController::class, 'adminFormSubmissions'])->name('admin.form-submissions');
         Route::get('/admin/form-submissions/{submission}', [DashboardController::class, 'adminFormSubmissionShow'])->name('admin.form-submissions.show');
         Route::post('/admin/form-submissions/{submission}/status', [DashboardController::class, 'adminFormSubmissionStatusUpdate'])->name('admin.form-submissions.status');
+        Route::post('/admin/form-submissions/{submission}/delete', [DashboardController::class, 'adminFormSubmissionDestroy'])->name('admin.form-submissions.delete');
         Route::post('/admin/clients/{client}/projects', [DashboardController::class, 'adminClientProjectStore'])->name('admin.clients.projects.store');
         Route::post('/admin/projects/{project}/status', [DashboardController::class, 'adminClientProjectStatusUpdate'])->name('admin.projects.status');
         Route::post('/admin/projects/{project}/assignments', [DashboardController::class, 'adminProjectAssignmentsUpdate'])->name('admin.projects.assignments.update');

@@ -377,7 +377,7 @@
       <p id="appConfirmMessage" class="panel-muted" style="margin:0;">Are you sure?</p>
       <div class="panel-form-row" style="justify-content:flex-end; gap:8px; margin-top:8px;">
         <button id="appConfirmCancel" class="panel-btn" type="button" data-confirm-close>Cancel</button>
-        <button id="appConfirmOk" class="panel-btn panel-btn-danger panel-btn-icon" type="button" title="Confirm delete" aria-label="Confirm delete"><span class="panel-icon-trash" aria-hidden="true"><x-panel-icon name="trash" /></span></button>
+        <button id="appConfirmOk" class="panel-btn panel-btn-danger" type="button" title="Confirm delete" aria-label="Confirm delete">Confirm</button>
       </div>
     </article>
   </div>

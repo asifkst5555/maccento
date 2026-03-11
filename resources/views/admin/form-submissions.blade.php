@@ -29,7 +29,13 @@
           <td>{{ $submission->service ?: '-' }}</td>
           <td>{{ $submission->region ?: '-' }}</td>
           <td><span class="panel-badge">{{ $submission->status }}</span></td>
-          <td><a class="panel-link panel-btn-icon" href="{{ route('admin.form-submissions.show', $submission) }}" title="Open submission" aria-label="Open submission"><span class="panel-icon" aria-hidden="true"><svg viewBox="0 0 20 20"><path d="M4 10h12M10 4l6 6-6 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span></a></td>
+          <td>
+            <a class="panel-link panel-btn-icon" href="{{ route('admin.form-submissions.show', $submission) }}" title="Open submission" aria-label="Open submission"><span class="panel-icon" aria-hidden="true"><svg viewBox="0 0 20 20"><path d="M4 10h12M10 4l6 6-6 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span></a>
+            <form method="post" action="{{ route('admin.form-submissions.delete', $submission) }}" data-app-confirm="1" data-confirm-message="Delete this submission?" data-confirm="Delete this submission?" style="display:inline-block;margin-left:8px;">
+              @csrf
+              <button class="panel-btn panel-btn-danger panel-btn-icon" type="submit" title="Delete submission" aria-label="Delete submission"><span class="panel-icon-trash" aria-hidden="true"><x-panel-icon name="trash" /></span></button>
+            </form>
+          </td>
         </tr>
         @empty
         <tr><td colspan="8" class="panel-muted">No submissions.</td></tr>
