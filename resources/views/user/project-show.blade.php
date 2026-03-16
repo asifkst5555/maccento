@@ -1,4 +1,4 @@
-@extends('layouts.panel', [
+﻿@extends('layouts.panel', [
   'title' => $project->title,
   'heading' => $project->title,
   'subheading' => 'Project workspace with delivery, billing, and communication history.',
@@ -186,15 +186,7 @@
     <article class="panel-card client-portal-stack">
       <h2 class="panel-section-title">Request Additional Service</h2>
       <p class="panel-muted">Need an add-on for this project? Send it directly to the team from this workspace.</p>
-      <form method="post" action="{{ route('user.service-requests.store') }}" class="panel-stack">
-        @csrf
-        <input type="hidden" name="client_project_id" value="{{ $project->id }}">
-        <input class="panel-input" type="text" name="requested_service" placeholder="Additional service request" required>
-        <input class="panel-input" type="text" name="subject" placeholder="Subject (optional)">
-        <input class="panel-input" type="date" name="preferred_date">
-        <textarea class="panel-textarea" name="details" placeholder="Describe the request for this project"></textarea>
-        <button class="panel-btn panel-btn-primary" type="submit">Send Project Request</button>
-      </form>
+      <button class="panel-btn panel-btn-primary" type="button" data-service-request-open>Request</button>
     </article>
   @endif
   </section>
@@ -339,6 +331,87 @@
     </article>
   </section>
 @endif
+
+  <section class="panel-card client-portal-table">
+    <div class="panel-form-row" style="justify-content: space-between; align-items: center;">
+      <h2 class="panel-section-title" style="margin: 0;">Request a Revision</h2>
+    </div>
+    <form method="post" action="{{ route('user.service-requests.store') }}" class="panel-stack" style="margin-top: 12px;">
+      @csrf
+      <input type="hidden" name="client_project_id" value="{{ $project->id }}">
+      <input type="hidden" name="requested_service" value="Revision Request">
+      <input class="panel-input" type="text" name="subject" placeholder="Revision summary (optional)">
+      <textarea class="panel-textarea" name="details" rows="3" placeholder="Describe the revisions you need"></textarea>
+      <button class="panel-btn panel-btn-primary" type="submit">Submit Revision Request</button>
+    </form>
+  </section>
+
+  <section class="panel-card client-portal-table">
+    <h2 class="panel-section-title">Activity Timeline</h2>
+    <div class="panel-table-wrap">
+      <table class="panel-table">
+        <thead>
+          <tr>
+            <th>When</th>
+            <th>From</th>
+            <th>Message</th>
+          </tr>
+        </thead>
+        <tbody>
+          @forelse($project->messages->take(12) as $message)
+            <tr>
+              <td>{{ optional($message->sent_at ?? $message->created_at)->format('Y-m-d H:i') ?: '-' }}</td>
+              <td>{{ $message->sender?->name ?: ucfirst($message->sender_role ?: 'system') }}</td>
+              <td>{{ $message->message }}</td>
+            </tr>
+          @empty
+            <tr><td colspan="3" class="panel-muted">No activity messages yet.</td></tr>
+          @endforelse
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel-card client-portal-table">
+    <div class="panel-form-row" style="justify-content: space-between; align-items: center;">
+      <h2 class="panel-section-title" style="margin: 0;">Booking Requests</h2>
+      @if($canViewBilling)
+      <button class="panel-btn panel-btn-primary" type="button" data-service-request-open>Request</button>
+      @endif
+    </div>
+    <div class="panel-table-wrap">
+      <table class="panel-table">
+        <thead>
+          <tr>
+            <th>Requested Service</th>
+            <th>Status</th>
+            <th>Preferred</th>
+          </tr>
+        </thead>
+        <tbody>
+          @forelse($project->bookingRequests as $requestItem)
+            <tr>
+              <td>
+                {{ $requestItem->requested_service }}
+                @if(!blank($requestItem->notes))
+                  <div class="panel-muted">{{ \Illuminate\Support\Str::limit($requestItem->notes, 90) }}</div>
+                @endif
+              </td>
+              <td><span class="panel-badge">{{ $requestItem->status }}</span></td>
+              <td>
+                {{ $requestItem->preferred_date?->format('Y-m-d') ?: '-' }}
+                @if(!blank($requestItem->preferred_time_window))
+                  <div class="panel-muted">{{ $requestItem->preferred_time_window }}</div>
+                @endif
+              </td>
+            </tr>
+          @empty
+            <tr><td colspan="3" class="panel-muted">No booking requests are linked to this project yet.</td></tr>
+          @endforelse
+        </tbody>
+      </table>
+    </div>
+  </section>
 
   <section class="project-team-grid">
     <article class="panel-card project-team-card">
@@ -501,7 +574,110 @@
   modal-id="user-project-gallery-viewer"
   open-selector="[data-gallery-open]"
 />
+
+@if($canViewBilling)
+<div class="panel-modal" data-service-request-modal hidden>
+  <div class="panel-modal-backdrop" data-service-request-close></div>
+  <div class="panel-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="service-request-title">
+    <div class="panel-modal-head">
+      <h3 id="service-request-title" class="panel-modal-title">Request</h3>
+      <button class="panel-modal-close" type="button" data-service-request-close aria-label="Close request form">Ã—</button>
+    </div>
+    <div class="panel-modal-body">
+      <p class="panel-muted">Choose a request type and share the details.</p>
+      <form method="post" action="{{ route('user.requests.store') }}" class="panel-stack" data-unified-request-form>
+        @csrf
+        <select class="panel-select" name="request_type" data-request-type required>
+          <option value="service">Service request</option>
+          <option value="booking">Booking request</option>
+        </select>
+        <input type="hidden" name="client_project_id" value="{{ $project->id }}" data-request-project>
+        <input class="panel-input" type="text" name="requested_service" data-requested-service placeholder="Requested service" required>
+
+        <div data-request-service-fields>
+          <input class="panel-input" type="text" name="subject" placeholder="Subject (optional)">
+          <input class="panel-input" type="date" name="preferred_date">
+          <textarea class="panel-textarea" name="details" placeholder="Describe the request for this project"></textarea>
+        </div>
+
+        <div data-request-booking-fields hidden>
+          <input class="panel-input" type="date" name="preferred_date">
+          <select class="panel-select" name="preferred_time_window">
+            <option value="">Preferred time window (optional)</option>
+            <option value="Morning (8-12)">Morning (8-12)</option>
+            <option value="Midday (12-3)">Midday (12-3)</option>
+            <option value="Afternoon (3-6)">Afternoon (3-6)</option>
+            <option value="Evening (6-8)">Evening (6-8)</option>
+            <option value="Any time">Any time</option>
+          </select>
+          <textarea class="panel-textarea" name="notes" placeholder="Notes about access, timing, or priorities"></textarea>
+        </div>
+        <div class="panel-form-row" style="justify-content: flex-end;">
+          <button class="panel-btn" type="button" data-service-request-close>Cancel</button>
+          <button class="panel-btn panel-btn-primary" type="submit">Submit</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+@endif
+
+<script>
+  (function () {
+    var modal = document.querySelector('[data-service-request-modal]');
+    var openBtn = document.querySelector('[data-service-request-open]');
+    if (!modal || !openBtn) return;
+
+    var closeButtons = modal.querySelectorAll('[data-service-request-close]');
+    var typeSelect = modal.querySelector('[data-request-type]');
+    var serviceFields = modal.querySelector('[data-request-service-fields]');
+    var bookingFields = modal.querySelector('[data-request-booking-fields]');
+    var projectInput = modal.querySelector('[data-request-project]');
+    var requestedService = modal.querySelector('[data-requested-service]');
+    var closeModal = function () {
+      modal.hidden = true;
+      modal.classList.remove('is-open');
+      document.body.classList.remove('panel-modal-open');
+    };
+    var syncFields = function () {
+      var isBooking = typeSelect && typeSelect.value === 'booking';
+      if (serviceFields) serviceFields.hidden = isBooking;
+      if (bookingFields) bookingFields.hidden = !isBooking;
+      if (projectInput) {
+        projectInput.disabled = isBooking;
+      }
+      if (requestedService) {
+        requestedService.placeholder = isBooking ? 'New project request / service' : 'Requested service';
+      }
+    };
+
+    openBtn.addEventListener('click', function () {
+      modal.hidden = false;
+      modal.classList.add('is-open');
+      document.body.classList.add('panel-modal-open');
+      syncFields();
+    });
+
+    closeButtons.forEach(function (btn) {
+      btn.addEventListener('click', closeModal);
+    });
+
+    modal.addEventListener('click', function (event) {
+      if (event.target === modal) closeModal();
+    });
+
+    document.addEventListener('keydown', function (event) {
+      if (event.key === 'Escape' && !modal.hidden) closeModal();
+    });
+
+    if (typeSelect) {
+      typeSelect.addEventListener('change', syncFields);
+    }
+  })();
+</script>
 @endsection
+
+
 
 
 

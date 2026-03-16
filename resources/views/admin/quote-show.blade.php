@@ -133,7 +133,11 @@
     <form method="post" action="{{ route('admin.quotes.line-items', $quote) }}" class="panel-stack" data-line-item-editor>
       @csrf
       <div class="panel-form-row">
-        <input class="panel-input" type="text" name="currency" maxlength="8" value="{{ old('currency', $quote->currency) }}" placeholder="Currency (USD)" @disabled($isFixedPackage)>
+        <select class="panel-input" name="currency" data-select-flags="currency" @disabled($isFixedPackage)>
+          @foreach($currencyOptions ?? ['USD' => 'US Dollar'] as $code => $label)
+            <option value="{{ $code }}" @selected(old('currency', $quote->currency) === $code)>{{ $code }} - {{ $label }}</option>
+          @endforeach
+        </select>
         <textarea class="panel-textarea" name="notes" placeholder="Internal note" @disabled($isFixedPackage)>{{ old('notes', $quote->notes) }}</textarea>
       </div>
 

@@ -126,27 +126,29 @@
     border-color: #a5172d;
   }
 
-    .corp-admin-shell .panel-btn-icon {
-    width: 48px;
-    height: 48px;
+  .corp-admin-shell .panel-btn-icon {
+    width: 35px;
+    height: 35px;
     padding: 0;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     border-radius: 10px;
-    border: 1px solid #f0c7cd;
-    background: #fff5f6;
-    color: #b71d34;
+    transition: transform 0.15s ease;
+    line-height: 0;
   }
 
   .corp-admin-shell .panel-btn-icon svg {
-    width: 32px !important;
-    height: 32px !important;
+    width: 18px !important;
+    height: 18px !important;
+    display: block;
   }
 
-  .corp-admin-shell .panel-btn-icon:hover {
-    background: #fdecee;
-    border-color: #e7aeb8;
+  .corp-admin-shell .panel-btn-danger.panel-btn-icon:hover {
+    transform: scale(1.08);
+    background: #b71d34;
+    border-color: #9f162b;
+    color: #ffffff;
   }
 
   .panel-modal {
@@ -209,10 +211,24 @@
   .corp-admin-shell .panel-table-wrap {
     border: 1px solid var(--corp-line);
     border-radius: 12px;
-    overflow: hidden;
     background: #fff;
     overflow-x: auto;
+    overflow-y: visible;
     padding-bottom: 0.4rem;
+  }
+  .corp-admin-shell .panel-table-wrap::-webkit-scrollbar {
+    height: 8px;
+  }
+  .corp-admin-shell .panel-table-wrap::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .corp-admin-shell .panel-table-wrap::-webkit-scrollbar-thumb {
+    background: rgba(193, 31, 55, 0.2);
+    border-radius: 999px;
+  }
+  .corp-admin-shell .panel-table-wrap {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(193, 31, 55, 0.25) transparent;
   }
 
   .corp-admin-shell .panel-table {
@@ -491,8 +507,8 @@
               </select>
               <button class="panel-btn panel-btn-primary" type="submit">Save</button>
               @if($canDeleteProjects)
-              <button class="panel-btn panel-btn-icon" type="submit" form="delete-project-{{ $project->id }}" title="Delete project" aria-label="Delete project">
-                <x-panel-icon name="trash" class="panel-delete-icon" />
+              <button class="panel-btn panel-btn-danger panel-btn-icon" type="submit" form="delete-project-{{ $project->id }}" title="Delete project" aria-label="Delete project">
+                <span class="panel-icon-trash" aria-hidden="true"><x-panel-icon name="trash" /></span>
               </button>
               @endif
             </form>
@@ -506,10 +522,10 @@
             @endif
             @if($project->client)
               @if($canManageProjects)
-            <a class="panel-link" href="{{ route('admin.clients.show', ['client' => $project->client, 'project_id' => $project->id]) }}">Open project</a>
+            <a class="panel-link" href="{{ route('admin.projects.workspace', $project) }}">Open project</a>
             <a class="panel-link" href="{{ route('admin.clients.show', $project->client) }}">Open client</a>
               @else
-            <a class="panel-link" href="{{ route('admin.media-delivery.index', ['media_search' => $project->title]) }}#project-{{ $project->id }}">Open project</a>
+            <a class="panel-link" href="{{ route('admin.projects.workspace', $project) }}">Open project</a>
               @endif
             @endif
             @if($canManageProjects)

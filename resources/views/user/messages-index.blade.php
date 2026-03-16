@@ -94,7 +94,7 @@
                   <h3 class="messages-thread-name">{{ $project->title }}</h3>
                   <span class="messages-thread-time">{{ $project->messages_count }} msgs</span>
                 </div>
-                <p class="messages-thread-meta">{{ $project->service_requests_count }} service requests</p>
+                <p class="messages-thread-meta">{{ $project->service_requests_count }} service requests &bull; {{ $project->booking_requests_count }} booking requests</p>
                 <p class="messages-thread-preview">Open the project thread</p>
               </div>
             </a>
@@ -246,6 +246,49 @@
       </table>
     </div>
     <x-panel-pagination :paginator="$serviceRequests" />
+  </section>
+
+  <section class="panel-card panel-stack">
+    <h2 class="panel-section-title">Booking Request History</h2>
+    <div class="panel-table-wrap">
+      <table class="panel-table">
+        <thead>
+          <tr>
+            <th>Requested Service</th>
+            <th>Project</th>
+            <th>Status</th>
+            <th>Preferred</th>
+          </tr>
+        </thead>
+        <tbody>
+          @forelse($bookingRequests as $requestItem)
+            <tr>
+              <td data-label="Requested Service">
+                {{ $requestItem->requested_service }}
+                @if(!blank($requestItem->notes))
+                  <div class="panel-muted">{{ \Illuminate\Support\Str::limit($requestItem->notes, 90) }}</div>
+                @endif
+              </td>
+              <td data-label="Project">{{ $requestItem->project?->title ?: 'General booking' }}</td>
+              <td data-label="Status"><span class="{{ $requestStatusClass($requestItem->status) }}">{{ $requestItem->status }}</span></td>
+              <td data-label="Preferred">
+                {{ $requestItem->preferred_date?->format('Y-m-d') ?: '-' }}
+                @if(!blank($requestItem->preferred_time_window))
+                  <div class="panel-muted">{{ $requestItem->preferred_time_window }}</div>
+                @endif
+              </td>
+            </tr>
+          @empty
+            <tr>
+              <td colspan="4" class="panel-muted">
+                <strong>No booking requests yet</strong>Booking history will appear after you submit a request.
+              </td>
+            </tr>
+          @endforelse
+        </tbody>
+      </table>
+    </div>
+    <x-panel-pagination :paginator="$bookingRequests" />
   </section>
 </div>
 @endsection

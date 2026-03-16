@@ -1,4 +1,4 @@
-@extends('layouts.panel', [
+﻿@extends('layouts.panel', [
   'title' => 'Client Workspace',
   'heading' => 'Client Workspace',
   'subheading' => 'Track projects, invoices, quotes, and deliveries in one client portal.',
@@ -175,24 +175,51 @@
   </section>
 
   <section class="panel-grid" style="grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 1rem;">
-    <article class="panel-card panel-stack">
-      <h2 class="panel-section-title">Request a New Service</h2>
-      <p class="panel-muted">Send a new request directly to the team from your portal.</p>
-      <form method="post" action="{{ route('user.service-requests.store') }}" class="panel-stack">
+    <article class="panel-card panel-stack" id="client-request-form">
+      <h2 class="panel-section-title">Request</h2>
+      <p class="panel-muted">Choose a request type and share the details.</p>
+      @php
+        $hasProjects = $recentProjects->isNotEmpty();
+      @endphp
+      <form method="post" action="{{ route('user.requests.store') }}" class="panel-stack" data-unified-request-form data-has-projects="{{ $hasProjects ? '1' : '0' }}">
         @csrf
-        @if($recentProjects->isNotEmpty())
-          <select class="panel-select" name="client_project_id">
-            <option value="">General request (not linked to a project)</option>
+        <select class="panel-select" name="request_type" data-request-type required>
+          <option value="service" @disabled(!$hasProjects)>Service request</option>
+          <option value="booking">Booking request</option>
+        </select>
+        @if(!$hasProjects)
+          <p class="panel-muted">No active projects yet. Use booking request to start a new project.</p>
+        @endif
+        <div data-request-project-fields @if(!$hasProjects) hidden @endif>
+          <select class="panel-select" name="client_project_id" data-request-project required>
+            <option value="">Select a project</option>
             @foreach($recentProjects as $project)
               <option value="{{ $project->id }}">{{ $project->title }}</option>
             @endforeach
           </select>
-        @endif
-        <input class="panel-input" type="text" name="requested_service" placeholder="Service needed" required>
-        <input class="panel-input" type="text" name="subject" placeholder="Short subject (optional)">
-        <input class="panel-input" type="date" name="preferred_date">
-        <textarea class="panel-textarea" name="details" placeholder="Tell us about your request"></textarea>
-        <button class="panel-btn panel-btn-primary" type="submit">Submit Request</button>
+        </div>
+        <input class="panel-input" type="text" name="requested_service" data-requested-service placeholder="Requested service" required>
+
+        <div data-request-service-fields>
+          <input class="panel-input" type="text" name="subject" placeholder="Short subject (optional)">
+          <input class="panel-input" type="date" name="preferred_date">
+          <textarea class="panel-textarea" name="details" placeholder="Tell us about your request"></textarea>
+        </div>
+
+        <div data-request-booking-fields hidden>
+          <input class="panel-input" type="date" name="preferred_date">
+          <select class="panel-select" name="preferred_time_window">
+            <option value="">Preferred time window (optional)</option>
+            <option value="Morning (8-12)">Morning (8-12)</option>
+            <option value="Midday (12-3)">Midday (12-3)</option>
+            <option value="Afternoon (3-6)">Afternoon (3-6)</option>
+            <option value="Evening (6-8)">Evening (6-8)</option>
+            <option value="Any time">Any time</option>
+          </select>
+          <textarea class="panel-textarea" name="notes" placeholder="Notes about access, timing, or priorities"></textarea>
+        </div>
+
+        <button class="panel-btn panel-btn-primary" type="submit">Submit</button>
       </form>
     </article>
 
@@ -227,4 +254,62 @@
     </article>
   </section>
 </div>
+<script>
+  (function () {
+    var form = document.querySelector('[data-unified-request-form]');
+    if (!form) return;
+    var typeSelect = form.querySelector('[data-request-type]');
+    var serviceFields = form.querySelector('[data-request-service-fields]');
+    var bookingFields = form.querySelector('[data-request-booking-fields]');
+    var projectFields = form.querySelector('[data-request-project-fields]');
+    var projectSelect = form.querySelector('[data-request-project]');
+    var requestedService = form.querySelector('[data-requested-service]');
+    var hasProjects = form.getAttribute('data-has-projects') === '1';
+    if (!typeSelect) return;
+
+    var syncFields = function () {
+      var isBooking = typeSelect.value === 'booking';
+      if (serviceFields) serviceFields.hidden = isBooking;
+      if (bookingFields) bookingFields.hidden = !isBooking;
+      if (projectFields) projectFields.hidden = isBooking || !hasProjects;
+      if (projectSelect) {
+        projectSelect.required = !isBooking && hasProjects;
+        projectSelect.disabled = isBooking || !hasProjects;
+        if (isBooking || !hasProjects) {
+          projectSelect.value = '';
+        }
+      }
+      if (requestedService) {
+        requestedService.placeholder = isBooking ? 'New project request / service' : 'Requested service';
+      }
+    };
+
+    if (!hasProjects) {
+      typeSelect.value = 'booking';
+    }
+
+    typeSelect.addEventListener('change', syncFields);
+
+    var anchor = window.location.hash.replace('#', '');
+    if (anchor === 'service-request' || anchor === 'booking-request') {
+      if (anchor === 'booking-request' || !hasProjects) {
+        typeSelect.value = 'booking';
+      } else {
+        typeSelect.value = 'service';
+      }
+      var requestCard = document.getElementById('client-request-form');
+      if (requestCard) {
+        window.setTimeout(function () {
+          requestCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 100);
+      }
+    }
+
+    syncFields();
+  })();
+</script>
 @endsection
+
+
+
+

@@ -87,5 +87,23 @@
       </article>
     </div>
   </section>
+
+  <section class="panel-card client-portal-stack">
+    <h2 class="panel-section-title">Notification Preferences</h2>
+    <form method="post" action="{{ route('user.account.update') }}" class="panel-stack">
+      @csrf
+      <label class="panel-inline-check">
+        <input type="hidden" name="notify_portal" value="0">
+        <input type="checkbox" name="notify_portal" value="1" @checked((bool) ($client?->notify_portal ?? true))>
+        Receive portal notifications
+      </label>
+      <label class="panel-inline-check">
+        <input type="hidden" name="notify_invoice_email" value="0">
+        <input type="checkbox" name="notify_invoice_email" value="1" @checked((bool) ($client?->notify_invoice_email ?? true))>
+        Receive invoice emails and reminders
+      </label>
+      <button class="panel-btn panel-btn-primary" type="submit">Save Preferences</button>
+    </form>
+  </section>
 </div>
 @endsection

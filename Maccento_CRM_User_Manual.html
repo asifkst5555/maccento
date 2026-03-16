@@ -10,6 +10,7 @@
     }
 
     :root {
+      --font-scale: 1.3;
       --brand-red: #be1e2d;
       --brand-red-deep: #8f1420;
       --ink: #1a2c42;
@@ -29,7 +30,7 @@
       font-family: "Segoe UI", Arial, sans-serif;
       color: var(--ink);
       background: #ffffff;
-      font-size: 12.5px;
+      font-size: calc(12.5px * var(--font-scale));
       line-height: 1.58;
     }
 
@@ -38,14 +39,14 @@
     }
 
     h1 {
-      font-size: 32px;
+      font-size: calc(32px * var(--font-scale));
       line-height: 1.12;
       letter-spacing: -0.02em;
       margin-bottom: 10px;
     }
 
     h2 {
-      font-size: 21px;
+      font-size: calc(21px * var(--font-scale));
       line-height: 1.2;
       margin: 30px 0 12px;
       padding-bottom: 7px;
@@ -54,14 +55,14 @@
     }
 
     h3 {
-      font-size: 15px;
+      font-size: calc(15px * var(--font-scale));
       line-height: 1.3;
       margin: 18px 0 8px;
       color: #183455;
     }
 
     h4 {
-      font-size: 13px;
+      font-size: calc(13px * var(--font-scale));
       line-height: 1.3;
       margin: 14px 0 6px;
       color: #284766;
@@ -98,14 +99,14 @@
       border: 1px solid #f1c3ca;
       background: #ffffff;
       color: var(--brand-red-deep);
-      font-size: 10px;
+      font-size: calc(10px * var(--font-scale));
       font-weight: 800;
       letter-spacing: 0.1em;
       text-transform: uppercase;
     }
 
     .cover p.lead {
-      font-size: 14px;
+      font-size: calc(14px * var(--font-scale));
       line-height: 1.65;
       color: #314b6b;
       max-width: 760px;
@@ -129,7 +130,7 @@
     .meta-card strong {
       display: block;
       margin-bottom: 5px;
-      font-size: 11px;
+      font-size: calc(11px * var(--font-scale));
       text-transform: uppercase;
       letter-spacing: 0.06em;
       color: var(--muted);
@@ -174,7 +175,7 @@
     th {
       background: #f8fbff;
       color: #21405d;
-      font-size: 11.5px;
+      font-size: calc(11.5px * var(--font-scale));
       letter-spacing: 0.02em;
     }
 
@@ -202,7 +203,7 @@
       border: 1px solid #d9e3ef;
       background: #fbfdff;
       color: #355271;
-      font-size: 11px;
+      font-size: calc(11px * var(--font-scale));
       font-weight: 700;
     }
 
@@ -211,17 +212,17 @@
       padding-top: 10px;
       border-top: 1px solid var(--line);
       color: var(--muted);
-      font-size: 11px;
+      font-size: calc(11px * var(--font-scale));
     }
 
     .small {
-      font-size: 11.5px;
+      font-size: calc(11.5px * var(--font-scale));
       color: var(--muted);
     }
 
     .mono {
       font-family: Consolas, "Courier New", monospace;
-      font-size: 11.5px;
+      font-size: calc(11.5px * var(--font-scale));
     }
 
     @media print {
@@ -309,7 +310,7 @@
         </tr>
         <tr>
           <td>Admin CRM</td>
-          <td>Manages leads, quotes, invoices, projects, email, delivery, users, and settings.</td>
+          <td>Manages leads, follow-ups, quotes, invoices, projects, service requests, messages, email, delivery, exports, and settings.</td>
           <td>Owner, admin, manager, delivery team roles.</td>
         </tr>
         <tr>
@@ -415,22 +416,22 @@
         <tr>
           <td>Manager</td>
           <td>Broad operations without owner-only user administration.</td>
-          <td>Pipeline supervision, delivery coordination, billing follow-up.</td>
+          <td>Pipeline supervision, delivery coordination, billing follow-up, and internal team coordination.</td>
         </tr>
         <tr>
           <td>Photographer</td>
           <td>Delivery-focused access.</td>
-          <td>Project visibility, media delivery, preview, operational context.</td>
+          <td>Assigned-project delivery work: upload raw footage (images/videos and raw ZIP), collaborate via project comments, and coordinate with admin/manager.</td>
         </tr>
         <tr>
           <td>Editor</td>
           <td>Delivery-focused access similar to photographer.</td>
-          <td>Media handling, delivery progress, project media review.</td>
+          <td>Assigned-project post-production: upload edited/final media, upload final delivery ZIP, collaborate via project comments, and coordinate with admin/manager.</td>
         </tr>
         <tr>
           <td>Client / User / Agent</td>
           <td>Portal-only access to their own records.</td>
-          <td>Quotes, invoices, downloads, service requests, project view.</td>
+          <td>Quotes, invoices, media previews/downloads (payment-gated), service requests, project view, project discussion comments, and messages.</td>
         </tr>
       </tbody>
     </table>
@@ -453,7 +454,7 @@
       <li><strong>Leads from AI Assistance:</strong> AI-originated inquiry focus.</li>
       <li><strong>Leads from Packages:</strong> Package-builder and pricing-flow leads.</li>
       <li><strong>Website Submissions:</strong> Direct website form submissions.</li>
-      <li>Lead records include status control, notes, follow-ups, and email actions.</li>
+      <li>Lead records include status control, notes, follow-ups, outbound email actions, and optional chat export to PDF.</li>
     </ul>
 
     <h3>4.3 Quote Pipeline</h3>
@@ -471,7 +472,7 @@
       <li>Create invoices from client and project contexts.</li>
       <li>Update invoice status through <span class="mono">draft</span>, <span class="mono">sent</span>, <span class="mono">partial</span>, <span class="mono">paid</span>, and <span class="mono">overdue</span>.</li>
       <li>Generate downloadable invoice PDFs for admin and clients.</li>
-      <li>Invoice settings support tax inclusion and tax rate configuration.</li>
+      <li>Invoice settings support tax rate configuration and an include-tax-in-PDF toggle.</li>
     </ul>
 
     <h3>4.5 Projects</h3>
@@ -479,16 +480,22 @@
       <li>Primary operational workspace for active client work.</li>
       <li>Project statuses include <span class="mono">accepted</span>, <span class="mono">shooting</span>, <span class="mono">editing</span>, and <span class="mono">complete</span>.</li>
       <li>Projects link to clients, invoices, media, and service requests.</li>
+      <li>Assignments support coordinating internal delivery roles (for example, photographer/editor).</li>
+      <li>Assigned Team list is visible inside the client portal project view.</li>
+      <li>Project discussion supports replies, edits, and client-visible collaboration (clients and assigned internal users can participate).</li>
       <li>Admin users can open client and project contexts directly from project rows.</li>
     </ul>
 
     <h3>4.6 Media Delivery</h3>
     <ul>
-      <li>Upload gallery media for a project.</li>
-      <li>Upload final delivery ZIP files.</li>
-      <li>Preview project media inside the admin panel.</li>
-      <li>Track payment gate context before delivery is opened to clients.</li>
-      <li>Manage watermark settings and rebuild behavior where permitted.</li>
+      <li>Delivery workspace supports <strong>Raw Footage</strong> and <strong>Edited/Final</strong> stages for gallery media (images/videos).</li>
+      <li>Raw Footage uploads: gallery files plus optional <strong>Raw Footage ZIP</strong> (commonly uploaded by the photographer).</li>
+      <li>Edited/Final uploads: gallery files plus <strong>Final Delivery ZIP</strong> (commonly uploaded by the editor).</li>
+      <li>Uploads are attributed to the uploader (name/role) and stored under project media folders.</li>
+      <li>Assigned photographers/editors can upload and manage media only for projects they are assigned to.</li>
+      <li>Client preview experience: when a project is unpaid, <strong>image previews are watermarked</strong>; downloads are locked until payment.</li>
+      <li>Final ZIP delivery is available to the client after payment is completed and a final ZIP exists.</li>
+      <li>Watermark settings include logo, position, size, opacity, and rebuild tools where permitted.</li>
     </ul>
 
     <h3>4.7 Clients</h3>
@@ -506,6 +513,7 @@
       <li>Draft mailbox with autosave and one-click send.</li>
       <li>Compose email modal with AI-assisted writing and file attachments.</li>
       <li>Automation settings and backfill actions for lead follow-up workflow.</li>
+      <li>AI Write generates first-pass draft content from CRM context.</li>
     </ul>
 
     <h3>4.9 Users</h3>
@@ -513,6 +521,53 @@
       <li>Internal user account management is reserved for high-permission roles.</li>
       <li>Used to create, review, and remove internal CRM accounts.</li>
     </ul>
+
+    <h3>4.10 Messages</h3>
+    <ul>
+      <li>In-app messaging center supports two conversation types: <strong>Client Threads</strong> and <strong>User Direct Messages</strong>.</li>
+      <li><strong>Client Threads:</strong> Admin/Owner can view and message client threads; messages can optionally be linked to a project.</li>
+      <li><strong>User Direct Messages:</strong> Internal users can message admin-team users; Admin/Owner can message any internal user for coordination.</li>
+      <li>Clients can message the admin team from the portal Messages area; replies appear in the same thread for continuity.</li>
+      <li>Messages generate notifications for recipients to reduce missed updates.</li>
+      <li>Works alongside Email Center; use messages for short operational updates and email for formal threads.</li>
+    </ul>
+
+    <h3>4.11 Form Submissions</h3>
+    <ul>
+      <li>Lists website contact-form submissions for review and follow-up.</li>
+      <li>Supports opening submission detail, updating status, and deleting spam submissions.</li>
+    </ul>
+
+    <h3>4.12 Exports (CSV)</h3>
+    <ul>
+      <li>Export leads, quotes, and follow-ups to CSV for reporting and offline review.</li>
+      <li>Use exports for periodic performance snapshots and pipeline tracking.</li>
+    </ul>
+
+    <h3>4.13 Follow-Ups</h3>
+    <ul>
+      <li>Leads can have follow-ups scheduled with due dates and notes.</li>
+      <li>Follow-up status can be updated as work is completed.</li>
+    </ul>
+
+    <h3>4.14 Service Requests (Admin Handling)</h3>
+    <ul>
+      <li>Service requests are submitted from the client portal and attached to a client and optionally a project.</li>
+      <li>Admins can update service request status through <span class="mono">new</span>, <span class="mono">accepted</span>, <span class="mono">in_progress</span>, <span class="mono">completed</span>, and <span class="mono">closed</span>.</li>
+      <li>Use service requests to track add-ons, revisions, and post-delivery work.</li>
+    </ul>
+
+    <h3>4.15 Notifications</h3>
+    <ul>
+      <li>Top-bar notification bell shows an unread counter and a quick feed (latest items).</li>
+      <li>Notifications can be filtered by category: <strong>All</strong>, <strong>Quotes</strong>, <strong>Invoices</strong>, and <strong>Messages</strong>.</li>
+      <li>Each notification may include an action link (Open) to jump to the relevant screen.</li>
+      <li>Supports marking individual notifications as read and using <strong>Mark all read</strong> to clear the badge.</li>
+      <li>Common quote notifications: new quote submission, quote status updated, quote revision requested.</li>
+      <li>Common invoice notifications: invoice created, invoice status updated.</li>
+      <li>Common message notifications: new admin message, direct message received, new service request, service request status updated, project assigned, project status updated, project comment added, admin email sent, client email reply received.</li>
+    </ul>
+
   </section>
 
   <section>
@@ -527,13 +582,18 @@
       <li>Project list with detailed popup view.</li>
       <li>Invoice downloads and project-linked invoice visibility.</li>
       <li>Media preview, media download, and final ZIP download when eligible.</li>
+      <li>Account page for contact details and profile context.</li>
+      <li>Messages center for client-to-admin communication.</li>
     </ul>
 
     <h3>5.2 Client Project Experience</h3>
     <ul>
-      <li>Each project can show status, schedule, invoices, timeline, and related service requests.</li>
+      <li>Each project can show status, schedule, invoices, and related service requests.</li>
+      <li><strong>Assigned Team</strong> shows which internal users are attached to the project.</li>
+      <li><strong>Project Discussion</strong> enables threaded comments (reply, edit, delete your own comments).</li>
       <li>Clients can submit additional service requests linked to a project.</li>
-      <li>Project downloads are controlled by payment state.</li>
+      <li>Project downloads are controlled by payment state (downloads unlock after invoice/project is marked paid).</li>
+      <li>Image previews are watermarked until the project is paid; downloads are locked until payment.</li>
     </ul>
 
     <h3>5.3 Client Service Requests</h3>
@@ -635,13 +695,13 @@
     <ul>
       <li>Watermark settings exist for authorized roles only.</li>
       <li>Rebuild actions apply to preview/media workflow where configured.</li>
+      <li>When unpaid, clients can still preview media, but images are watermarked to protect delivery.</li>
       <li>Watermark controls are not intended as a replacement for final paid delivery packaging.</li>
     </ul>
 
     <h3>8.3 Payment Gate</h3>
     <div class="callout">
-      Client project downloads are locked until the related project is paid. This rule protects final delivery access
-      and is one of the most important operational controls in the CRM.
+      Client downloads are locked until the related project is paid. Image previews remain available with watermarking when unpaid, and final ZIP downloads unlock only after payment is complete. This rule protects final delivery access and is one of the most important operational controls in the CRM.
     </div>
   </section>
 

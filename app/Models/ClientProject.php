@@ -71,6 +71,11 @@ class ClientProject extends Model
         return $this->hasMany(ClientServiceRequest::class);
     }
 
+    public function bookingRequests(): HasMany
+    {
+        return $this->hasMany(BookingRequest::class);
+    }
+
     public function assignments(): HasMany
     {
         return $this->hasMany(ClientProjectAssignment::class);
@@ -86,6 +91,11 @@ class ClientProject extends Model
     public function comments(): HasMany
     {
         return $this->hasMany(ClientProjectComment::class)->latest('id');
+    }
+
+    public function tasks(): HasMany
+    {
+        return $this->hasMany(ProjectTask::class, 'client_project_id');
     }
 
     public function isFullyPaid(): bool

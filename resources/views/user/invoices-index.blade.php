@@ -41,6 +41,8 @@
             <th>Invoice</th>
             <th>Project</th>
             <th>Amount</th>
+            <th>Paid</th>
+            <th>Due Amount</th>
             <th>Status</th>
             <th>Due Date</th>
             <th>Action</th>
@@ -52,13 +54,20 @@
               <td>{{ $invoice->invoice_number }}</td>
               <td>{{ $invoice->project?->title ?: 'General invoice' }}</td>
               <td><span class="client-portal-money">{{ number_format((float) $invoice->amount, 2) }} {{ $invoice->currency }}</span></td>
+              <td>{{ number_format((float) ($invoice->amount_paid ?? 0), 2) }}</td>
+              <td>{{ number_format((float) ($invoice->balance_due ?? $invoice->amount), 2) }}</td>
               <td><span class="{{ $invoiceStatusClass($invoice->status) }}">{{ $invoice->status }}</span></td>
               <td>{{ $invoice->due_date?->format('Y-m-d') ?: '-' }}</td>
-              <td><a class="panel-btn panel-btn-primary" href="{{ route('user.invoices.download', $invoice) }}">Download PDF</a></td>
+              <td>
+                <a class="panel-btn panel-btn-primary" href="{{ route('user.invoices.download', $invoice) }}">Download PDF</a>
+                @if($invoice->status !== 'paid')
+                  <a class="panel-btn" href="{{ route('user.invoices.pay', $invoice) }}" style="margin-left: 8px;">Pay Now</a>
+                @endif
+              </td>
             </tr>
           @empty
             <tr>
-              <td colspan="6">
+              <td colspan="8">
                 <div class="client-portal-empty"><strong>No invoices yet</strong>Billing records will appear here once your projects move into invoicing.</div>
               </td>
             </tr>

@@ -20,6 +20,13 @@ class Client extends Model
         'company',
         'status',
         'notes',
+        'notify_portal',
+        'notify_invoice_email',
+    ];
+
+    protected $casts = [
+        'notify_portal' => 'boolean',
+        'notify_invoice_email' => 'boolean',
     ];
 
     public function user(): BelongsTo
@@ -50,5 +57,10 @@ class Client extends Model
     public function serviceRequests(): HasMany
     {
         return $this->hasMany(ClientServiceRequest::class);
+    }
+
+    public function bookingRequests(): HasMany
+    {
+        return $this->hasMany(BookingRequest::class);
     }
 }

@@ -4,18 +4,25 @@ namespace App\Http\Controllers;
 
 use App\Mail\BrandedNotificationMail;
 use App\Models\AiUsageLog;
+use App\Models\ApiIntegrationSetting;
+use App\Models\BookingRequest;
+use App\Models\BackupSetting;
 use App\Models\Client;
 use App\Models\ClientInvoice;
+use App\Models\ClientInvoicePayment;
 use App\Models\ClientMessage;
 use App\Models\ClientProject;
 use App\Models\ClientProjectAssignment;
 use App\Models\ClientProjectComment;
 use App\Models\ClientProjectMedia;
+use App\Models\ProjectTask;
 use App\Models\ClientServiceRequest;
+use App\Models\CurrencySetting;
 use App\Models\EmailDraft;
 use App\Models\EmailLog;
 use App\Models\FollowUp;
 use App\Models\InboundEmail;
+use App\Models\RequestEditLog;
 use App\Models\InvoiceSetting;
 use App\Models\LeadAutoEmailSetting;
 use App\Models\LeadEvent;
@@ -31,6 +38,8 @@ use App\Models\WebsiteFormSubmission;
 use App\Services\PanelNotificationService;
 use App\Services\QuoteNotificationService;
 use App\Services\LeadAutoCaptureService;
+use App\Services\InvoiceEmailService;
+use App\Services\OutboundWebhookService;
 use App\Services\AI\AiProviderManager;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -40,10 +49,14 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Password;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Throwable;
 use Illuminate\View\View;
@@ -519,6 +532,9 @@ class DashboardController extends Controller
             ->paginate(20)
             ->withQueryString();
 
+        $currencyOptions = $this->currencyOptions();
+        $defaultCurrency = $this->resolveDefaultCurrency();
+
         return view('admin.quotes-index', [
             'quotes' => $quotes,
             'filters' => [
@@ -532,6 +548,8 @@ class DashboardController extends Controller
             'widgetVisibility' => [
                 'can_export_data' => !$this->isManagerRole((string) $request->user()?->role),
             ],
+            'currencyOptions' => $currencyOptions,
+            'defaultCurrency' => $defaultCurrency,
         ]);
     }
 
@@ -703,6 +721,25 @@ class DashboardController extends Controller
             );
         }
 
+        $this->logActivity(
+            $request,
+            'project',
+            $project->id,
+            $project->client_id,
+            $request->user(),
+            'create',
+            'Project created: ' . ($project->title ?: ('Project #' . $project->id)),
+            [
+                'after' => [
+                    'title' => $project->title,
+                    'status' => $project->status,
+                    'scheduled_at' => $project->scheduled_at,
+                    'due_at' => $project->due_at,
+                    'client_id' => $project->client_id,
+                ],
+            ]
+        );
+
         return redirect()
             ->route('admin.clients.show', ['client' => (int) $validated['client_id'], 'project_id' => $project->id])
             ->with('status', 'Project created successfully.');
@@ -712,11 +749,90 @@ class DashboardController extends Controller
     {
         $this->ensureOwnerAdminAccess($request);
 
+        $snapshot = $project->only(['title', 'status', 'scheduled_at', 'due_at', 'client_id']);
         $project->delete();
+
+        $this->logActivity(
+            $request,
+            'project',
+            $project->id,
+            $project->client_id,
+            $request->user(),
+            'delete',
+            'Project deleted: ' . ($project->title ?: ('Project #' . $project->id)),
+            ['before' => $snapshot]
+        );
 
         return redirect()
             ->route('admin.projects.index')
             ->with('status', 'Project deleted successfully.');
+    }
+
+    public function adminProjectWorkspace(Request $request, ClientProject $project): View
+    {
+        $this->ensureInternalUserCanAccessAssignedProject($request, $project);
+
+        $project->loadMissing([
+            'client:id,name,email,phone',
+            'assignments.user:id,name,email,role',
+            'invoices:id,client_project_id,invoice_number,amount,currency,status,due_date,paid_at',
+            'tasks.assignee:id,name,email,role',
+            'tasks.creator:id,name,email,role',
+            'comments' => function ($query): void {
+                $query->latest('id');
+            },
+            'comments.user:id,name,email,role',
+            'comments.parent.user:id,name,email,role',
+        ]);
+
+        $role = strtolower(trim((string) $request->user()?->role));
+        $canManageProjects = in_array($role, ['owner', 'admin', 'manager'], true);
+        $currencyOptions = $this->currencyOptions();
+        $defaultCurrency = $this->resolveDefaultCurrency();
+
+        return view('admin.project-workspace', [
+            'project' => $project,
+            'assignableUsers' => $this->assignableProjectUsers(),
+            'canManageProjects' => $canManageProjects,
+            'currencyOptions' => $currencyOptions,
+            'defaultCurrency' => $defaultCurrency,
+        ]);
+    }
+
+    public function adminProjectCalendarIcs(Request $request, ClientProject $project)
+    {
+        $this->ensureInternalUserCanAccessAssignedProject($request, $project);
+
+        $startAt = $project->scheduled_at ?: $project->due_at;
+        if (!$startAt) {
+            abort(404, 'No scheduled date is available for this project.');
+        }
+
+        $endAt = (clone $startAt)->addHours(2);
+        $uid = 'project-' . $project->id . '@maccento.local';
+        $title = $project->title ?: 'Project';
+        $clientName = $project->client?->name ?: 'Client';
+
+        $ics = implode("\r\n", [
+            'BEGIN:VCALENDAR',
+            'VERSION:2.0',
+            'PRODID:-//Maccento CRM//Project Calendar//EN',
+            'CALSCALE:GREGORIAN',
+            'BEGIN:VEVENT',
+            'UID:' . $uid,
+            'DTSTAMP:' . now()->utc()->format('Ymd\THis\Z'),
+            'DTSTART:' . $startAt->copy()->utc()->format('Ymd\THis\Z'),
+            'DTEND:' . $endAt->copy()->utc()->format('Ymd\THis\Z'),
+            'SUMMARY:' . addslashes($title),
+            'DESCRIPTION:' . addslashes("Client: {$clientName}"),
+            'END:VEVENT',
+            'END:VCALENDAR',
+        ]);
+
+        return response($ics, 200, [
+            'Content-Type' => 'text/calendar; charset=utf-8',
+            'Content-Disposition' => 'attachment; filename="project-' . $project->id . '.ics"',
+        ]);
     }
 
     public function adminMediaDeliveryIndex(Request $request): View
@@ -1081,6 +1197,16 @@ class DashboardController extends Controller
         $validated = $request->validate([
             'include_tax_on_pdf' => ['nullable', 'in:0,1'],
             'tax_rate_percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'stripe_enabled' => ['nullable', 'in:0,1'],
+            'paypal_enabled' => ['nullable', 'in:0,1'],
+            'manual_enabled' => ['nullable', 'in:0,1'],
+            'manual_instructions' => ['nullable', 'string', 'max:2000'],
+            'auto_email_on_invoice_create' => ['nullable', 'in:0,1'],
+            'reminder_enabled' => ['nullable', 'in:0,1'],
+            'reminder_days_before' => ['nullable', 'integer', 'min:1', 'max:30'],
+            'reminder_send_on_due_date' => ['nullable', 'in:0,1'],
+            'overdue_reminder_enabled' => ['nullable', 'in:0,1'],
+            'overdue_reminder_every_days' => ['nullable', 'integer', 'min:1', 'max:30'],
         ]);
 
         $includeTax = (string) ($validated['include_tax_on_pdf'] ?? '0') === '1';
@@ -1089,9 +1215,31 @@ class DashboardController extends Controller
         $settings = $this->resolveInvoiceSettings();
         $settings->include_tax_on_pdf = $includeTax;
         $settings->tax_rate_percent = $taxRate;
+        $settings->stripe_enabled = (bool) ($validated['stripe_enabled'] ?? false);
+        $settings->paypal_enabled = (bool) ($validated['paypal_enabled'] ?? false);
+        $settings->manual_enabled = (bool) ($validated['manual_enabled'] ?? false);
+        $settings->manual_instructions = $validated['manual_instructions'] ?? null;
+        if (Schema::hasColumn('invoice_settings', 'auto_email_on_invoice_create')) {
+            $settings->auto_email_on_invoice_create = (bool) ($validated['auto_email_on_invoice_create'] ?? true);
+        }
+        if (Schema::hasColumn('invoice_settings', 'reminder_enabled')) {
+            $settings->reminder_enabled = (bool) ($validated['reminder_enabled'] ?? true);
+        }
+        if (Schema::hasColumn('invoice_settings', 'reminder_days_before')) {
+            $settings->reminder_days_before = (int) ($validated['reminder_days_before'] ?? 3);
+        }
+        if (Schema::hasColumn('invoice_settings', 'reminder_send_on_due_date')) {
+            $settings->reminder_send_on_due_date = (bool) ($validated['reminder_send_on_due_date'] ?? true);
+        }
+        if (Schema::hasColumn('invoice_settings', 'overdue_reminder_enabled')) {
+            $settings->overdue_reminder_enabled = (bool) ($validated['overdue_reminder_enabled'] ?? true);
+        }
+        if (Schema::hasColumn('invoice_settings', 'overdue_reminder_every_days')) {
+            $settings->overdue_reminder_every_days = (int) ($validated['overdue_reminder_every_days'] ?? 3);
+        }
         $settings->save();
 
-        return back()->with('status', 'Invoice PDF tax settings updated.');
+        return back()->with('status', 'Invoice settings updated.');
     }
 
     public function adminEmailsIndex(Request $request): View
@@ -1120,6 +1268,186 @@ class DashboardController extends Controller
         return $this->renderAdminEmailMailbox($request, 'drafts');
     }
 
+    public function adminApiIntegrationsIndex(Request $request): View
+    {
+        $this->ensureOwnerAdminAccess($request);
+
+        return view('admin.api-integrations', [
+            'settings' => $this->buildApiDisplaySettings(),
+        ]);
+    }
+
+    public function adminApiIntegrationsUpdate(Request $request): RedirectResponse
+    {
+        $this->ensureOwnerAdminAccess($request);
+
+        $validated = $request->validate([
+            'stripe_publishable_key' => ['nullable', 'string', 'max:255'],
+            'stripe_secret_key' => ['nullable', 'string', 'max:255'],
+            'paypal_client_id' => ['nullable', 'string', 'max:255'],
+            'paypal_secret' => ['nullable', 'string', 'max:255'],
+            'paypal_sandbox' => ['nullable', 'in:0,1'],
+            'mail_mailer' => ['nullable', 'string', 'max:50'],
+            'mail_host' => ['nullable', 'string', 'max:120'],
+            'mail_port' => ['nullable', 'integer', 'min:1', 'max:65535'],
+            'mail_username' => ['nullable', 'string', 'max:120'],
+            'mail_password' => ['nullable', 'string', 'max:255'],
+            'mail_encryption' => ['nullable', 'string', 'max:20'],
+            'mail_from_address' => ['nullable', 'email', 'max:120'],
+            'mail_from_name' => ['nullable', 'string', 'max:120'],
+            'media_disk' => ['nullable', 'string', 'max:20'],
+            's3_key' => ['nullable', 'string', 'max:255'],
+            's3_secret' => ['nullable', 'string', 'max:255'],
+            's3_region' => ['nullable', 'string', 'max:120'],
+            's3_bucket' => ['nullable', 'string', 'max:120'],
+            's3_endpoint' => ['nullable', 'string', 'max:255'],
+            's3_path_style' => ['nullable', 'in:0,1'],
+            'outbound_webhook_enabled' => ['nullable', 'in:0,1'],
+            'outbound_webhook_url' => ['nullable', 'url', 'max:255'],
+            'outbound_webhook_secret' => ['nullable', 'string', 'max:255'],
+            'chat_provider' => ['nullable', 'string', 'max:80'],
+            'chat_api_key' => ['nullable', 'string', 'max:255'],
+            'chat_webhook_url' => ['nullable', 'url', 'max:255'],
+            'ai_provider' => ['nullable', 'string', 'max:60'],
+            'ai_model' => ['nullable', 'string', 'max:120'],
+            'openai_api_key' => ['nullable', 'string', 'max:255'],
+            'openai_base_url' => ['nullable', 'string', 'max:255'],
+            'openrouter_api_key' => ['nullable', 'string', 'max:255'],
+            'openrouter_base_url' => ['nullable', 'string', 'max:255'],
+            'openrouter_model' => ['nullable', 'string', 'max:120'],
+            'gemini_api_key' => ['nullable', 'string', 'max:255'],
+            'gemini_base_url' => ['nullable', 'string', 'max:255'],
+            'gemini_model' => ['nullable', 'string', 'max:120'],
+        ]);
+
+        $settings = $this->resolveApiIntegrationSettings();
+        $settings->fill([
+            'stripe_publishable_key' => $validated['stripe_publishable_key'] ?? null,
+            'stripe_secret_key' => $validated['stripe_secret_key'] ?? null,
+            'paypal_client_id' => $validated['paypal_client_id'] ?? null,
+            'paypal_secret' => $validated['paypal_secret'] ?? null,
+            'paypal_sandbox' => (bool) ($validated['paypal_sandbox'] ?? true),
+            'mail_mailer' => $validated['mail_mailer'] ?? null,
+            'mail_host' => $validated['mail_host'] ?? null,
+            'mail_port' => $validated['mail_port'] ?? null,
+            'mail_username' => $validated['mail_username'] ?? null,
+            'mail_password' => $validated['mail_password'] ?? null,
+            'mail_encryption' => $validated['mail_encryption'] ?? null,
+            'mail_from_address' => $validated['mail_from_address'] ?? null,
+            'mail_from_name' => $validated['mail_from_name'] ?? null,
+            'media_disk' => $validated['media_disk'] ?? null,
+            's3_key' => $validated['s3_key'] ?? null,
+            's3_secret' => $validated['s3_secret'] ?? null,
+            's3_region' => $validated['s3_region'] ?? null,
+            's3_bucket' => $validated['s3_bucket'] ?? null,
+            's3_endpoint' => $validated['s3_endpoint'] ?? null,
+            's3_path_style' => (bool) ($validated['s3_path_style'] ?? false),
+            'outbound_webhook_enabled' => (bool) ($validated['outbound_webhook_enabled'] ?? false),
+            'outbound_webhook_url' => $validated['outbound_webhook_url'] ?? null,
+            'outbound_webhook_secret' => $validated['outbound_webhook_secret'] ?? null,
+            'chat_provider' => $validated['chat_provider'] ?? null,
+            'chat_api_key' => $validated['chat_api_key'] ?? null,
+            'chat_webhook_url' => $validated['chat_webhook_url'] ?? null,
+            'ai_provider' => $validated['ai_provider'] ?? null,
+            'ai_model' => $validated['ai_model'] ?? null,
+            'openai_api_key' => $validated['openai_api_key'] ?? null,
+            'openai_base_url' => $validated['openai_base_url'] ?? null,
+            'openrouter_api_key' => $validated['openrouter_api_key'] ?? null,
+            'openrouter_base_url' => $validated['openrouter_base_url'] ?? null,
+            'openrouter_model' => $validated['openrouter_model'] ?? null,
+            'gemini_api_key' => $validated['gemini_api_key'] ?? null,
+            'gemini_base_url' => $validated['gemini_base_url'] ?? null,
+            'gemini_model' => $validated['gemini_model'] ?? null,
+        ]);
+        $settings->save();
+
+        return back()->with('status', 'API integration settings saved.');
+    }
+
+    public function adminSettingsIndex(Request $request): View
+    {
+        $this->ensureOwnerAdminAccess($request);
+
+        $settings = $this->getWatermarkSettings();
+        $renderConfig = $this->resolveWatermarkRenderConfig($settings);
+        $signature = (string) ($renderConfig['signature'] ?? '');
+        $logoExists = !blank($settings->logo_path)
+            && Storage::disk((string) ($settings->logo_disk ?: 'public'))->exists((string) $settings->logo_path);
+
+        $unpaidImageTotal = ClientProjectMedia::query()
+            ->where('type', 'image')
+            ->whereHas('project', function ($query): void {
+                $query->whereDoesntHave('invoices', function ($invoiceQuery): void {
+                    $invoiceQuery->where('status', 'paid');
+                });
+            })
+            ->count();
+
+        $upToDateWatermarks = ClientProjectMedia::query()
+            ->where('type', 'image')
+            ->where('watermark_signature', $signature)
+            ->whereHas('project', function ($query): void {
+                $query->whereDoesntHave('invoices', function ($invoiceQuery): void {
+                    $invoiceQuery->where('status', 'paid');
+                });
+            })
+            ->count();
+
+        $pendingRebuild = max(0, $unpaidImageTotal - $upToDateWatermarks);
+
+        $invoiceSettings = $this->resolveInvoiceSettings();
+        $canManageInvoiceSettings = in_array(strtolower(trim((string) $request->user()?->role)), ['owner', 'admin'], true);
+
+        $currencySettings = $this->resolveCurrencySettings();
+        $currencyOptions = $this->currencyOptions();
+
+        return view('admin.settings-index', [
+            'apiSettings' => $this->buildApiDisplaySettings(),
+            'watermarkSettings' => $settings,
+            'unpaidImageTotal' => $unpaidImageTotal,
+            'upToDateWatermarks' => $upToDateWatermarks,
+            'pendingRebuild' => $pendingRebuild,
+            'logoExists' => $logoExists,
+            'invoiceSettings' => $invoiceSettings,
+            'canManageInvoiceSettings' => $canManageInvoiceSettings,
+            'currencySettings' => $currencySettings,
+            'currencyOptions' => $currencyOptions,
+        ]);
+    }
+
+    public function adminCurrencySettingsUpdate(Request $request): RedirectResponse
+    {
+        $this->ensureOwnerAdminAccess($request);
+
+        if (!Schema::hasTable('currency_settings')) {
+            return back()->withErrors(['currency' => 'Currency settings table not found. Run migrations.']);
+        }
+
+        $options = $this->currencyOptions();
+        $allowed = array_keys($options);
+
+        $validated = $request->validate([
+            'default_currency' => ['required', Rule::in($allowed)],
+            'enabled_currencies' => ['nullable', 'array'],
+            'enabled_currencies.*' => [Rule::in($allowed)],
+        ]);
+
+        $enabled = array_values(array_unique($validated['enabled_currencies'] ?? []));
+        if ($enabled === []) {
+            $enabled = [$validated['default_currency']];
+        }
+
+        if (!in_array($validated['default_currency'], $enabled, true)) {
+            $enabled[] = $validated['default_currency'];
+        }
+
+        $settings = $this->resolveCurrencySettings();
+        $settings->default_currency = $validated['default_currency'];
+        $settings->enabled_currencies = $enabled;
+        $settings->save();
+
+        return back()->with('status', 'Currency settings updated.');
+    }
     public function adminEmailAutomationSettingsIndex(Request $request): View
     {
         $this->ensureOwnerAdminAccess($request);
@@ -1659,6 +1987,22 @@ class DashboardController extends Controller
                 $draft->last_opened_at = now();
                 $draft->save();
             }
+
+            if ($emailLog !== null) {
+                $this->logActivity(
+                    $request,
+                    'email',
+                    $emailLog->id,
+                    null,
+                    $request->user(),
+                    'send',
+                    'Email sent to ' . $recipient,
+                    [
+                        'subject' => $subject,
+                        'template_key' => (string) ($validated['template_key'] ?? ''),
+                    ]
+                );
+            }
         } catch (Throwable $exception) {
             if ($emailLog !== null) {
                 $emailLog->forceFill([
@@ -1697,6 +2041,12 @@ class DashboardController extends Controller
     {
         $this->ensurePipelineWriteAccess($request);
 
+        $allowedCurrencies = $this->resolveAllowedCurrencyCodes();
+        $currencyRule = ['nullable', 'string', 'max:8'];
+        if ($allowedCurrencies !== []) {
+            $currencyRule[] = Rule::in($allowedCurrencies);
+        }
+
         $validated = $request->validate([
             'contact_name' => ['required', 'string', 'max:120'],
             'contact_email' => ['nullable', 'email', 'max:255'],
@@ -1704,7 +2054,7 @@ class DashboardController extends Controller
             'services' => ['required', 'string', 'max:255'],
             'listing_type' => ['nullable', 'in:home,condo,rental,chalet,other'],
             'estimated_total' => ['required', 'integer', 'min:0'],
-            'currency' => ['nullable', 'string', 'max:8'],
+            'currency' => $currencyRule,
             'notes' => ['nullable', 'string', 'max:1000'],
         ]);
 
@@ -1929,7 +2279,84 @@ class DashboardController extends Controller
             fclose($out);
         }, 'followups-export-' . now()->format('Ymd-His') . '.csv');
     }
+    public function adminBookingRequestDestroy(Request $request, BookingRequest $bookingRequest): RedirectResponse
+    {
+        $this->logRequestEdit('booking', (int) $bookingRequest->id, $bookingRequest->client_id, $request->user(), [
+            'action' => 'delete',
+            'snapshot' => $bookingRequest->only(['client_project_id', 'requested_service', 'preferred_date', 'preferred_time_window', 'notes', 'status']),
+        ]);
 
+        $bookingRequest->delete();
+
+        return back()->with('status', 'Booking request deleted.');
+    }
+
+    public function adminServiceRequestDestroy(Request $request, ClientServiceRequest $serviceRequest): RedirectResponse
+    {
+        $this->logRequestEdit('service', (int) $serviceRequest->id, $serviceRequest->client_id, $request->user(), [
+            'action' => 'delete',
+            'snapshot' => $serviceRequest->only(['client_project_id', 'requested_service', 'subject', 'details', 'preferred_date', 'status']),
+        ]);
+
+        $serviceRequest->delete();
+
+        return back()->with('status', 'Service request deleted.');
+    }
+    public function adminBookingRequestUpdate(Request $request, BookingRequest $bookingRequest): RedirectResponse
+    {
+        $validated = $request->validate([
+            'client_project_id' => ['nullable', 'integer'],
+            'requested_service' => ['required', 'string', 'max:160'],
+            'preferred_date' => ['nullable', 'date'],
+            'preferred_time_window' => ['nullable', 'string', 'max:80'],
+            'notes' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        $before = $bookingRequest->only(['client_project_id', 'requested_service', 'preferred_date', 'preferred_time_window', 'notes']);
+
+        $bookingRequest->client_project_id = $validated['client_project_id'] ?? null;
+        $bookingRequest->requested_service = $validated['requested_service'];
+        $bookingRequest->preferred_date = $validated['preferred_date'] ?? null;
+        $bookingRequest->preferred_time_window = $validated['preferred_time_window'] ?? null;
+        $bookingRequest->notes = $validated['notes'] ?? null;
+        $bookingRequest->save();
+
+        $this->logRequestEdit('booking', (int) $bookingRequest->id, $bookingRequest->client_id, $request->user(), [
+            'action' => 'update',
+            'before' => $before,
+            'after' => $bookingRequest->only(['client_project_id', 'requested_service', 'preferred_date', 'preferred_time_window', 'notes']),
+        ]);
+
+        return back()->with('status', 'Booking request updated.');
+    }
+
+    public function adminServiceRequestUpdate(Request $request, ClientServiceRequest $serviceRequest): RedirectResponse
+    {
+        $validated = $request->validate([
+            'client_project_id' => ['nullable', 'integer'],
+            'requested_service' => ['required', 'string', 'max:120'],
+            'subject' => ['nullable', 'string', 'max:255'],
+            'details' => ['nullable', 'string', 'max:2000'],
+            'preferred_date' => ['nullable', 'date'],
+        ]);
+
+        $before = $serviceRequest->only(['client_project_id', 'requested_service', 'subject', 'details', 'preferred_date']);
+
+        $serviceRequest->client_project_id = $validated['client_project_id'] ?? null;
+        $serviceRequest->requested_service = $validated['requested_service'];
+        $serviceRequest->subject = $validated['subject'] ?? null;
+        $serviceRequest->details = $validated['details'] ?? null;
+        $serviceRequest->preferred_date = $validated['preferred_date'] ?? null;
+        $serviceRequest->save();
+
+        $this->logRequestEdit('service', (int) $serviceRequest->id, $serviceRequest->client_id, $request->user(), [
+            'action' => 'update',
+            'before' => $before,
+            'after' => $serviceRequest->only(['client_project_id', 'requested_service', 'subject', 'details', 'preferred_date']),
+        ]);
+
+        return back()->with('status', 'Service request updated.');
+    }
     public function adminLeadShow(LeadProfile $lead): View
     {
         $lead->load([
@@ -2022,8 +2449,56 @@ class DashboardController extends Controller
         return back()->with('status', 'Submission deleted.');
     }
 
+    public function adminBookingRequestsIndex(Request $request): View
+    {
+        $this->ensurePipelineWriteAccess($request);
 
-        public function adminClientsIndex(Request $request): View
+        $statusFilter = trim((string) $request->string('status'));
+        $search = trim((string) $request->string('search'));
+
+        $query = BookingRequest::query()
+            ->with(['client:id,name,email,phone', 'project:id,title,scheduled_at'])
+            ->latest('created_at');
+
+        if ($statusFilter !== '') {
+            $query->where('status', $statusFilter);
+        }
+
+        if ($search !== '') {
+            $query->where(function ($inner) use ($search): void {
+                $inner->where('requested_service', 'like', '%' . $search . '%')
+                    ->orWhereHas('client', function ($clientQuery) use ($search): void {
+                        $clientQuery->where('name', 'like', '%' . $search . '%')
+                            ->orWhere('email', 'like', '%' . $search . '%');
+                    })
+                    ->orWhereHas('project', function ($projectQuery) use ($search): void {
+                        $projectQuery->where('title', 'like', '%' . $search . '%');
+                    });
+            });
+        }
+
+        $bookingRequests = $query->paginate(20)->appends($request->query());
+
+        $editRequest = null;
+        if ($request->filled('edit')) {
+            $editRequest = BookingRequest::query()
+                ->with(['client:id,name,email,phone', 'project:id,title,scheduled_at'])
+                ->find((int) $request->input('edit'));
+        }
+
+        $statusOptions = ['new', 'proposed', 'confirmed', 'rescheduled', 'cancelled', 'closed'];
+
+        return view('admin.booking-requests-index', [
+            'bookingRequests' => $bookingRequests,
+            'statusFilter' => $statusFilter,
+            'search' => $search,
+            'statusOptions' => $statusOptions,
+            'editRequest' => $editRequest,
+        ]);
+    }
+
+
+    public function adminClientsIndex(Request $request): View
     {
         $status = trim((string) $request->string('status'));
         $search = trim((string) $request->string('search'));
@@ -2065,12 +2540,508 @@ class DashboardController extends Controller
             ],
         ]);
     }
-public function adminClientStore(Request $request): RedirectResponse
+
+    public function adminServiceRequestsIndex(Request $request): View
+    {
+        $this->ensurePipelineWriteAccess($request);
+
+        $statusFilter = trim((string) $request->string('status'));
+        $search = trim((string) $request->string('search'));
+
+        $query = ClientServiceRequest::query()
+            ->with(['client:id,name,email,phone', 'project:id,title'])
+            ->latest('id');
+
+        if ($statusFilter !== '') {
+            $query->where('status', $statusFilter);
+        }
+
+        if ($search !== '') {
+            $query->where(function ($inner) use ($search): void {
+                $inner->where('requested_service', 'like', '%' . $search . '%')
+                    ->orWhereHas('client', function ($clientQuery) use ($search): void {
+                        $clientQuery->where('name', 'like', '%' . $search . '%')
+                            ->orWhere('email', 'like', '%' . $search . '%');
+                    })
+                    ->orWhereHas('project', function ($projectQuery) use ($search): void {
+                        $projectQuery->where('title', 'like', '%' . $search . '%');
+                    });
+            });
+        }
+
+        $serviceRequests = $query->paginate(20)->appends($request->query());
+        $statusOptions = ['new', 'accepted', 'in_progress', 'completed', 'closed'];
+        $canManagePipeline = true;
+        $currencyOptions = $this->currencyOptions();
+        $defaultCurrency = $this->resolveDefaultCurrency();
+
+        $editRequest = null;
+        if ($request->filled('edit')) {
+            $editRequest = ClientServiceRequest::query()
+                ->with(['client:id,name,email,phone', 'project:id,title'])
+                ->find((int) $request->input('edit'));
+        }
+
+        return view('admin.service-requests-index', [
+            'serviceRequests' => $serviceRequests,
+            'statusFilter' => $statusFilter,
+            'search' => $search,
+            'statusOptions' => $statusOptions,
+            'canManagePipeline' => $canManagePipeline,
+            'editRequest' => $editRequest,
+            'currencyOptions' => $currencyOptions,
+            'defaultCurrency' => $defaultCurrency,
+        ]);
+    }
+
+    public function adminRequestEditLogsIndex(Request $request): View
+    {
+        $this->ensurePipelineWriteAccess($request);
+
+        $typeFilter = trim((string) $request->string('type'));
+        $actionFilter = trim((string) $request->string('action'));
+        $search = trim((string) $request->string('search'));
+
+        $query = RequestEditLog::query()
+            ->with([
+                'actor:id,name,email,role',
+                'client:id,name,email,phone',
+            ])
+            ->latest('id');
+
+        if ($typeFilter !== '') {
+            $query->where(function ($inner) use ($typeFilter): void {
+                $inner->where('entity_type', $typeFilter)
+                    ->orWhere('request_type', $typeFilter);
+            });
+        }
+
+        if ($actionFilter !== '') {
+            $query->where(function ($inner) use ($actionFilter): void {
+                $inner->where('action', $actionFilter)
+                    ->orWhere('changes->action', $actionFilter);
+            });
+        }
+
+        if ($search !== '') {
+            $query->where(function ($inner) use ($search): void {
+                $inner->where('request_type', 'like', '%' . $search . '%')
+                    ->orWhere('entity_type', 'like', '%' . $search . '%')
+                    ->orWhere('action', 'like', '%' . $search . '%')
+                    ->orWhere('summary', 'like', '%' . $search . '%')
+                    ->orWhere('changes->action', 'like', '%' . $search . '%');
+
+                if (is_numeric($search)) {
+                    $inner->orWhere('request_id', (int) $search)
+                        ->orWhere('entity_id', (int) $search);
+                }
+
+                $inner->orWhereHas('client', function ($clientQuery) use ($search): void {
+                    $clientQuery->where('name', 'like', '%' . $search . '%')
+                        ->orWhere('email', 'like', '%' . $search . '%');
+                })
+                ->orWhereHas('actor', function ($actorQuery) use ($search): void {
+                    $actorQuery->where('name', 'like', '%' . $search . '%')
+                        ->orWhere('email', 'like', '%' . $search . '%');
+                });
+            });
+        }
+
+        $logs = $query->paginate(25)->appends($request->query());
+        $typeOptions = [
+            'booking',
+            'service',
+            'lead',
+            'quote',
+            'invoice',
+            'project',
+            'client',
+            'user',
+            'message',
+            'media',
+            'email',
+        ];
+        $actionOptions = ['create', 'update', 'status_update', 'delete', 'send', 'upload', 'download', 'payment'];
+
+        return view('admin.request-edit-logs-index', [
+            'logs' => $logs,
+            'typeFilter' => $typeFilter,
+            'actionFilter' => $actionFilter,
+            'search' => $search,
+            'typeOptions' => $typeOptions,
+            'actionOptions' => $actionOptions,
+        ]);
+    }
+
+    public function adminReportsIndex(Request $request): View
+    {
+        $this->ensurePipelineWriteAccess($request);
+
+        [$fromDateRaw, $toDateRaw] = $this->extractDateRange($request, 'from', 'to');
+        $fromDateRaw ??= now()->subDays(30)->toDateString();
+        $toDateRaw ??= now()->toDateString();
+
+        $fromDate = Carbon::parse($fromDateRaw)->startOfDay();
+        $toDate = Carbon::parse($toDateRaw)->endOfDay();
+
+        $issuedInvoicesQuery = ClientInvoice::query()
+            ->whereDate('issued_at', '>=', $fromDate->toDateString())
+            ->whereDate('issued_at', '<=', $toDate->toDateString());
+
+        $paidInvoicesQuery = ClientInvoice::query()
+            ->where('status', 'paid')
+            ->whereBetween('paid_at', [$fromDate, $toDate]);
+
+        $issuedCount = (clone $issuedInvoicesQuery)->count();
+        $paidCount = (clone $paidInvoicesQuery)->count();
+        $unpaidCount = (clone $issuedInvoicesQuery)
+            ->whereIn('status', ['sent', 'partial', 'overdue'])
+            ->count();
+
+        $revenueByCurrency = (clone $paidInvoicesQuery)
+            ->select('currency', DB::raw('sum(amount) as total'))
+            ->groupBy('currency')
+            ->orderBy('currency')
+            ->get();
+
+        $outstandingByCurrency = ClientInvoice::query()
+            ->whereIn('status', ['sent', 'partial', 'overdue'])
+            ->whereDate('issued_at', '>=', $fromDate->toDateString())
+            ->whereDate('issued_at', '<=', $toDate->toDateString())
+            ->select('currency', DB::raw('sum(amount) as total'))
+            ->groupBy('currency')
+            ->orderBy('currency')
+            ->get();
+
+        $leadsCreated = LeadProfile::query()
+            ->whereBetween('created_at', [$fromDate, $toDate])
+            ->count();
+        $leadsWon = LeadProfile::query()
+            ->where('status', 'won')
+            ->whereBetween('updated_at', [$fromDate, $toDate])
+            ->count();
+
+        $quotesCreated = QuoteBuild::query()
+            ->whereBetween('created_at', [$fromDate, $toDate])
+            ->count();
+        $quotesBooked = QuoteBuild::query()
+            ->where('status', 'booked')
+            ->whereBetween('updated_at', [$fromDate, $toDate])
+            ->count();
+
+        $projectsCompleted = ClientProject::query()
+            ->where('status', 'complete')
+            ->whereBetween('updated_at', [$fromDate, $toDate])
+            ->count();
+        $projectsOverdue = ClientProject::query()
+            ->whereIn('status', ['accepted', 'shooting', 'editing'])
+            ->whereNotNull('due_at')
+            ->where('due_at', '<', now())
+            ->count();
+
+        $paidInvoices = (clone $paidInvoicesQuery)->get(['issued_at', 'paid_at']);
+        $avgDaysToPay = null;
+        if ($paidInvoices->isNotEmpty()) {
+            $sumDays = 0;
+            $countDays = 0;
+            foreach ($paidInvoices as $invoice) {
+                if ($invoice->issued_at && $invoice->paid_at) {
+                    $sumDays += Carbon::parse($invoice->issued_at)->diffInDays(Carbon::parse($invoice->paid_at));
+                    $countDays++;
+                }
+            }
+            if ($countDays > 0) {
+                $avgDaysToPay = round($sumDays / $countDays, 1);
+            }
+        }
+
+        $overdueAging = [
+            '0_7' => 0,
+            '8_14' => 0,
+            '15_30' => 0,
+            '31_plus' => 0,
+        ];
+        $overdueInvoices = ClientInvoice::query()
+            ->whereIn('status', ['sent', 'partial', 'overdue'])
+            ->whereNotNull('due_date')
+            ->whereDate('due_date', '<', now()->toDateString())
+            ->get(['due_date']);
+        foreach ($overdueInvoices as $invoice) {
+            $days = Carbon::parse($invoice->due_date)->diffInDays(now());
+            if ($days <= 7) {
+                $overdueAging['0_7']++;
+            } elseif ($days <= 14) {
+                $overdueAging['8_14']++;
+            } elseif ($days <= 30) {
+                $overdueAging['15_30']++;
+            } else {
+                $overdueAging['31_plus']++;
+            }
+        }
+
+        $topClients = DB::table('client_invoices')
+            ->join('clients', 'clients.id', '=', 'client_invoices.client_id')
+            ->select(
+                'clients.id',
+                'clients.name',
+                'clients.email',
+                'client_invoices.currency',
+                DB::raw('sum(client_invoices.amount) as total'),
+                DB::raw('count(*) as invoices_count')
+            )
+            ->where('client_invoices.status', 'paid')
+            ->whereBetween('client_invoices.paid_at', [$fromDate, $toDate])
+            ->groupBy('clients.id', 'clients.name', 'clients.email', 'client_invoices.currency')
+            ->orderByDesc('total')
+            ->limit(8)
+            ->get();
+
+        return view('admin.reports-index', [
+            'fromDate' => $fromDate->toDateString(),
+            'toDate' => $toDate->toDateString(),
+            'issuedCount' => $issuedCount,
+            'paidCount' => $paidCount,
+            'unpaidCount' => $unpaidCount,
+            'revenueByCurrency' => $revenueByCurrency,
+            'outstandingByCurrency' => $outstandingByCurrency,
+            'leadsCreated' => $leadsCreated,
+            'leadsWon' => $leadsWon,
+            'quotesCreated' => $quotesCreated,
+            'quotesBooked' => $quotesBooked,
+            'projectsCompleted' => $projectsCompleted,
+            'projectsOverdue' => $projectsOverdue,
+            'avgDaysToPay' => $avgDaysToPay,
+            'overdueAging' => $overdueAging,
+            'topClients' => $topClients,
+        ]);
+    }
+
+    public function adminSystemHealthIndex(Request $request): View
+    {
+        $this->ensurePipelineWriteAccess($request);
+
+        $now = now();
+        $windowStart = $now->copy()->subHours(24);
+
+        $failedJobs = [];
+        $failedJobsCount = null;
+        $latestFailedJobAt = null;
+        if (Schema::hasTable('failed_jobs')) {
+            $failedJobs = DB::table('failed_jobs')
+                ->orderByDesc('failed_at')
+                ->limit(20)
+                ->get();
+            $failedJobsCount = (int) DB::table('failed_jobs')
+                ->where('failed_at', '>=', $windowStart)
+                ->count();
+            $latestFailedJobAt = DB::table('failed_jobs')->max('failed_at');
+        }
+
+        $failedEmails = [];
+        $failedEmailsCount = null;
+        if (Schema::hasTable('email_logs')) {
+            $failedEmails = EmailLog::query()
+                ->where('status', 'failed')
+                ->latest('id')
+                ->limit(20)
+                ->get();
+            $failedEmailsCount = (int) EmailLog::query()
+                ->where('status', 'failed')
+                ->where('created_at', '>=', $windowStart)
+                ->count();
+        }
+
+        $sendgridFailures = [];
+        $sendgridFailuresCount = null;
+        if (Schema::hasTable('sendgrid_webhook_events')) {
+            $sendgridFailures = SendgridWebhookEvent::query()
+                ->whereIn('event_type', ['bounce', 'dropped', 'spamreport', 'blocked'])
+                ->orderByDesc('occurred_at')
+                ->limit(20)
+                ->get();
+            $sendgridFailuresCount = (int) SendgridWebhookEvent::query()
+                ->whereIn('event_type', ['bounce', 'dropped', 'spamreport', 'blocked'])
+                ->where('occurred_at', '>=', $windowStart)
+                ->count();
+        }
+
+        return view('admin.system-health-index', [
+            'failedJobs' => $failedJobs,
+            'failedJobsCount' => $failedJobsCount,
+            'latestFailedJobAt' => $latestFailedJobAt ? Carbon::parse((string) $latestFailedJobAt) : null,
+            'failedEmails' => $failedEmails,
+            'failedEmailsCount' => $failedEmailsCount,
+            'sendgridFailures' => $sendgridFailures,
+            'sendgridFailuresCount' => $sendgridFailuresCount,
+        ]);
+    }
+
+    public function adminBackupRestoreIndex(Request $request): View
+    {
+        $this->ensurePipelineWriteAccess($request);
+
+        $backupFiles = Storage::disk('local')->exists('backups')
+            ? Storage::disk('local')->files('backups')
+            : [];
+
+        $backupSettings = Schema::hasTable('backup_settings')
+            ? BackupSetting::query()->first()
+            : null;
+
+        return view('admin.backup-restore', [
+            'backupFiles' => $backupFiles,
+            'backupSettings' => $backupSettings,
+        ]);
+    }
+
+    public function adminBackupSettingsUpdate(Request $request): RedirectResponse
+    {
+        $this->ensureOwnerAdminAccess($request);
+
+        $validated = $request->validate([
+            'enabled' => ['nullable', 'in:0,1'],
+            'run_time' => ['required', 'date_format:H:i'],
+            'run_days' => ['nullable', 'array'],
+            'run_days.*' => ['in:mon,tue,wed,thu,fri,sat,sun'],
+            'keep_count' => ['required', 'integer', 'min:1', 'max:365'],
+        ]);
+
+        if (!Schema::hasTable('backup_settings')) {
+            return back()->withErrors(['backup' => 'Backup settings table not found. Run migrations.']);
+        }
+
+        $settings = BackupSetting::query()->first() ?? new BackupSetting();
+        $settings->enabled = (bool) ($validated['enabled'] ?? false);
+        $settings->run_time = (string) $validated['run_time'];
+        $settings->run_days = $validated['run_days'] ?? [];
+        $settings->keep_count = (int) $validated['keep_count'];
+        $settings->save();
+
+        return back()->with('status', 'Backup settings updated.');
+    }
+
+    public function adminBackupRunNow(Request $request)
+    {
+        $this->ensureOwnerAdminAccess($request);
+
+        $exitCode = Artisan::call('system:db-backup', [
+            '--force' => true,
+            '--prune' => true,
+        ]);
+        $commandOutput = trim((string) Artisan::output());
+
+        if ($exitCode !== 0) {
+            $message = 'Backup failed. ';
+            if ($commandOutput !== '') {
+                $message .= 'Details: ' . Str::limit($commandOutput, 240);
+            } else {
+                $message .= 'Check server logs for details.';
+            }
+            return back()->withErrors(['backup' => $message]);
+        }
+
+        $backupFiles = Storage::disk('local')->exists('backups')
+            ? Storage::disk('local')->files('backups')
+            : [];
+
+        if ($backupFiles === []) {
+            return back()->withErrors(['backup' => 'Backup completed but no files were found.']);
+        }
+
+        $latestFile = null;
+        $latestTimestamp = null;
+        foreach ($backupFiles as $file) {
+            $timestamp = Storage::disk('local')->lastModified($file);
+            if ($latestTimestamp === null || $timestamp > $latestTimestamp) {
+                $latestTimestamp = $timestamp;
+                $latestFile = $file;
+            }
+        }
+
+        if ($latestFile === null) {
+            return back()->withErrors(['backup' => 'Backup completed but latest file could not be resolved.']);
+        }
+
+        return Storage::disk('local')->download($latestFile, basename($latestFile));
+    }
+
+    public function adminBackupRestore(Request $request): RedirectResponse
+    {
+        $this->ensureOwnerAdminAccess($request);
+
+        $validated = $request->validate([
+            'backup_file' => ['required', 'string'],
+        ]);
+
+        $file = basename((string) $validated['backup_file']);
+        if (!Storage::disk('local')->exists('backups/' . $file)) {
+            return back()->withErrors(['backup_file' => 'Backup file not found.']);
+        }
+
+        Artisan::call('system:db-restore', [
+            'file' => $file,
+        ]);
+
+        return back()->with('status', 'Restore command executed. Check logs for details.');
+    }
+
+    public function adminBackupUploadRestore(Request $request): RedirectResponse
+    {
+        $this->ensureOwnerAdminAccess($request);
+
+        $validated = $request->validate([
+            'backup_upload' => ['required', 'file', 'max:512000'],
+        ]);
+
+        $file = $validated['backup_upload'];
+        $originalName = basename((string) ($file->getClientOriginalName() ?: 'backup.sql'));
+        if (!preg_match('/\.(sql|sqlite)$/i', $originalName)) {
+            return back()->withErrors(['backup_upload' => 'Unsupported backup file type.']);
+        }
+
+        $storedPath = $file->storeAs('backups', $originalName, 'local');
+        if (!$storedPath) {
+            return back()->withErrors(['backup_upload' => 'Failed to store backup file.']);
+        }
+
+        Artisan::call('system:db-restore', [
+            'file' => $originalName,
+        ]);
+
+        return back()->with('status', 'Backup uploaded and restore command executed. Check logs for details.');
+    }
+
+    public function adminBackupDownload(Request $request)
+    {
+        $this->ensureOwnerAdminAccess($request);
+
+        $file = basename((string) $request->query('file', ''));
+        if ($file === '') {
+            return back()->withErrors(['backup_file' => 'Backup file is required.']);
+        }
+
+        if (!preg_match('/\.(sql|sqlite)$/i', $file)) {
+            return back()->withErrors(['backup_file' => 'Unsupported backup file type.']);
+        }
+
+        $path = 'backups/' . $file;
+        if (!Storage::disk('local')->exists($path)) {
+            return back()->withErrors(['backup_file' => 'Backup file not found.']);
+        }
+
+        return Storage::disk('local')->download($path, $file);
+    }
+
+    public function adminClientStore(Request $request): RedirectResponse
     {
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255'],
-            'password' => ['required', 'string', 'min:8', 'max:100'],
+            'password' => [
+                'required',
+                'string',
+                Password::min(8)->mixedCase()->letters()->numbers()->symbols()->uncompromised(),
+            ],
             'phone' => ['nullable', 'string', 'max:30'],
             'company' => ['nullable', 'string', 'max:255'],
             'role' => ['required', 'in:client'],
@@ -2123,6 +3094,8 @@ public function adminClientStore(Request $request): RedirectResponse
             $clientCreated = true;
         }
 
+        $clientBefore = $client->exists ? $client->only(['name', 'email', 'phone', 'company', 'status']) : null;
+
         $client->fill($this->filterTableColumns('clients', [
             'user_id' => $linkedUser->id,
             'created_by' => $client->created_by ?: $request->user()?->id,
@@ -2136,6 +3109,20 @@ public function adminClientStore(Request $request): RedirectResponse
         $client->save();
 
         $statusMessage = $clientCreated ? 'Client created.' : 'Existing client updated.';
+
+        $this->logActivity(
+            $request,
+            'client',
+            $client->id,
+            $client->id,
+            $request->user(),
+            $clientCreated ? 'create' : 'update',
+            $clientCreated ? 'Client created: ' . ($client->name ?: ('Client #' . $client->id)) : 'Client updated: ' . ($client->name ?: ('Client #' . $client->id)),
+            [
+                'before' => $clientBefore,
+                'after' => $client->only(['name', 'email', 'phone', 'company', 'status']),
+            ]
+        );
 
         return redirect()->route('admin.clients.show', $client)->with('status', "{$statusMessage} {$accountMessage} Login password has been set.");
     }
@@ -2189,7 +3176,11 @@ public function adminClientStore(Request $request): RedirectResponse
             'email' => ['required', 'email', 'max:255', 'unique:users,email'],
             'phone' => ['nullable', 'string', 'max:30'],
             'role' => ['required', 'in:admin,manager,photographer,editor,client'],
-            'password' => ['nullable', 'string', 'min:8', 'max:100'],
+            'password' => [
+                'nullable',
+                'string',
+                Password::min(8)->mixedCase()->letters()->numbers()->symbols()->uncompromised(),
+            ],
             'company' => ['nullable', 'string', 'max:255'],
             'notes' => ['nullable', 'string', 'max:1500'],
         ]);
@@ -2197,7 +3188,7 @@ public function adminClientStore(Request $request): RedirectResponse
         $email = strtolower(trim((string) $validated['email']));
         $passwordForAdmin = trim((string) ($validated['password'] ?? ''));
         if ($passwordForAdmin === '') {
-            $passwordForAdmin = 'Maccento@' . strtoupper(Str::random(6));
+            $passwordForAdmin = 'Maccento@' . random_int(100000, 999999);
         }
 
         $user = User::create([
@@ -2207,6 +3198,24 @@ public function adminClientStore(Request $request): RedirectResponse
             'role' => $validated['role'],
             'password' => $passwordForAdmin,
         ]);
+
+        $this->logActivity(
+            $request,
+            'user',
+            $user->id,
+            null,
+            $request->user(),
+            'create',
+            'User created: ' . ($user->email ?: ('User #' . $user->id)),
+            [
+                'after' => [
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'phone' => $user->phone,
+                    'role' => $user->role,
+                ],
+            ]
+        );
 
         if (in_array($validated['role'], ['client'], true)) {
             Client::updateOrCreate(
@@ -2235,7 +3244,24 @@ public function adminClientStore(Request $request): RedirectResponse
         }
 
         $display = $user->email ?: $user->name;
+        $snapshot = [
+            'name' => $user->name,
+            'email' => $user->email,
+            'phone' => $user->phone,
+            'role' => $user->role,
+        ];
         $user->delete();
+
+        $this->logActivity(
+            $request,
+            'user',
+            $user->id,
+            null,
+            $request->user(),
+            'delete',
+            'User deleted: ' . ($display ?: ('User #' . $user->id)),
+            ['before' => $snapshot]
+        );
 
         return back()->with('status', "User {$display} deleted successfully.");
     }
@@ -2245,7 +3271,19 @@ public function adminClientStore(Request $request): RedirectResponse
         $this->ensureOwnerAdminAccess($request);
 
         $clientName = $client->name ?: ('Client #' . $client->id);
+        $snapshot = $client->only(['name', 'email', 'phone', 'company', 'status']);
         $client->delete();
+
+        $this->logActivity(
+            $request,
+            'client',
+            $client->id,
+            $client->id,
+            $request->user(),
+            'delete',
+            'Client deleted: ' . $clientName,
+            ['before' => $snapshot]
+        );
 
         return redirect()->route('admin.clients.index')->with('status', "{$clientName} deleted successfully.");
     }
@@ -2254,51 +3292,157 @@ public function adminClientStore(Request $request): RedirectResponse
     {
         $client->load([
             'projects' => function ($query): void {
-                $query->latest('id')->with([
-                    'creator:id,name,email',
-                    'media' => function ($mediaQuery): void {
-                        $mediaQuery->latest('id')->with('uploader:id,name,email,role');
-                    },
-                    'invoices:id,client_project_id,status',
-                    'messages' => function ($messageQuery): void {
-                        $messageQuery->latest('id')->with('sender:id,name,email');
-                    },
-                    'comments' => function ($query): void {
-                        $query->latest('id')->with(['user:id,name,email,role', 'parent.user:id,name,email,role']);
-                    },
-                    'assignments.user:id,name,email,role',
-                    'serviceRequests' => function ($requestQuery): void {
-                        $requestQuery->latest('id')->with('requester:id,name,email');
-                    },
-                ]);
-            },
-            'invoices' => function ($query): void {
-                $query->latest('id')->with('project:id,title');
-            },
-            'messages' => function ($query): void {
-                $query->latest('id')->with('sender:id,name,email');
-            },
-            'serviceRequests' => function ($query): void {
-                $query->latest('id')->with(['requester:id,name,email', 'project:id,title']);
+                $query->latest('scheduled_at')
+                    ->latest('id')
+                    ->withCount([
+                        'media as gallery_media_count' => function ($mediaQuery): void {
+                            $mediaQuery->whereIn('type', ['image', 'video']);
+                        },
+                        'media as final_zip_count' => function ($mediaQuery): void {
+                            $mediaQuery->where('type', 'final_zip');
+                        },
+                        'invoices',
+                        'serviceRequests',
+                        'bookingRequests',
+                        'comments',
+                    ])
+                    ->with([
+                        'creator:id,name,email',
+                        'invoices:id,client_project_id,status,amount,currency,due_date',
+                        'assignments.user:id,name,email,role',
+                    ]);
             },
         ]);
-
-        $focusedProjectId = $request->filled('project_id') ? (int) $request->query('project_id') : null;
-        $focusedProject = null;
-        if ($focusedProjectId !== null && $focusedProjectId > 0) {
-            $focusedProject = $client->projects->firstWhere('id', $focusedProjectId);
-            if (!$focusedProject) {
-                $focusedProjectId = null;
-            }
-        }
 
         return view('admin.client-show', [
             'client' => $client,
             'projectStatuses' => ['accepted', 'shooting', 'editing', 'complete'],
-            'focusedProject' => $focusedProject,
-            'focusedProjectId' => $focusedProjectId,
-            'assignableUsers' => $this->assignableProjectUsers(),
         ]);
+    }
+
+    public function adminClientExport(Request $request, Client $client)
+    {
+        $this->ensureOwnerAdminAccess($request);
+
+        $client->load([
+            'projects' => function ($query): void {
+                $query->with([
+                    'assignments.user:id,name,email,role',
+                    'media',
+                    'comments.user:id,name,email,role',
+                    'tasks.assignee:id,name,email,role',
+                    'tasks.creator:id,name,email,role',
+                    'invoices.payments',
+                ])->withCount([
+                    'invoices',
+                    'serviceRequests',
+                    'bookingRequests',
+                    'comments',
+                ]);
+            },
+            'invoices.payments',
+            'messages',
+            'serviceRequests',
+            'bookingRequests',
+        ]);
+
+        $payload = [
+            'exported_at' => now()->toIso8601String(),
+            'client' => $client->toArray(),
+        ];
+
+        $filename = 'client-export-' . $client->id . '-' . now()->format('Ymd-His') . '.json';
+
+        return response()->streamDownload(function () use ($payload): void {
+            echo json_encode($payload, JSON_PRETTY_PRINT);
+        }, $filename);
+    }
+
+    public function adminClientAnonymize(Request $request, Client $client): RedirectResponse
+    {
+        $this->ensureOwnerAdminAccess($request);
+
+        $suffix = 'deleted+' . $client->id . '@example.invalid';
+        $placeholderName = 'Deleted Client #' . $client->id;
+
+        if ($client->user) {
+            $client->user->name = $placeholderName;
+            $client->user->email = $suffix;
+            $client->user->phone = null;
+            $client->user->password = 'Deleted@' . strtoupper(Str::random(12));
+            $client->user->save();
+        }
+
+        $client->name = $placeholderName;
+        $client->email = $suffix;
+        $client->phone = null;
+        $client->company = null;
+        $client->notes = 'Client anonymized on ' . now()->format('Y-m-d H:i:s');
+        $client->notify_portal = false;
+        $client->notify_invoice_email = false;
+        $client->save();
+
+        if (Schema::hasTable('client_messages')) {
+            DB::table('client_messages')
+                ->where('client_id', $client->id)
+                ->where('sender_role', 'client')
+                ->update([
+                    'sender_user_id' => null,
+                    'message' => '[redacted]',
+                ]);
+        }
+
+        if (Schema::hasTable('client_project_comments')) {
+            $projectIds = $client->projects()->pluck('id')->all();
+            if ($projectIds !== []) {
+                DB::table('client_project_comments')
+                    ->whereIn('client_project_id', $projectIds)
+                    ->where('sender_role', 'client')
+                    ->update([
+                        'user_id' => null,
+                        'body' => '[redacted]',
+                    ]);
+            }
+        }
+
+        if (Schema::hasTable('client_service_requests')) {
+            DB::table('client_service_requests')
+                ->where('client_id', $client->id)
+                ->update([
+                    'subject' => null,
+                    'details' => null,
+                ]);
+        }
+
+        if (Schema::hasTable('booking_requests')) {
+            DB::table('booking_requests')
+                ->where('client_id', $client->id)
+                ->update([
+                    'notes' => null,
+                    'preferred_time_window' => null,
+                    'alternate_slots' => null,
+                ]);
+        }
+
+        if (Schema::hasTable('client_invoices')) {
+            DB::table('client_invoices')
+                ->where('client_id', $client->id)
+                ->update([
+                    'notes' => null,
+                ]);
+        }
+
+        $this->logActivity(
+            $request,
+            'client',
+            $client->id,
+            $client->id,
+            $request->user(),
+            'update',
+            'Client anonymized'
+        );
+
+        return back()->with('status', 'Client anonymized successfully.');
     }
 
         public function adminClientMessagesIndex(Request $request): View
@@ -2580,6 +3724,20 @@ public function adminClientMessagesCenterStore(Request $request): RedirectRespon
             'sent_at' => now(),
         ]);
 
+        $this->logActivity(
+            $request,
+            'message',
+            $client->id,
+            $client->id,
+            $request->user(),
+            'send',
+            'Client message sent: ' . ($client->name ?: ('Client #' . $client->id)),
+            [
+                'project_id' => $projectId,
+                'preview' => mb_strimwidth($validated['message'], 0, 140, '...'),
+            ]
+        );
+
         $this->notifyClientUser(
             $client,
             'new_admin_message',
@@ -2613,6 +3771,19 @@ public function adminClientMessagesCenterStore(Request $request): RedirectRespon
             'message' => $validated['message'],
             'sent_at' => now(),
         ]);
+
+        $this->logActivity(
+            $request,
+            'message',
+            $recipientId,
+            null,
+            $request->user(),
+            'send',
+            'Internal message sent to user #' . $recipientId,
+            [
+                'preview' => mb_strimwidth($validated['message'], 0, 140, '...'),
+            ]
+        );
 
         $senderName = (string) ($request->user()?->name ?? 'Admin');
         $messagePreview = mb_strimwidth($validated['message'], 0, 140, '...');
@@ -2685,6 +3856,25 @@ public function adminClientMessagesCenterStore(Request $request): RedirectRespon
             ['project_id' => $project->id]
         );
 
+        $this->logActivity(
+            $request,
+            'project',
+            $project->id,
+            $project->client_id,
+            $request->user(),
+            'create',
+            'Project created: ' . ($project->title ?: ('Project #' . $project->id)),
+            [
+                'after' => [
+                    'title' => $project->title,
+                    'status' => $project->status,
+                    'scheduled_at' => $project->scheduled_at,
+                    'due_at' => $project->due_at,
+                    'client_id' => $project->client_id,
+                ],
+            ]
+        );
+
         return back()->with('status', 'Project created.');
     }
 
@@ -2696,6 +3886,7 @@ public function adminClientMessagesCenterStore(Request $request): RedirectRespon
             'status' => ['required', 'in:accepted,shooting,editing,complete'],
         ]);
 
+        $previousStatus = $project->status;
         $project->status = $validated['status'];
         $project->save();
 
@@ -2723,6 +3914,27 @@ public function adminClientMessagesCenterStore(Request $request): RedirectRespon
             (int) ($request->user()?->id ?? 0),
             true
         );
+
+        $this->logActivity(
+            $request,
+            'project',
+            $project->id,
+            $project->client_id,
+            $request->user(),
+            'status_update',
+            'Project status updated: ' . ($project->title ?: ('Project #' . $project->id)),
+            [
+                'before' => ['status' => $previousStatus],
+                'after' => ['status' => $project->status],
+            ]
+        );
+
+        app(OutboundWebhookService::class)->send('project.status_updated', [
+            'project_id' => $project->id,
+            'client_id' => $project->client_id,
+            'status' => $project->status,
+            'previous_status' => $previousStatus,
+        ]);
 
         return back()->with('status', 'Project status updated.');
     }
@@ -2775,7 +3987,168 @@ public function adminClientMessagesCenterStore(Request $request): RedirectRespon
             }
         }
 
+        $this->logActivity(
+            $request,
+            'project',
+            $project->id,
+            $project->client_id,
+            $request->user(),
+            'update',
+            'Project assignments updated: ' . ($project->title ?: ('Project #' . $project->id)),
+            [
+                'before' => ['assigned_user_ids' => $previousAssignmentIds],
+                'after' => ['assigned_user_ids' => $assignmentIds],
+            ]
+        );
+
         return back()->with('status', 'Assigned team updated.');
+    }
+
+    public function adminProjectTaskStore(Request $request, ClientProject $project): RedirectResponse
+    {
+        $this->ensurePipelineWriteAccess($request);
+
+        $validated = $request->validate([
+            'title' => ['required', 'string', 'max:200'],
+            'notes' => ['nullable', 'string', 'max:2000'],
+            'due_date' => ['nullable', 'date'],
+            'assigned_to' => ['nullable', 'integer', 'exists:users,id'],
+        ]);
+
+        $task = ProjectTask::create([
+            'client_project_id' => $project->id,
+            'title' => $validated['title'],
+            'notes' => $validated['notes'] ?? null,
+            'status' => 'open',
+            'due_date' => $validated['due_date'] ?? null,
+            'assigned_to' => $validated['assigned_to'] ?? null,
+            'created_by' => $request->user()?->id,
+        ]);
+
+        if ($task->assigned_to) {
+            $this->notificationService()->notifyUser(
+                (int) $task->assigned_to,
+                'project_task_assigned',
+                'New task assigned',
+                $task->title,
+                route('admin.projects.workspace', $project),
+                ['project_id' => $project->id, 'task_id' => $task->id]
+            );
+        }
+
+        $this->logActivity(
+            $request,
+            'project',
+            $project->id,
+            $project->client_id,
+            $request->user(),
+            'create',
+            'Project task created: ' . $task->title,
+            ['task_id' => $task->id]
+        );
+
+        app(OutboundWebhookService::class)->send('project.task_created', [
+            'task_id' => $task->id,
+            'project_id' => $project->id,
+            'client_id' => $project->client_id,
+            'title' => $task->title,
+            'status' => $task->status,
+            'due_date' => $task->due_date?->toDateString(),
+            'assigned_to' => $task->assigned_to,
+        ]);
+
+        return back()->with('status', 'Task added.');
+    }
+
+    public function adminProjectTaskUpdate(Request $request, ClientProject $project, ProjectTask $task): RedirectResponse
+    {
+        $this->ensurePipelineWriteAccess($request);
+
+        if ((int) $task->client_project_id !== (int) $project->id) {
+            abort(404);
+        }
+
+        $validated = $request->validate([
+            'status' => ['required', 'in:open,in_progress,blocked,done'],
+            'assigned_to' => ['nullable', 'integer', 'exists:users,id'],
+            'due_date' => ['nullable', 'date'],
+        ]);
+
+        $previousStatus = $task->status;
+        $task->status = $validated['status'];
+        $task->assigned_to = $validated['assigned_to'] ?? null;
+        $task->due_date = $validated['due_date'] ?? null;
+        if ($task->status === 'done') {
+            $task->completed_at = now();
+            $task->completed_by = $request->user()?->id;
+        } else {
+            $task->completed_at = null;
+            $task->completed_by = null;
+        }
+        $task->save();
+
+        if ($task->assigned_to) {
+            $this->notificationService()->notifyUser(
+                (int) $task->assigned_to,
+                'project_task_updated',
+                'Task updated',
+                $task->title,
+                route('admin.projects.workspace', $project),
+                ['project_id' => $project->id, 'task_id' => $task->id]
+            );
+        }
+
+        $this->logActivity(
+            $request,
+            'project',
+            $project->id,
+            $project->client_id,
+            $request->user(),
+            'update',
+            'Project task updated: ' . $task->title,
+            [
+                'task_id' => $task->id,
+                'before' => ['status' => $previousStatus],
+                'after' => ['status' => $task->status],
+            ]
+        );
+
+        app(OutboundWebhookService::class)->send('project.task_updated', [
+            'task_id' => $task->id,
+            'project_id' => $project->id,
+            'client_id' => $project->client_id,
+            'status' => $task->status,
+            'previous_status' => $previousStatus,
+            'due_date' => $task->due_date?->toDateString(),
+            'assigned_to' => $task->assigned_to,
+        ]);
+
+        return back()->with('status', 'Task updated.');
+    }
+
+    public function adminProjectTaskDestroy(Request $request, ClientProject $project, ProjectTask $task): RedirectResponse
+    {
+        $this->ensurePipelineWriteAccess($request);
+
+        if ((int) $task->client_project_id !== (int) $project->id) {
+            abort(404);
+        }
+
+        $title = $task->title;
+        $task->delete();
+
+        $this->logActivity(
+            $request,
+            'project',
+            $project->id,
+            $project->client_id,
+            $request->user(),
+            'delete',
+            'Project task deleted: ' . $title,
+            ['task_title' => $title]
+        );
+
+        return back()->with('status', 'Task deleted.');
     }
 
     public function adminProjectCommentStore(Request $request, ClientProject $project): RedirectResponse
@@ -2893,6 +4266,7 @@ public function adminClientMessagesCenterStore(Request $request): RedirectRespon
         $saved = 0;
         $projectMediaBasePath = $this->projectMediaBasePath($project);
         $galleryUploadPath = $this->projectMediaUploadPath($project, $request->user(), $this->projectMediaBucketForStage($mediaStage));
+        $mediaDisk = $this->resolveMediaDisk();
         $watermarkSettings = $this->getWatermarkSettings();
         $watermarkRenderConfig = $this->resolveWatermarkRenderConfig($watermarkSettings);
         $watermarkSignature = (string) ($watermarkRenderConfig['signature'] ?? '');
@@ -2904,7 +4278,7 @@ public function adminClientMessagesCenterStore(Request $request): RedirectRespon
                 continue;
             }
 
-            $storedPath = $file->store($galleryUploadPath, 'public');
+            $storedPath = $file->store($galleryUploadPath, $mediaDisk);
             if (!$storedPath) {
                 continue;
             }
@@ -2913,7 +4287,7 @@ public function adminClientMessagesCenterStore(Request $request): RedirectRespon
             $watermarkPath = null;
             $mediaWatermarkSignature = null;
             if ($type === 'image') {
-                $watermarked = $this->generateHardWatermarkVariant('public', $storedPath, $projectMediaBasePath, $watermarkRenderConfig);
+                $watermarked = $this->generateHardWatermarkVariant($mediaDisk, $storedPath, $projectMediaBasePath, $watermarkRenderConfig);
                 if (is_array($watermarked)) {
                     $watermarkDisk = (string) ($watermarked['disk'] ?? 'public');
                     $watermarkPath = (string) ($watermarked['path'] ?? '');
@@ -2931,7 +4305,7 @@ public function adminClientMessagesCenterStore(Request $request): RedirectRespon
                 'uploaded_by' => $request->user()?->id,
                 'type' => $type,
                 'delivery_stage' => $mediaStage,
-                'disk' => 'public',
+                'disk' => $mediaDisk,
                 'path' => $storedPath,
                 'watermark_disk' => $watermarkDisk,
                 'watermark_path' => $watermarkPath,
@@ -2950,6 +4324,20 @@ public function adminClientMessagesCenterStore(Request $request): RedirectRespon
 
         $stageLabel = $mediaStage === 'edited' ? 'edited/final media' : 'raw footage media';
 
+        $this->logActivity(
+            $request,
+            'media',
+            $project->id,
+            $project->client_id,
+            $request->user(),
+            'upload',
+            "Uploaded {$saved} {$stageLabel} file(s) to project: " . ($project->title ?: ('Project #' . $project->id)),
+            [
+                'stage' => $mediaStage,
+                'count' => $saved,
+            ]
+        );
+
         return back()->with('status', "{$saved} {$stageLabel} file(s) uploaded.");
     }
 
@@ -2962,19 +4350,34 @@ public function adminClientMessagesCenterStore(Request $request): RedirectRespon
         ]);
 
         $file = $validated['raw_zip'];
-        $storedPath = $file->store($this->projectMediaUploadPath($project, $request->user(), 'raw-zip'), 'public');
+        $mediaDisk = $this->resolveMediaDisk();
+        $storedPath = $file->store($this->projectMediaUploadPath($project, $request->user(), 'raw-zip'), $mediaDisk);
 
-        ClientProjectMedia::create([
+        $mediaItem = ClientProjectMedia::create([
             'client_project_id' => $project->id,
             'uploaded_by' => $request->user()?->id,
             'type' => 'raw_zip',
             'delivery_stage' => 'raw',
-            'disk' => 'public',
+            'disk' => $mediaDisk,
             'path' => $storedPath,
             'original_name' => (string) ($file->getClientOriginalName() ?: basename($storedPath)),
             'mime_type' => (string) ($file->getClientMimeType() ?: 'application/zip'),
             'size_bytes' => (int) $file->getSize(),
         ]);
+
+        $this->logActivity(
+            $request,
+            'media',
+            $mediaItem->id,
+            $project->client_id,
+            $request->user(),
+            'upload',
+            'Raw ZIP uploaded: ' . ($mediaItem->original_name ?: ('Media #' . $mediaItem->id)),
+            [
+                'project_id' => $project->id,
+                'type' => 'raw_zip',
+            ]
+        );
 
         return back()->with('status', 'Raw footage ZIP uploaded.');
     }
@@ -2988,19 +4391,34 @@ public function adminClientMessagesCenterStore(Request $request): RedirectRespon
         ]);
 
         $file = $validated['delivery_zip'];
-        $storedPath = $file->store($this->projectMediaUploadPath($project, $request->user(), 'delivery'), 'public');
+        $mediaDisk = $this->resolveMediaDisk();
+        $storedPath = $file->store($this->projectMediaUploadPath($project, $request->user(), 'delivery'), $mediaDisk);
 
-        ClientProjectMedia::create([
+        $mediaItem = ClientProjectMedia::create([
             'client_project_id' => $project->id,
             'uploaded_by' => $request->user()?->id,
             'type' => 'final_zip',
             'delivery_stage' => 'final_zip',
-            'disk' => 'public',
+            'disk' => $mediaDisk,
             'path' => $storedPath,
             'original_name' => (string) ($file->getClientOriginalName() ?: basename($storedPath)),
             'mime_type' => (string) ($file->getClientMimeType() ?: 'application/zip'),
             'size_bytes' => (int) $file->getSize(),
         ]);
+
+        $this->logActivity(
+            $request,
+            'media',
+            $mediaItem->id,
+            $project->client_id,
+            $request->user(),
+            'upload',
+            'Final ZIP uploaded: ' . ($mediaItem->original_name ?: ('Media #' . $mediaItem->id)),
+            [
+                'project_id' => $project->id,
+                'type' => 'final_zip',
+            ]
+        );
 
         return back()->with('status', 'Final delivery ZIP uploaded.');
     }
@@ -3160,6 +4578,7 @@ public function adminClientMessagesCenterStore(Request $request): RedirectRespon
         $displayName = trim((string) $media->original_name) !== ''
             ? (string) $media->original_name
             : ('Media #' . $media->id);
+        $snapshot = $media->only(['id', 'type', 'delivery_stage', 'disk', 'path', 'original_name', 'size_bytes']);
 
         try {
             if (Storage::disk($media->disk)->exists($media->path)) {
@@ -3180,6 +4599,17 @@ public function adminClientMessagesCenterStore(Request $request): RedirectRespon
             return back()->withErrors(['media' => 'Could not delete media file. Please try again.']);
         }
 
+        $this->logActivity(
+            $request,
+            'media',
+            $media->id,
+            $project->client_id,
+            $request->user(),
+            'delete',
+            'Media deleted: ' . $displayName,
+            ['before' => $snapshot, 'project_id' => $project->id]
+        );
+
         return back()->with('status', "Deleted media file: {$displayName}");
     }
 
@@ -3198,6 +4628,17 @@ public function adminClientMessagesCenterStore(Request $request): RedirectRespon
         if (!Storage::disk($media->disk)->exists($media->path)) {
             abort(404);
         }
+
+        $this->logActivity(
+            $request,
+            'media',
+            $media->id,
+            $project->client_id,
+            $request->user(),
+            'download',
+            'Media downloaded by client: ' . ($media->original_name ?: ('Media #' . $media->id)),
+            ['project_id' => $project->id]
+        );
 
         return Storage::disk($media->disk)->download($media->path, $media->original_name);
     }
@@ -3223,6 +4664,17 @@ public function adminClientMessagesCenterStore(Request $request): RedirectRespon
             $downloadName = trim((string) $finalZip->original_name) !== ''
                 ? (string) $finalZip->original_name
                 : ('project-' . $project->id . '-delivery.zip');
+
+            $this->logActivity(
+                $request,
+                'media',
+                $finalZip->id,
+                $project->client_id,
+                $request->user(),
+                'download',
+                'Final delivery ZIP downloaded by client: ' . ($finalZip->original_name ?: ('Media #' . $finalZip->id)),
+                ['project_id' => $project->id]
+            );
 
             return Storage::disk($finalZip->disk)->download($finalZip->path, $downloadName);
         }
@@ -3282,10 +4734,16 @@ public function adminClientMessagesCenterStore(Request $request): RedirectRespon
     {
         $this->ensurePipelineWriteAccess($request);
 
+        $allowedCurrencies = $this->resolveAllowedCurrencyCodes();
+        $currencyRule = ['required', 'string', 'max:10'];
+        if ($allowedCurrencies !== []) {
+            $currencyRule[] = Rule::in($allowedCurrencies);
+        }
+
         $validated = $request->validate([
             'client_project_id' => ['nullable', 'integer'],
             'amount' => ['required', 'numeric', 'min:0.01'],
-            'currency' => ['required', 'string', 'max:10'],
+            'currency' => $currencyRule,
             'status' => ['required', 'in:draft,sent,partial,paid,overdue'],
             'issued_at' => ['nullable', 'date'],
             'due_date' => ['nullable', 'date'],
@@ -3319,6 +4777,8 @@ public function adminClientMessagesCenterStore(Request $request): RedirectRespon
                 'created_by' => $request->user()?->id,
                 'invoice_number' => $this->generateInvoiceNumber(),
                 'amount' => round((float) $validated['amount'], 2),
+                'amount_paid' => 0,
+                'balance_due' => round((float) $validated['amount'], 2),
                 'currency' => strtoupper(trim((string) $validated['currency'])),
                 'status' => $validated['status'],
                 'issued_at' => $issuedAt,
@@ -3326,6 +4786,18 @@ public function adminClientMessagesCenterStore(Request $request): RedirectRespon
                 'paid_at' => $validated['status'] === 'paid' ? now() : null,
                 'notes' => $validated['notes'] ?? null,
             ]);
+
+            if ($validated['status'] === 'paid') {
+                $this->recordInvoicePayment(
+                    $invoice,
+                    (float) $invoice->amount,
+                    $request->user(),
+                    'manual',
+                    'manual-' . now()->timestamp,
+                    'manual',
+                    ['note' => 'Marked paid on creation.']
+                );
+            }
 
             $this->notifyClientUser(
                 $client,
@@ -3335,6 +4807,46 @@ public function adminClientMessagesCenterStore(Request $request): RedirectRespon
                 route('user.dashboard'),
                 ['invoice_id' => $invoice->id, 'invoice_number' => $invoice->invoice_number]
             );
+
+            $settings = $this->resolveInvoiceSettings();
+            if (
+                (bool) ($settings->auto_email_on_invoice_create ?? true)
+                && in_array($invoice->status, ['sent', 'partial', 'overdue'], true)
+            ) {
+                app(InvoiceEmailService::class)->sendInvoiceCreated($invoice, $client, $request->user());
+            }
+
+            $this->logActivity(
+                $request,
+                'invoice',
+                $invoice->id,
+                $invoice->client_id,
+                $request->user(),
+                'create',
+                'Invoice created: ' . $invoice->invoice_number,
+                [
+                    'after' => [
+                        'invoice_number' => $invoice->invoice_number,
+                        'amount' => $invoice->amount,
+                        'currency' => $invoice->currency,
+                        'status' => $invoice->status,
+                        'issued_at' => $invoice->issued_at,
+                        'due_date' => $invoice->due_date,
+                    ],
+                ]
+            );
+
+            app(OutboundWebhookService::class)->send('invoice.created', [
+                'invoice_id' => $invoice->id,
+                'invoice_number' => $invoice->invoice_number,
+                'client_id' => $invoice->client_id,
+                'project_id' => $invoice->client_project_id,
+                'amount' => $invoice->amount,
+                'currency' => $invoice->currency,
+                'status' => $invoice->status,
+                'issued_at' => $invoice->issued_at?->toDateString(),
+                'due_date' => $invoice->due_date?->toDateString(),
+            ]);
         } catch (Throwable $exception) {
             report($exception);
             return back()->withErrors(['invoice' => 'Invoice could not be created. Please try again.'])->withInput();
@@ -3388,13 +4900,28 @@ public function adminClientMessagesCenterStore(Request $request): RedirectRespon
     {
         $this->ensurePipelineWriteAccess($request);
 
+        $previousStatus = (string) $invoice->status;
         $validated = $request->validate([
             'status' => ['required', 'in:draft,sent,partial,paid,overdue'],
         ]);
 
-        $invoice->status = $validated['status'];
-        $invoice->paid_at = $validated['status'] === 'paid' ? now() : null;
-        $invoice->save();
+        if ($validated['status'] === 'paid') {
+            $this->recordInvoicePayment(
+                $invoice,
+                (float) ($invoice->balance_due ?? $invoice->amount),
+                $request->user(),
+                'manual',
+                'manual-' . now()->timestamp,
+                'manual',
+                ['note' => 'Marked paid by admin.']
+            );
+        } else {
+            $invoice->status = $validated['status'];
+            if ($validated['status'] !== 'paid') {
+                $invoice->paid_at = null;
+            }
+            $invoice->save();
+        }
 
         $invoice->loadMissing('client');
         if ($invoice->client) {
@@ -3406,9 +4933,65 @@ public function adminClientMessagesCenterStore(Request $request): RedirectRespon
                 route('user.dashboard'),
                 ['invoice_id' => $invoice->id, 'invoice_number' => $invoice->invoice_number, 'status' => $invoice->status]
             );
+
+            $settings = $this->resolveInvoiceSettings();
+            if (
+                (bool) ($settings->auto_email_on_invoice_create ?? true)
+                && in_array($invoice->status, ['sent', 'partial', 'overdue'], true)
+                && $previousStatus !== $invoice->status
+            ) {
+                app(InvoiceEmailService::class)->sendInvoiceCreated($invoice, $invoice->client, $request->user());
+            }
         }
 
+        $this->logActivity(
+            $request,
+            'invoice',
+            $invoice->id,
+            $invoice->client_id,
+            $request->user(),
+            'status_update',
+            'Invoice status updated: ' . $invoice->invoice_number,
+            [
+                'before' => ['status' => $previousStatus],
+                'after' => ['status' => $invoice->status],
+            ]
+        );
+
         return back()->with('status', "Invoice {$invoice->invoice_number} updated.");
+    }
+
+    public function adminInvoicePaymentStore(Request $request, ClientInvoice $invoice): RedirectResponse
+    {
+        $this->ensurePipelineWriteAccess($request);
+
+        $validated = $request->validate([
+            'amount' => ['required', 'numeric', 'min:0.01'],
+            'method' => ['required', 'in:manual,stripe,paypal,bank_transfer,cheque,cash,other'],
+            'reference' => ['nullable', 'string', 'max:120'],
+        ]);
+
+        $amount = (float) $validated['amount'];
+        $invoice->refresh();
+        $balanceDue = (float) ($invoice->balance_due ?? $invoice->amount);
+        if ($amount > $balanceDue) {
+            return back()->withErrors(['amount' => 'Payment amount cannot exceed balance due.'])->withInput();
+        }
+
+        $method = (string) $validated['method'];
+        $provider = in_array($method, ['stripe', 'paypal'], true) ? $method : 'manual';
+
+        $this->recordInvoicePayment(
+            $invoice,
+            $amount,
+            $request->user(),
+            $provider,
+            $validated['reference'] ?? null,
+            $method,
+            ['source' => 'admin_manual_entry']
+        );
+
+        return back()->with('status', 'Payment recorded.');
     }
 
     public function adminInvoiceDestroy(Request $request, ClientInvoice $invoice): RedirectResponse
@@ -3416,7 +4999,19 @@ public function adminClientMessagesCenterStore(Request $request): RedirectRespon
         $this->ensurePipelineWriteAccess($request);
 
         $invoiceNumber = (string) $invoice->invoice_number;
+        $snapshot = $invoice->only(['invoice_number', 'amount', 'currency', 'status', 'issued_at', 'due_date', 'client_id']);
         $invoice->delete();
+
+        $this->logActivity(
+            $request,
+            'invoice',
+            $invoice->id,
+            $invoice->client_id,
+            $request->user(),
+            'delete',
+            'Invoice deleted: ' . $invoiceNumber,
+            ['before' => $snapshot]
+        );
 
         return back()->with('status', "Invoice {$invoiceNumber} deleted successfully.");
     }
@@ -3429,6 +5024,16 @@ public function adminClientMessagesCenterStore(Request $request): RedirectRespon
             'client:id,user_id,name,email,phone,company',
             'project:id,title,service_type,property_address',
         ]);
+
+        $this->logActivity(
+            $request,
+            'invoice',
+            $invoice->id,
+            $invoice->client_id,
+            $request->user(),
+            'download',
+            'Invoice PDF downloaded: ' . $invoice->invoice_number
+        );
 
         $clientName = trim((string) ($invoice->client?->name ?? 'client'));
         $safeName = Str::slug($clientName !== '' ? $clientName : 'client');
@@ -3471,15 +5076,97 @@ public function adminClientMessagesCenterStore(Request $request): RedirectRespon
         return $pdf->download($filename);
     }
 
+    public function adminBookingRequestStatusUpdate(Request $request, BookingRequest $bookingRequest): RedirectResponse
+    {
+        $this->ensurePipelineWriteAccess($request);
+
+        $validated = $request->validate([
+            'status' => ['required', 'in:new,proposed,confirmed,rescheduled,cancelled,closed'],
+            'scheduled_at' => ['nullable', 'date'],
+            'admin_note' => ['nullable', 'string', 'max:400'],
+        ]);
+
+        $previousStatus = (string) $bookingRequest->status;
+        $bookingRequest->status = $validated['status'];
+        $bookingRequest->save();
+
+        $bookingRequest->loadMissing([
+            'client',
+            'project:id,title,scheduled_at',
+        ]);
+
+        $scheduledAt = $validated['scheduled_at'] ?? null;
+        if ($scheduledAt && $bookingRequest->project) {
+            $bookingRequest->project->scheduled_at = $scheduledAt;
+            $bookingRequest->project->save();
+        }
+
+        $timelineFragments = [];
+        if ($previousStatus !== $bookingRequest->status) {
+            $timelineFragments[] = 'Booking request status changed from ' . $previousStatus . ' to ' . $bookingRequest->status . '.';
+        } else {
+            $timelineFragments[] = 'Booking request status confirmed as ' . $bookingRequest->status . '.';
+        }
+
+        if ($scheduledAt && $bookingRequest->project) {
+            $scheduledLabel = Carbon::parse((string) $scheduledAt)->format('Y-m-d H:i');
+            $timelineFragments[] = 'Project schedule updated to ' . $scheduledLabel . '.';
+        }
+
+        $adminNote = trim((string) ($validated['admin_note'] ?? ''));
+        if ($adminNote !== '') {
+            $timelineFragments[] = $adminNote;
+        }
+
+        $this->logRequestEdit('booking', (int) $bookingRequest->id, $bookingRequest->client_id, $request->user(), [
+            'action' => 'status_update',
+            'before' => [
+                'status' => $previousStatus,
+            ],
+            'after' => [
+                'status' => $bookingRequest->status,
+                'scheduled_at' => $scheduledAt,
+            ],
+            'note' => $adminNote ?: null,
+        ]);
+
+        ClientMessage::create([
+            'client_id' => $bookingRequest->client_id,
+            'client_project_id' => $bookingRequest->client_project_id,
+            'sender_user_id' => $request->user()?->id,
+            'sender_role' => 'admin',
+            'message' => implode(' ', $timelineFragments),
+            'sent_at' => now(),
+        ]);
+
+        if ($bookingRequest->client) {
+            $this->notifyClientUser(
+                $bookingRequest->client,
+                'booking_request_status_updated',
+                'Booking request updated',
+                "Your booking request for {$bookingRequest->requested_service} is now {$bookingRequest->status}.",
+                route('user.dashboard')
+            );
+        }
+
+        return back()->with('status', 'Booking request updated.');
+    }
+
     public function adminServiceRequestStatusUpdate(Request $request, ClientServiceRequest $serviceRequest): RedirectResponse
     {
         $this->ensurePipelineWriteAccess($request);
+
+        $allowedCurrencies = $this->resolveAllowedCurrencyCodes();
+        $invoiceCurrencyRule = ['nullable', 'string', 'max:10'];
+        if ($allowedCurrencies !== []) {
+            $invoiceCurrencyRule[] = Rule::in($allowedCurrencies);
+        }
 
         $validated = $request->validate([
             'status' => ['required', 'in:new,accepted,in_progress,completed,closed'],
             'create_invoice' => ['nullable', 'in:0,1'],
             'invoice_amount' => ['nullable', 'numeric', 'min:0.01'],
-            'invoice_currency' => ['nullable', 'string', 'max:10'],
+            'invoice_currency' => $invoiceCurrencyRule,
             'invoice_due_date' => ['nullable', 'date'],
             'invoice_notes' => ['nullable', 'string', 'max:1500'],
             'timeline_note' => ['nullable', 'string', 'max:400'],
@@ -3532,6 +5219,8 @@ public function adminClientMessagesCenterStore(Request $request): RedirectRespon
                 'created_by' => $request->user()?->id,
                 'invoice_number' => $this->generateInvoiceNumber(),
                 'amount' => $invoiceAmount,
+                'amount_paid' => 0,
+                'balance_due' => $invoiceAmount,
                 'currency' => $invoiceCurrency,
                 'status' => 'sent',
                 'issued_at' => $issuedAt,
@@ -3556,6 +5245,20 @@ public function adminClientMessagesCenterStore(Request $request): RedirectRespon
         if ($timelineNote !== '') {
             $timelineFragments[] = $timelineNote;
         }
+
+        $this->logRequestEdit('service', (int) $serviceRequest->id, $serviceRequest->client_id, $request->user(), [
+            'action' => 'status_update',
+            'before' => [
+                'status' => $previousStatus,
+            ],
+            'after' => [
+                'status' => $serviceRequest->status,
+            ],
+            'create_invoice' => $createInvoice,
+            'invoice_id' => $invoice?->id,
+            'invoice_number' => $invoice?->invoice_number,
+            'timeline_note' => $timelineNote ?: null,
+        ]);
 
         ClientMessage::create([
             'client_id' => $serviceRequest->client_id,
@@ -3603,6 +5306,7 @@ public function adminClientMessagesCenterStore(Request $request): RedirectRespon
             'note' => ['nullable', 'string', 'max:1000'],
         ]);
 
+        $previousStatus = $lead->status;
         $lead->status = $validated['status'];
         if ($validated['status'] === 'qualified' && $lead->qualified_at === null) {
             $lead->qualified_at = now();
@@ -3625,6 +5329,28 @@ public function adminClientMessagesCenterStore(Request $request): RedirectRespon
             route('user.dashboard'),
             ['lead_id' => $lead->id, 'status' => $lead->status]
         );
+
+        $this->logActivity(
+            $request,
+            'lead',
+            $lead->id,
+            $lead->client_id ?? null,
+            $request->user(),
+            'status_update',
+            'Lead status updated: ' . ($lead->name ?: ('Lead #' . $lead->id)),
+            [
+                'before' => ['status' => $previousStatus],
+                'after' => ['status' => $lead->status],
+            ]
+        );
+
+        app(OutboundWebhookService::class)->send('lead.status_updated', [
+            'lead_id' => $lead->id,
+            'status' => $lead->status,
+            'previous_status' => $previousStatus,
+            'email' => $lead->email,
+            'phone' => $lead->phone,
+        ]);
 
         return back()->with('status', 'Lead status updated.');
     }
@@ -3663,7 +5389,19 @@ public function adminClientMessagesCenterStore(Request $request): RedirectRespon
         $this->ensurePipelineWriteAccess($request);
 
         $leadLabel = $lead->name ?: ('Lead #' . $lead->id);
+        $snapshot = $lead->only(['name', 'email', 'phone', 'status', 'service_type', 'timeline']);
         $lead->delete();
+
+        $this->logActivity(
+            $request,
+            'lead',
+            $lead->id,
+            $lead->client_id ?? null,
+            $request->user(),
+            'delete',
+            'Lead deleted: ' . $leadLabel,
+            ['before' => $snapshot]
+        );
 
         return redirect()->route('admin.leads.index')->with('status', "{$leadLabel} deleted successfully.");
     }
@@ -3854,6 +5592,9 @@ public function userProjectShow(Request $request, ClientProject $project): View
             },
             'assignments.user:id,name,email,role',
             'serviceRequests' => function ($query): void {
+                $query->latest('id')->with('requester:id,name,email');
+            },
+            'bookingRequests' => function ($query): void {
                 $query->latest('id')->with('requester:id,name,email');
             },
         ]);
@@ -4076,12 +5817,20 @@ public function userProjectCommentStore(Request $request, ClientProject $project
                 ->latest('id')
                 ->paginate(12, ['*'], 'requests_page')
             : $this->emptyPaginator(12, 'requests_page');
+        $bookingRequests = $client
+            ? BookingRequest::query()
+                ->where('client_id', $client->id)
+                ->with('project:id,title,status')
+                ->latest('id')
+                ->paginate(12, ['*'], 'booking_page')
+            : $this->emptyPaginator(12, 'booking_page');
         $projects = $client
             ? ClientProject::query()
                 ->where('client_id', $client->id)
                 ->withCount([
                     'messages',
                     'serviceRequests',
+                    'bookingRequests',
                 ])
                 ->latest('scheduled_at')
                 ->latest('id')
@@ -4094,6 +5843,7 @@ public function userProjectCommentStore(Request $request, ClientProject $project
             'portalStats' => $portalStats,
             'messages' => $messages,
             'serviceRequests' => $serviceRequests,
+            'bookingRequests' => $bookingRequests,
             'projects' => $projects,
             'adminUsers' => $adminUsers,
             'adminThreadSummaries' => $adminThreadSummaries,
@@ -4143,7 +5893,68 @@ public function userProjectCommentStore(Request $request, ClientProject $project
         ])->with('status', 'Message sent successfully.');
     }
 
-    public function userDeliveriesIndex(Request $request): View
+        public function userServiceRequestsIndex(Request $request): View
+    {
+        $user = $request->user();
+        $client = $this->resolvePortalClient($user, ['projects:id,client_id,title']);
+        $portalStats = $this->buildUserPortalStats($client, $this->userLeadQuery($user), $this->userQuoteQuery($user));
+
+        $projects = $client?->projects?->sortBy('title')->values() ?? collect();
+        $serviceRequests = $client
+            ? ClientServiceRequest::query()
+                ->with(['project:id,title'])
+                ->where('client_id', $client->id)
+                ->latest('id')
+                ->paginate(20)
+            : $this->emptyPaginator(20, 'service_page');
+
+        $editRequest = null;
+        if ($client && $request->filled('edit')) {
+            $editRequest = ClientServiceRequest::query()
+                ->where('client_id', $client->id)
+                ->find((int) $request->input('edit'));
+        }
+
+        return view('user.service-requests-index', [
+            'client' => $client,
+            'portalStats' => $portalStats,
+            'projects' => $projects,
+            'serviceRequests' => $serviceRequests,
+            'editRequest' => $editRequest,
+        ]);
+    }
+
+    public function userBookingRequestsIndex(Request $request): View
+    {
+        $user = $request->user();
+        $client = $this->resolvePortalClient($user, ['projects:id,client_id,title']);
+        $portalStats = $this->buildUserPortalStats($client, $this->userLeadQuery($user), $this->userQuoteQuery($user));
+
+        $projects = $client?->projects?->sortBy('title')->values() ?? collect();
+        $bookingRequests = $client
+            ? BookingRequest::query()
+                ->with(['project:id,title'])
+                ->where('client_id', $client->id)
+                ->latest('id')
+                ->paginate(20)
+            : $this->emptyPaginator(20, 'booking_page');
+
+        $editRequest = null;
+        if ($client && $request->filled('edit')) {
+            $editRequest = BookingRequest::query()
+                ->where('client_id', $client->id)
+                ->find((int) $request->input('edit'));
+        }
+
+        return view('user.booking-requests-index', [
+            'client' => $client,
+            'portalStats' => $portalStats,
+            'projects' => $projects,
+            'bookingRequests' => $bookingRequests,
+            'editRequest' => $editRequest,
+        ]);
+    }
+public function userDeliveriesIndex(Request $request): View
     {
         $user = $request->user();
         $client = $this->resolvePortalClient($user);
@@ -4197,6 +6008,348 @@ public function userProjectCommentStore(Request $request, ClientProject $project
         ]);
     }
 
+    public function userAccountUpdate(Request $request): RedirectResponse
+    {
+        $user = $request->user();
+        $client = $this->resolvePortalClient($user);
+
+        $validated = $request->validate([
+            'notify_portal' => ['nullable', 'in:0,1'],
+            'notify_invoice_email' => ['nullable', 'in:0,1'],
+        ]);
+
+        if (!$client) {
+            return back()->withErrors(['account' => 'Client record not found. Please contact support.']);
+        }
+
+        $client->notify_portal = (bool) ($validated['notify_portal'] ?? false);
+        $client->notify_invoice_email = (bool) ($validated['notify_invoice_email'] ?? false);
+        $client->save();
+
+        return back()->with('status', 'Notification preferences updated.');
+    }
+
+    public function userInvoicePay(Request $request, ClientInvoice $invoice): View
+    {
+        $this->ensureUserCanAccessInvoice($request, $invoice);
+        $invoice->loadMissing(['client', 'project']);
+
+        $settings = $this->resolveInvoiceSettings();
+        $demoMode = $this->isPaymentDemoMode();
+
+        return view('user.invoice-pay', [
+            'invoice' => $invoice,
+            'settings' => $settings,
+            'stripeEnabled' => (bool) ($settings->stripe_enabled ?? false),
+            'paypalEnabled' => (bool) ($settings->paypal_enabled ?? false),
+            'manualEnabled' => (bool) ($settings->manual_enabled ?? true),
+            'manualInstructions' => (string) ($settings->manual_instructions ?? ''),
+            'stripePublicKey' => $this->resolveStripePublishableKey(),
+            'paypalClientId' => $this->resolvePayPalClientId(),
+            'demoMode' => $demoMode,
+        ]);
+    }
+
+    public function userInvoiceStripeCheckout(Request $request, ClientInvoice $invoice): RedirectResponse
+    {
+        $this->ensureUserCanAccessInvoice($request, $invoice);
+
+        if ($invoice->status === 'paid') {
+            return back()->with('status', 'Invoice already paid.');
+        }
+
+        $invoice->refresh();
+        $balanceDue = (float) ($invoice->balance_due ?? $invoice->amount);
+        $validated = $request->validate([
+            'amount' => ['required', 'numeric', 'min:0.01'],
+        ]);
+        $amount = (float) $validated['amount'];
+        if ($amount > $balanceDue) {
+            return back()->withErrors(['payment' => 'Payment amount cannot exceed the balance due.']);
+        }
+
+        $settings = $this->resolveInvoiceSettings();
+        if (!($settings->stripe_enabled ?? false)) {
+            return back()->withErrors(['payment' => 'Stripe payments are disabled.']);
+        }
+
+        $demoMode = $this->isPaymentDemoMode();
+        if ($demoMode || blank(env('STRIPE_SECRET_KEY'))) {
+            $this->recordInvoicePayment($invoice, $amount, $request->user(), 'stripe_demo', 'demo-' . now()->timestamp, 'card', [
+                'mode' => 'demo',
+            ], 'Client partial payment');
+
+            return redirect()->route('user.invoices.index')->with('status', 'Demo payment recorded.');
+        }
+
+        $invoice->loadMissing(['client', 'project']);
+        $currency = strtoupper((string) ($invoice->currency ?: 'USD'));
+
+        $successUrl = route('user.invoices.stripe.success', [$invoice]) . '?session_id={CHECKOUT_SESSION_ID}';
+        $cancelUrl = route('user.invoices.pay', [$invoice]);
+
+        $response = Http::asForm()->withBasicAuth($this->resolveStripeSecretKey(), '')
+            ->post('https://api.stripe.com/v1/checkout/sessions', [
+                'mode' => 'payment',
+                'success_url' => $successUrl,
+                'cancel_url' => $cancelUrl,
+                'client_reference_id' => (string) $invoice->id,
+                'customer_email' => $invoice->client?->email,
+                'payment_method_types[]' => 'card',
+                'line_items[0][price_data][currency]' => strtolower($currency),
+                'line_items[0][price_data][product_data][name]' => 'Invoice ' . $invoice->invoice_number,
+                'line_items[0][price_data][unit_amount]' => (int) round($amount * 100),
+                'line_items[0][quantity]' => 1,
+                'metadata[invoice_id]' => (string) $invoice->id,
+                'metadata[amount_requested]' => number_format($amount, 2, '.', ''),
+            ]);
+
+        if (!$response->successful()) {
+            return back()->withErrors(['payment' => 'Stripe payment could not be started.']);
+        }
+
+        $payload = $response->json();
+        if (empty($payload['url'])) {
+            return back()->withErrors(['payment' => 'Stripe did not return a checkout URL.']);
+        }
+
+        return redirect()->away((string) $payload['url']);
+    }
+
+    public function userInvoiceStripeSuccess(Request $request, ClientInvoice $invoice): RedirectResponse
+    {
+        $this->ensureUserCanAccessInvoice($request, $invoice);
+
+        if ($invoice->status === 'paid') {
+            return redirect()->route('user.invoices.index')->with('status', 'Invoice already paid.');
+        }
+
+        $sessionId = (string) $request->string('session_id');
+        if ($sessionId === '') {
+            return redirect()->route('user.invoices.pay', $invoice)->withErrors(['payment' => 'Missing Stripe session.']);
+        }
+
+        $demoMode = $this->isPaymentDemoMode();
+        if ($demoMode || blank(env('STRIPE_SECRET_KEY'))) {
+            $this->recordInvoicePayment($invoice, (float) ($invoice->balance_due ?? $invoice->amount), $request->user(), 'stripe_demo', $sessionId, 'card', [
+                'mode' => 'demo',
+            ], 'Stripe demo payment');
+
+            return redirect()->route('user.invoices.index')->with('status', 'Demo payment recorded.');
+        }
+
+        $response = Http::withBasicAuth($this->resolveStripeSecretKey(), '')
+            ->get('https://api.stripe.com/v1/checkout/sessions/' . $sessionId);
+
+        if (!$response->successful()) {
+            return redirect()->route('user.invoices.pay', $invoice)->withErrors(['payment' => 'Unable to verify Stripe payment.']);
+        }
+
+        $session = $response->json();
+        if (($session['payment_status'] ?? '') !== 'paid') {
+            return redirect()->route('user.invoices.pay', $invoice)->withErrors(['payment' => 'Stripe payment not completed yet.']);
+        }
+
+        $amountTotal = (float) (($session['amount_total'] ?? 0) / 100);
+        if ($amountTotal <= 0) {
+            return redirect()->route('user.invoices.pay', $invoice)->withErrors(['payment' => 'Stripe payment amount could not be verified.']);
+        }
+
+        $this->recordInvoicePayment($invoice, $amountTotal, $request->user(), 'stripe', $sessionId, 'card', [
+            'payment_status' => $session['payment_status'] ?? null,
+            'amount_total' => $session['amount_total'] ?? null,
+            'currency' => $session['currency'] ?? null,
+        ], 'Stripe payment');
+
+        return redirect()->route('user.invoices.index')->with('status', 'Payment completed successfully.');
+    }
+
+    public function userInvoicePayPalCreate(Request $request, ClientInvoice $invoice): RedirectResponse
+    {
+        $this->ensureUserCanAccessInvoice($request, $invoice);
+
+        if ($invoice->status === 'paid') {
+            return back()->with('status', 'Invoice already paid.');
+        }
+
+        $invoice->refresh();
+        $balanceDue = (float) ($invoice->balance_due ?? $invoice->amount);
+        $validated = $request->validate([
+            'amount' => ['required', 'numeric', 'min:0.01'],
+        ]);
+        $amountValue = (float) $validated['amount'];
+        if ($amountValue > $balanceDue) {
+            return back()->withErrors(['payment' => 'Payment amount cannot exceed the balance due.']);
+        }
+
+        $settings = $this->resolveInvoiceSettings();
+        if (!($settings->paypal_enabled ?? false)) {
+            return back()->withErrors(['payment' => 'PayPal payments are disabled.']);
+        }
+
+        $demoMode = $this->isPaymentDemoMode();
+        if ($demoMode || blank(env('PAYPAL_CLIENT_ID')) || blank(env('PAYPAL_SECRET'))) {
+            $this->recordInvoicePayment($invoice, $amountValue, $request->user(), 'paypal_demo', 'demo-' . now()->timestamp, 'paypal', [
+                'mode' => 'demo',
+            ], 'PayPal demo payment');
+
+            return redirect()->route('user.invoices.index')->with('status', 'Demo payment recorded.');
+        }
+
+        $baseUrl = $this->paypalBaseUrl();
+        $tokenResponse = Http::asForm()->withBasicAuth($this->resolvePayPalClientId(), $this->resolvePayPalSecret())
+            ->post($baseUrl . '/v1/oauth2/token', [
+                'grant_type' => 'client_credentials',
+            ]);
+
+        if (!$tokenResponse->successful()) {
+            return back()->withErrors(['payment' => 'PayPal authentication failed.']);
+        }
+
+        $accessToken = (string) ($tokenResponse->json()['access_token'] ?? '');
+        if ($accessToken === '') {
+            return back()->withErrors(['payment' => 'PayPal token missing.']);
+        }
+
+        $invoice->loadMissing(['client', 'project']);
+        $amount = number_format($amountValue, 2, '.', '');
+        $currency = strtoupper((string) ($invoice->currency ?: 'USD'));
+
+        $orderResponse = Http::withToken($accessToken)
+            ->post($baseUrl . '/v2/checkout/orders', [
+                'intent' => 'CAPTURE',
+                'purchase_units' => [[
+                    'reference_id' => (string) $invoice->id,
+                    'description' => 'Invoice ' . $invoice->invoice_number,
+                    'amount' => [
+                        'currency_code' => $currency,
+                        'value' => $amount,
+                    ],
+                ]],
+                'application_context' => [
+                    'return_url' => route('user.invoices.paypal.success', $invoice),
+                    'cancel_url' => route('user.invoices.pay', $invoice),
+                    'brand_name' => 'Maccento CRM',
+                ],
+            ]);
+
+        if (!$orderResponse->successful()) {
+            return back()->withErrors(['payment' => 'Unable to create PayPal order.']);
+        }
+
+        $order = $orderResponse->json();
+        $approvalUrl = collect($order['links'] ?? [])->firstWhere('rel', 'approve')['href'] ?? null;
+        if (!is_string($approvalUrl) || $approvalUrl === '') {
+            return back()->withErrors(['payment' => 'PayPal approval link missing.']);
+        }
+
+        return redirect()->away($approvalUrl);
+    }
+
+    public function userInvoicePayPalSuccess(Request $request, ClientInvoice $invoice): RedirectResponse
+    {
+        $this->ensureUserCanAccessInvoice($request, $invoice);
+
+        if ($invoice->status === 'paid') {
+            return redirect()->route('user.invoices.index')->with('status', 'Invoice already paid.');
+        }
+
+        $orderId = (string) $request->string('token');
+        if ($orderId === '') {
+            return redirect()->route('user.invoices.pay', $invoice)->withErrors(['payment' => 'Missing PayPal order.']);
+        }
+
+        $demoMode = $this->isPaymentDemoMode();
+        if ($demoMode || blank(env('PAYPAL_CLIENT_ID')) || blank(env('PAYPAL_SECRET'))) {
+            $this->recordInvoicePayment($invoice, (float) ($invoice->balance_due ?? $invoice->amount), $request->user(), 'paypal_demo', $orderId, 'paypal', [
+                'mode' => 'demo',
+            ], 'PayPal demo payment');
+
+            return redirect()->route('user.invoices.index')->with('status', 'Demo payment recorded.');
+        }
+
+        $baseUrl = $this->paypalBaseUrl();
+        $tokenResponse = Http::asForm()->withBasicAuth($this->resolvePayPalClientId(), $this->resolvePayPalSecret())
+            ->post($baseUrl . '/v1/oauth2/token', [
+                'grant_type' => 'client_credentials',
+            ]);
+
+        if (!$tokenResponse->successful()) {
+            return redirect()->route('user.invoices.pay', $invoice)->withErrors(['payment' => 'PayPal authentication failed.']);
+        }
+
+        $accessToken = (string) ($tokenResponse->json()['access_token'] ?? '');
+        if ($accessToken === '') {
+            return redirect()->route('user.invoices.pay', $invoice)->withErrors(['payment' => 'PayPal token missing.']);
+        }
+
+        $captureResponse = Http::withToken($accessToken)
+            ->post($baseUrl . '/v2/checkout/orders/' . $orderId . '/capture');
+
+        if (!$captureResponse->successful()) {
+            return redirect()->route('user.invoices.pay', $invoice)->withErrors(['payment' => 'Unable to capture PayPal payment.']);
+        }
+
+        $capture = $captureResponse->json();
+        if (($capture['status'] ?? '') !== 'COMPLETED') {
+            return redirect()->route('user.invoices.pay', $invoice)->withErrors(['payment' => 'PayPal payment not completed yet.']);
+        }
+
+        $capturedAmount = 0.0;
+        foreach (($capture['purchase_units'] ?? []) as $unit) {
+            foreach (($unit['payments']['captures'] ?? []) as $captureItem) {
+                $capturedAmount += (float) ($captureItem['amount']['value'] ?? 0);
+            }
+        }
+        if ($capturedAmount <= 0) {
+            return redirect()->route('user.invoices.pay', $invoice)->withErrors(['payment' => 'PayPal payment amount could not be verified.']);
+        }
+
+        $this->recordInvoicePayment($invoice, $capturedAmount, $request->user(), 'paypal', $orderId, 'paypal', [
+            'status' => $capture['status'] ?? null,
+            'amount' => $capturedAmount,
+        ], 'PayPal payment');
+
+        return redirect()->route('user.invoices.index')->with('status', 'Payment completed successfully.');
+    }
+
+    public function userInvoiceManualNotify(Request $request, ClientInvoice $invoice): RedirectResponse
+    {
+        $this->ensureUserCanAccessInvoice($request, $invoice);
+
+        $invoice->refresh();
+        $balanceDue = (float) ($invoice->balance_due ?? $invoice->amount);
+        $validated = $request->validate([
+            'amount' => ['nullable', 'numeric', 'min:0.01'],
+        ]);
+        $amount = isset($validated['amount']) ? (float) $validated['amount'] : $balanceDue;
+        if ($amount > $balanceDue) {
+            return back()->withErrors(['payment' => 'Payment amount cannot exceed the balance due.']);
+        }
+
+        $invoice->loadMissing(['client', 'project']);
+        $client = $invoice->client;
+        if ($client) {
+            ClientMessage::create([
+                'client_id' => $client->id,
+                'client_project_id' => $invoice->client_project_id,
+                'sender_user_id' => $request->user()?->id,
+                'sender_role' => 'client',
+                'message' => 'Client will pay invoice ' . $invoice->invoice_number . ' manually. Amount: ' . number_format($amount, 2) . ' ' . strtoupper((string) $invoice->currency) . '.',
+                'sent_at' => now(),
+            ]);
+        }
+
+        $this->notificationService()->notifyInternal(
+            'invoice_manual_payment',
+            'Manual payment noted',
+            'Client will pay invoice ' . $invoice->invoice_number . ' manually. Amount: ' . number_format($amount, 2) . ' ' . strtoupper((string) $invoice->currency) . '.',
+            route('admin.invoices.index'),
+            ['invoice_id' => $invoice->id]
+        );
+
+        return back()->with('status', 'Manual payment request sent to admin.');
+    }
     public function userInvoicePdfDownload(Request $request, ClientInvoice $invoice)
     {
         $invoice->loadMissing([
@@ -4230,18 +6383,166 @@ public function userProjectCommentStore(Request $request, ClientProject $project
 
         return $pdf->download($filename);
     }
-
-    public function userServiceRequestStore(Request $request): RedirectResponse
+    public function userServiceRequestDestroy(Request $request, ClientServiceRequest $serviceRequest): RedirectResponse
     {
-        $user = $request->user();
+        $client = $this->resolvePortalClient($request->user());
+        if (!$client || (int) $serviceRequest->client_id !== (int) $client->id) {
+            abort(403);
+        }
+
+        $this->logRequestEdit('service', (int) $serviceRequest->id, $serviceRequest->client_id, $request->user(), [
+            'action' => 'delete',
+            'snapshot' => $serviceRequest->only(['client_project_id', 'requested_service', 'subject', 'details', 'preferred_date', 'status']),
+        ]);
+
+        $serviceRequest->delete();
+
+        return back()->with('status', 'Service request deleted.');
+    }
+
+    public function userBookingRequestDestroy(Request $request, BookingRequest $bookingRequest): RedirectResponse
+    {
+        $client = $this->resolvePortalClient($request->user());
+        if (!$client || (int) $bookingRequest->client_id !== (int) $client->id) {
+            abort(403);
+        }
+
+        $this->logRequestEdit('booking', (int) $bookingRequest->id, $bookingRequest->client_id, $request->user(), [
+            'action' => 'delete',
+            'snapshot' => $bookingRequest->only(['client_project_id', 'requested_service', 'preferred_date', 'preferred_time_window', 'notes', 'status']),
+        ]);
+
+        $bookingRequest->delete();
+
+        return back()->with('status', 'Booking request deleted.');
+    }
+    public function userServiceRequestUpdate(Request $request, ClientServiceRequest $serviceRequest): RedirectResponse
+    {
+        $client = $this->resolvePortalClient($request->user());
+        if (!$client || (int) $serviceRequest->client_id !== (int) $client->id) {
+            abort(403);
+        }
+
         $validated = $request->validate([
-            'client_project_id' => ['nullable', 'integer'],
+            'client_project_id' => ['required', 'integer'],
             'requested_service' => ['required', 'string', 'max:120'],
             'subject' => ['nullable', 'string', 'max:255'],
             'details' => ['nullable', 'string', 'max:2000'],
             'preferred_date' => ['nullable', 'date'],
         ]);
 
+        $before = $serviceRequest->only(['client_project_id', 'requested_service', 'subject', 'details', 'preferred_date']);
+
+        $serviceRequest->client_project_id = $validated['client_project_id'];
+        $serviceRequest->requested_service = $validated['requested_service'];
+        $serviceRequest->subject = $validated['subject'] ?? null;
+        $serviceRequest->details = $validated['details'] ?? null;
+        $serviceRequest->preferred_date = $validated['preferred_date'] ?? null;
+        $serviceRequest->save();
+
+        $this->logRequestEdit('service', (int) $serviceRequest->id, $serviceRequest->client_id, $request->user(), [
+            'action' => 'update',
+            'before' => $before,
+            'after' => $serviceRequest->only(['client_project_id', 'requested_service', 'subject', 'details', 'preferred_date']),
+        ]);
+
+        return back()->with('status', 'Service request updated.');
+    }
+
+    public function userBookingRequestUpdate(Request $request, BookingRequest $bookingRequest): RedirectResponse
+    {
+        $client = $this->resolvePortalClient($request->user());
+        if (!$client || (int) $bookingRequest->client_id !== (int) $client->id) {
+            abort(403);
+        }
+
+        $validated = $request->validate([
+            'requested_service' => ['required', 'string', 'max:160'],
+            'preferred_date' => ['nullable', 'date'],
+            'preferred_time_window' => ['nullable', 'string', 'max:80'],
+            'notes' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        $before = $bookingRequest->only(['requested_service', 'preferred_date', 'preferred_time_window', 'notes']);
+
+        $bookingRequest->requested_service = $validated['requested_service'];
+        $bookingRequest->preferred_date = $validated['preferred_date'] ?? null;
+        $bookingRequest->preferred_time_window = $validated['preferred_time_window'] ?? null;
+        $bookingRequest->notes = $validated['notes'] ?? null;
+        $bookingRequest->save();
+
+        $this->logRequestEdit('booking', (int) $bookingRequest->id, $bookingRequest->client_id, $request->user(), [
+            'action' => 'update',
+            'before' => $before,
+            'after' => $bookingRequest->only(['client_project_id', 'requested_service', 'preferred_date', 'preferred_time_window', 'notes']),
+        ]);
+
+        return back()->with('status', 'Booking request updated.');
+    }
+    public function userBookingRequestStore(Request $request): RedirectResponse
+    {
+        $user = $request->user();
+        $validated = $request->validate([
+            'client_project_id' => ['nullable', 'integer'],
+            'requested_service' => ['required', 'string', 'max:160'],
+            'preferred_date' => ['nullable', 'date'],
+            'preferred_time_window' => ['nullable', 'string', 'max:80'],
+            'notes' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        $this->createBookingRequest($user, $validated);
+
+        return back()->with('status', 'Booking request submitted successfully.');
+    }
+
+    public function userServiceRequestStore(Request $request): RedirectResponse
+    {
+        $user = $request->user();
+        $validated = $request->validate([
+            'client_project_id' => ['required', 'integer'],
+            'requested_service' => ['required', 'string', 'max:120'],
+            'subject' => ['nullable', 'string', 'max:255'],
+            'details' => ['nullable', 'string', 'max:2000'],
+            'preferred_date' => ['nullable', 'date'],
+        ]);
+        $this->createServiceRequest($user, $validated);
+
+        return back()->with('status', 'Service request submitted successfully.');
+    }
+
+    public function userUnifiedRequestStore(Request $request): RedirectResponse
+    {
+        $type = strtolower(trim((string) $request->input('request_type', 'service')));
+
+        if ($type === 'booking') {
+            $validated = $request->validate([
+                'client_project_id' => ['nullable', 'integer'],
+                'requested_service' => ['required', 'string', 'max:160'],
+                'preferred_date' => ['nullable', 'date'],
+                'preferred_time_window' => ['nullable', 'string', 'max:80'],
+                'notes' => ['nullable', 'string', 'max:2000'],
+            ]);
+
+            $this->createBookingRequest($request->user(), $validated);
+
+            return back()->with('status', 'Booking request submitted successfully.');
+        }
+
+        $validated = $request->validate([
+            'client_project_id' => ['required', 'integer'],
+            'requested_service' => ['required', 'string', 'max:120'],
+            'subject' => ['nullable', 'string', 'max:255'],
+            'details' => ['nullable', 'string', 'max:2000'],
+            'preferred_date' => ['nullable', 'date'],
+        ]);
+
+        $this->createServiceRequest($request->user(), $validated);
+
+        return back()->with('status', 'Service request submitted successfully.');
+    }
+
+    private function createServiceRequest(User $user, array $validated): void
+    {
         $client = Client::query()
             ->where('user_id', $user->id)
             ->orWhere('email', $user->email)
@@ -4272,7 +6573,7 @@ public function userProjectCommentStore(Request $request, ClientProject $project
             }
         }
 
-        ClientServiceRequest::create([
+        $serviceRequest = ClientServiceRequest::create([
             'client_id' => $client->id,
             'client_project_id' => $projectId,
             'requester_user_id' => $user->id,
@@ -4281,6 +6582,11 @@ public function userProjectCommentStore(Request $request, ClientProject $project
             'details' => $validated['details'] ?? null,
             'preferred_date' => $validated['preferred_date'] ?? null,
             'status' => 'new',
+        ]);
+
+        $this->logRequestEdit('service', (int) $serviceRequest->id, $client->id, $user, [
+            'action' => 'create',
+            'snapshot' => $serviceRequest->only(['client_project_id', 'requested_service', 'subject', 'details', 'preferred_date', 'status']),
         ]);
 
         $messagePrefix = 'New service request submitted: ';
@@ -4308,8 +6614,98 @@ public function userProjectCommentStore(Request $request, ClientProject $project
             $internalSummary,
             route('admin.clients.index')
         );
+    }
 
-        return back()->with('status', 'Service request submitted successfully.');
+    private function createBookingRequest(User $user, array $validated): void
+    {
+        $client = Client::query()
+            ->where('user_id', $user->id)
+            ->orWhere('email', $user->email)
+            ->first();
+
+        if (!$client) {
+            $client = Client::create([
+                'user_id' => $user->id,
+                'created_by' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'phone' => $user->phone,
+                'status' => 'active',
+                'notes' => 'Auto-created from client portal booking request.',
+            ]);
+        }
+
+        $projectId = null;
+        $projectTitle = null;
+        $leadProfileId = null;
+        if (!blank($validated['client_project_id'] ?? null)) {
+            $project = ClientProject::query()
+                ->where('client_id', $client->id)
+                ->where('id', (int) $validated['client_project_id'])
+                ->first(['id', 'title', 'lead_profile_id']);
+            if ($project) {
+                $projectId = (int) $project->id;
+                $projectTitle = (string) $project->title;
+                $leadProfileId = $project->lead_profile_id ? (int) $project->lead_profile_id : null;
+            }
+        }
+
+        $bookingRequest = BookingRequest::create([
+            'client_id' => $client->id,
+            'client_project_id' => $projectId,
+            'lead_profile_id' => $leadProfileId,
+            'requester_user_id' => $user->id,
+            'requested_service' => $validated['requested_service'],
+            'preferred_date' => $validated['preferred_date'] ?? null,
+            'preferred_time_window' => $validated['preferred_time_window'] ?? null,
+            'notes' => $validated['notes'] ?? null,
+            'status' => 'new',
+        ]);
+
+        $this->logRequestEdit('booking', (int) $bookingRequest->id, $client->id, $user, [
+            'action' => 'create',
+            'snapshot' => $bookingRequest->only(['client_project_id', 'requested_service', 'preferred_date', 'preferred_time_window', 'notes', 'status']),
+        ]);
+
+        $preferredBits = [];
+        if (!blank($validated['preferred_date'] ?? null)) {
+            $preferredBits[] = Carbon::parse((string) $validated['preferred_date'])->format('Y-m-d');
+        }
+        if (!blank($validated['preferred_time_window'] ?? null)) {
+            $preferredBits[] = (string) $validated['preferred_time_window'];
+        }
+
+        $messagePrefix = 'New booking request submitted: ';
+        if ($projectTitle !== null && $projectTitle !== '') {
+            $messagePrefix = 'Booking request for project "' . $projectTitle . '": ';
+        }
+
+        $message = $messagePrefix . $validated['requested_service'];
+        if ($preferredBits !== []) {
+            $message .= ' (Preferred: ' . implode(' - ', $preferredBits) . ')';
+        }
+
+        ClientMessage::create([
+            'client_id' => $client->id,
+            'client_project_id' => $projectId,
+            'sender_user_id' => $user->id,
+            'sender_role' => 'client',
+            'message' => $message,
+            'sent_at' => now(),
+        ]);
+
+        $internalSummary = "{$user->name} requested booking for {$validated['requested_service']}.";
+        if ($projectTitle !== null && $projectTitle !== '') {
+            $internalSummary = "{$user->name} submitted a booking request for {$projectTitle}: {$validated['requested_service']}.";
+        }
+
+        $this->notificationService()->notifyInternal(
+            'new_booking_request',
+            'New booking request',
+            $internalSummary,
+            route('admin.booking-requests.index'),
+            ['booking_request_id' => $bookingRequest->id]
+        );
     }
 
     public function adminQuoteShow(QuoteBuild $quote): View
@@ -4321,6 +6717,8 @@ public function userProjectCommentStore(Request $request, ClientProject $project
 
         return view('admin.quote-show', [
             'quote' => $quote,
+            'currencyOptions' => $this->currencyOptions(),
+            'defaultCurrency' => $this->resolveDefaultCurrency(),
         ]);
     }
 
@@ -4333,6 +6731,7 @@ public function userProjectCommentStore(Request $request, ClientProject $project
             'note' => ['nullable', 'string', 'max:1000'],
         ]);
 
+        $previousStatus = $quote->status;
         $quote->status = $validated['status'];
         $quote->save();
 
@@ -4355,6 +6754,28 @@ public function userProjectCommentStore(Request $request, ClientProject $project
             ['quote_id' => $quote->id, 'status' => $quote->status]
         );
 
+        $this->logActivity(
+            $request,
+            'quote',
+            $quote->id,
+            $quote->client_id ?? null,
+            $request->user(),
+            'status_update',
+            'Quote status updated: ' . $quote->quote_id,
+            [
+                'before' => ['status' => $previousStatus],
+                'after' => ['status' => $quote->status],
+            ]
+        );
+
+        app(OutboundWebhookService::class)->send('quote.status_updated', [
+            'quote_id' => $quote->id,
+            'quote_number' => $quote->quote_id,
+            'status' => $quote->status,
+            'previous_status' => $previousStatus,
+            'contact_email' => data_get($quote->options, 'contact_email'),
+        ]);
+
         return back()->with('status', 'Quote status updated.');
     }
 
@@ -4371,6 +6792,16 @@ public function userProjectCommentStore(Request $request, ClientProject $project
             'created_by' => auth()->id(),
         ]);
 
+        $this->logActivity(
+            $request,
+            'quote',
+            $quote->id,
+            $quote->client_id ?? null,
+            $request->user(),
+            'send',
+            'Quote email resent: ' . $quote->quote_id
+        );
+
         return back()->with('status', 'Quote emails resent.');
     }
 
@@ -4379,7 +6810,19 @@ public function userProjectCommentStore(Request $request, ClientProject $project
         $this->ensurePipelineWriteAccess($request);
 
         $quoteId = $quote->quote_id;
+        $snapshot = $quote->only(['quote_id', 'status', 'total', 'currency']);
         $quote->delete();
+
+        $this->logActivity(
+            $request,
+            'quote',
+            $quote->id,
+            $quote->client_id ?? null,
+            $request->user(),
+            'delete',
+            'Quote deleted: ' . $quoteId,
+            ['before' => $snapshot]
+        );
 
         return redirect()->route('admin.quotes.index')->with('status', "Quote {$quoteId} deleted successfully. Client can submit a new request.");
     }
@@ -4393,8 +6836,14 @@ public function userProjectCommentStore(Request $request, ClientProject $project
             return back()->withErrors(['line_items' => 'Fixed package quotes are locked for editing.']);
         }
 
+        $allowedCurrencies = $this->resolveAllowedCurrencyCodes();
+        $currencyRule = ['nullable', 'string', 'max:8'];
+        if ($allowedCurrencies !== []) {
+            $currencyRule[] = Rule::in($allowedCurrencies);
+        }
+
         $validated = $request->validate([
-            'currency' => ['nullable', 'string', 'max:8'],
+            'currency' => $currencyRule,
             'notes' => ['nullable', 'string', 'max:1000'],
             'line_items' => ['required', 'array', 'min:1'],
             'line_items.*.label' => ['required', 'string', 'max:150'],
@@ -4637,6 +7086,10 @@ public function userProjectCommentStore(Request $request, ClientProject $project
      */
     private function notifyClientUser(Client $client, string $type, string $title, ?string $body = null, ?string $actionUrl = null, array $data = []): void
     {
+        if ($this->tableHasColumn('clients', 'notify_portal') && $client->notify_portal === false) {
+            return;
+        }
+
         if ($client->user_id) {
             $this->notificationService()->notifyUser((int) $client->user_id, $type, $title, $body, $actionUrl, $data);
             return;
@@ -5350,6 +7803,53 @@ public function userProjectCommentStore(Request $request, ClientProject $project
 
         return $value;
     }
+    private function logRequestEdit(string $type, int $requestId, ?int $clientId, ?User $actor, array $changes): void
+    {
+        if (!Schema::hasTable('request_edit_logs')) {
+            return;
+        }
+
+        $payload = $this->filterTableColumns('request_edit_logs', [
+            'request_type' => $type,
+            'request_id' => $requestId,
+            'entity_type' => $type,
+            'entity_id' => $requestId,
+            'client_id' => $clientId,
+            'actor_user_id' => $actor?->id,
+            'actor_role' => $actor?->role,
+            'action' => $changes['action'] ?? null,
+            'summary' => $changes['summary'] ?? null,
+            'ip_address' => null,
+            'user_agent' => null,
+            'changes' => $changes,
+        ]);
+
+        RequestEditLog::create($payload);
+    }
+
+    private function logActivity(Request $request, string $entityType, int $entityId, ?int $clientId, ?User $actor, string $action, string $summary, array $changes = []): void
+    {
+        if (!Schema::hasTable('request_edit_logs')) {
+            return;
+        }
+
+        $payload = $this->filterTableColumns('request_edit_logs', [
+            'request_type' => $entityType,
+            'request_id' => $entityId,
+            'entity_type' => $entityType,
+            'entity_id' => $entityId,
+            'client_id' => $clientId,
+            'actor_user_id' => $actor?->id,
+            'actor_role' => $actor?->role,
+            'action' => $action,
+            'summary' => $summary,
+            'ip_address' => $request->ip(),
+            'user_agent' => substr((string) $request->userAgent(), 0, 255),
+            'changes' => $changes,
+        ]);
+
+        RequestEditLog::create($payload);
+    }
 
     private function resolvePortalClient(User $user, array $with = []): ?Client
     {
@@ -5709,6 +8209,75 @@ public function userProjectCommentStore(Request $request, ClientProject $project
         ];
     }
 
+    private function resolveApiIntegrationSettings(): ApiIntegrationSetting
+    {
+        $settings = ApiIntegrationSetting::query()->first();
+        if ($settings) {
+            return $settings;
+        }
+
+        return ApiIntegrationSetting::query()->create([
+            'paypal_sandbox' => true,
+        ]);
+    }
+
+    private function resolveIntegrationValue(?string $stored, string $envKey): string
+    {
+        $stored = trim((string) $stored);
+        if ($stored !== '') {
+            return $stored;
+        }
+
+        return (string) env($envKey, '');
+    }
+
+    private function resolveIntegrationFlag(?bool $stored, string $envKey, bool $default = false): bool
+    {
+        if ($stored !== null) {
+            return (bool) $stored;
+        }
+
+        return filter_var(env($envKey, $default), FILTER_VALIDATE_BOOLEAN);
+    }
+
+    private function resolveStripePublishableKey(): string
+    {
+        $settings = $this->resolveApiIntegrationSettings();
+        return $this->resolveIntegrationValue($settings->stripe_publishable_key, 'STRIPE_PUBLISHABLE_KEY');
+    }
+
+    private function resolveStripeSecretKey(): string
+    {
+        $settings = $this->resolveApiIntegrationSettings();
+        return $this->resolveIntegrationValue($settings->stripe_secret_key, 'STRIPE_SECRET_KEY');
+    }
+
+    private function resolvePayPalClientId(): string
+    {
+        $settings = $this->resolveApiIntegrationSettings();
+        return $this->resolveIntegrationValue($settings->paypal_client_id, 'PAYPAL_CLIENT_ID');
+    }
+
+    private function resolvePayPalSecret(): string
+    {
+        $settings = $this->resolveApiIntegrationSettings();
+        return $this->resolveIntegrationValue($settings->paypal_secret, 'PAYPAL_SECRET');
+    }
+
+    private function resolveMailSetting(?string $stored, string $envKey): string
+    {
+        $stored = trim((string) $stored);
+        if ($stored !== '') {
+            return $stored;
+        }
+
+        return (string) env($envKey, '');
+    }
+    private function resolvePayPalSandbox(): bool
+    {
+        $settings = $this->resolveApiIntegrationSettings();
+        return $this->resolveIntegrationFlag($settings->paypal_sandbox, 'PAYPAL_SANDBOX', true);
+    }
     private function resolveInvoiceSettings(): InvoiceSetting
     {
         $settings = InvoiceSetting::query()->first();
@@ -5716,10 +8285,143 @@ public function userProjectCommentStore(Request $request, ClientProject $project
             return $settings;
         }
 
-        return InvoiceSetting::query()->create([
+        $defaults = [
+            'stripe_enabled' => false,
+            'paypal_enabled' => false,
+            'manual_enabled' => true,
+            'manual_instructions' => 'Pay by bank transfer or cash. Please reference your invoice number.',
             'include_tax_on_pdf' => false,
             'tax_rate_percent' => 0,
+            'auto_email_on_invoice_create' => true,
+            'reminder_enabled' => true,
+            'reminder_days_before' => 3,
+            'reminder_send_on_due_date' => true,
+            'overdue_reminder_enabled' => true,
+            'overdue_reminder_every_days' => 3,
+        ];
+
+        $allowed = array_filter($defaults, static function ($value, $column): bool {
+            return Schema::hasColumn('invoice_settings', (string) $column);
+        }, ARRAY_FILTER_USE_BOTH);
+
+        return InvoiceSetting::query()->create($allowed);
+    }
+
+    private function buildApiDisplaySettings(): ApiIntegrationSetting
+    {
+        $settings = $this->resolveApiIntegrationSettings();
+        $displaySettings = clone $settings;
+        $displaySettings->stripe_publishable_key = $this->resolveStripePublishableKey();
+        $displaySettings->stripe_secret_key = $this->resolveStripeSecretKey();
+        $displaySettings->paypal_client_id = $this->resolvePayPalClientId();
+        $displaySettings->paypal_secret = $this->resolvePayPalSecret();
+        $displaySettings->paypal_sandbox = $this->resolvePayPalSandbox();
+        $displaySettings->mail_mailer = $this->resolveMailSetting($settings->mail_mailer, 'MAIL_MAILER');
+        $displaySettings->mail_host = $this->resolveMailSetting($settings->mail_host, 'MAIL_HOST');
+        $displaySettings->mail_port = $settings->mail_port ?? (int) env('MAIL_PORT', 0);
+        $displaySettings->mail_username = $this->resolveMailSetting($settings->mail_username, 'MAIL_USERNAME');
+        $displaySettings->mail_password = $this->resolveMailSetting($settings->mail_password, 'MAIL_PASSWORD');
+        $displaySettings->mail_encryption = $this->resolveMailSetting($settings->mail_encryption, 'MAIL_ENCRYPTION');
+        $displaySettings->mail_from_address = $this->resolveMailSetting($settings->mail_from_address, 'MAIL_FROM_ADDRESS');
+        $displaySettings->mail_from_name = $this->resolveMailSetting($settings->mail_from_name, 'MAIL_FROM_NAME');
+        $displaySettings->media_disk = $this->resolveIntegrationValue($settings->media_disk, 'MEDIA_DISK');
+        $displaySettings->s3_key = $this->resolveIntegrationValue($settings->s3_key, 'S3_ACCESS_KEY_ID');
+        $displaySettings->s3_secret = $this->resolveIntegrationValue($settings->s3_secret, 'S3_SECRET_ACCESS_KEY');
+        $displaySettings->s3_region = $this->resolveIntegrationValue($settings->s3_region, 'S3_REGION');
+        $displaySettings->s3_bucket = $this->resolveIntegrationValue($settings->s3_bucket, 'S3_BUCKET');
+        $displaySettings->s3_endpoint = $this->resolveIntegrationValue($settings->s3_endpoint, 'S3_ENDPOINT');
+        $displaySettings->s3_path_style = $this->resolveIntegrationFlag($settings->s3_path_style, 'S3_PATH_STYLE', false);
+        $displaySettings->outbound_webhook_enabled = $this->resolveIntegrationFlag($settings->outbound_webhook_enabled, 'OUTBOUND_WEBHOOK_ENABLED', false);
+        $displaySettings->outbound_webhook_url = $this->resolveIntegrationValue($settings->outbound_webhook_url, 'OUTBOUND_WEBHOOK_URL');
+        $displaySettings->outbound_webhook_secret = $this->resolveIntegrationValue($settings->outbound_webhook_secret, 'OUTBOUND_WEBHOOK_SECRET');
+        $displaySettings->ai_provider = $this->resolveIntegrationValue($settings->ai_provider, 'AI_PROVIDER');
+        $displaySettings->ai_model = $this->resolveIntegrationValue($settings->ai_model, 'AI_MODEL');
+        $displaySettings->openai_api_key = $this->resolveIntegrationValue($settings->openai_api_key, 'OPENAI_API_KEY');
+        $displaySettings->openai_base_url = $this->resolveIntegrationValue($settings->openai_base_url, 'OPENAI_BASE_URL');
+        $displaySettings->openrouter_api_key = $this->resolveIntegrationValue($settings->openrouter_api_key, 'OPENROUTER_API_KEY');
+        $displaySettings->openrouter_base_url = $this->resolveIntegrationValue($settings->openrouter_base_url, 'OPENROUTER_BASE_URL');
+        $displaySettings->openrouter_model = $this->resolveIntegrationValue($settings->openrouter_model, 'OPENROUTER_MODEL');
+        $displaySettings->gemini_api_key = $this->resolveIntegrationValue($settings->gemini_api_key, 'GEMINI_API_KEY');
+        $displaySettings->gemini_base_url = $this->resolveIntegrationValue($settings->gemini_base_url, 'GEMINI_BASE_URL');
+        $displaySettings->gemini_model = $this->resolveIntegrationValue($settings->gemini_model, 'GEMINI_MODEL');
+
+        return $displaySettings;
+    }
+
+    /**
+     * @return array<string,string>
+     */
+    private function currencyOptions(): array
+    {
+        return [
+            'USD' => 'US Dollar',
+            'EUR' => 'Euro',
+            'GBP' => 'British Pound',
+            'INR' => 'Indian Rupee',
+            'BDT' => 'Bangladeshi Taka',
+            'AUD' => 'Australian Dollar',
+            'CAD' => 'Canadian Dollar',
+            'SGD' => 'Singapore Dollar',
+        ];
+    }
+
+    private function resolveCurrencySettings(): CurrencySetting
+    {
+        if (!Schema::hasTable('currency_settings')) {
+            return new CurrencySetting([
+                'default_currency' => 'USD',
+                'enabled_currencies' => array_keys($this->currencyOptions()),
+            ]);
+        }
+
+        $settings = CurrencySetting::query()->first();
+        if ($settings) {
+            return $settings;
+        }
+
+        return CurrencySetting::query()->create([
+            'default_currency' => 'USD',
+            'enabled_currencies' => array_keys($this->currencyOptions()),
         ]);
+    }
+
+    private function resolveDefaultCurrency(): string
+    {
+        $settings = $this->resolveCurrencySettings();
+        $default = strtoupper(trim((string) ($settings->default_currency ?? 'USD')));
+        return $default !== '' ? $default : 'USD';
+    }
+
+    /**
+     * @return array<int,string>
+     */
+    private function resolveAllowedCurrencyCodes(): array
+    {
+        $options = array_keys($this->currencyOptions());
+        $settings = $this->resolveCurrencySettings();
+        $enabled = array_map('strtoupper', array_map('trim', (array) ($settings->enabled_currencies ?? [])));
+        $enabled = array_values(array_filter($enabled, static fn (string $code): bool => $code !== ''));
+        $enabled = array_values(array_intersect($enabled, $options));
+
+        return $enabled !== [] ? $enabled : $options;
+    }
+
+    private function resolveMediaDisk(): string
+    {
+        try {
+            if (Schema::hasTable('api_integration_settings')) {
+                $settings = ApiIntegrationSetting::query()->first();
+                $mediaDisk = trim((string) ($settings?->media_disk ?? ''));
+                if ($mediaDisk !== '') {
+                    return $mediaDisk;
+                }
+            }
+        } catch (Throwable $exception) {
+            return 'public';
+        }
+
+        $envDisk = trim((string) env('MEDIA_DISK', ''));
+        return $envDisk !== '' ? $envDisk : 'public';
     }
 
     private function watermarkScaleFromSize(string $size): float
@@ -5812,6 +8514,11 @@ public function userProjectCommentStore(Request $request, ClientProject $project
     private function generateHardWatermarkVariant(string $disk, string $originalPath, string $projectMediaBasePath, array $renderConfig): ?array
     {
         try {
+            $driver = (string) config("filesystems.disks.{$disk}.driver", 'local');
+            if (!in_array($driver, ['local'], true)) {
+                return null;
+            }
+
             if (!Storage::disk($disk)->exists($originalPath)) {
                 return null;
             }
@@ -6027,6 +8734,140 @@ public function userProjectCommentStore(Request $request, ClientProject $project
         return date('Y-m-d', $timestamp);
     }
 
+    private function markInvoicePaid(ClientInvoice $invoice, ?User $actor, string $provider, ?string $reference, array $meta = [], ?string $note = null): void
+    {
+        $this->recordInvoicePayment(
+            $invoice,
+            (float) ($invoice->balance_due ?? $invoice->amount),
+            $actor,
+            $provider,
+            $reference,
+            $provider,
+            $meta,
+            $note
+        );
+    }
+
+    private function recordInvoicePayment(
+        ClientInvoice $invoice,
+        float $amount,
+        ?User $actor,
+        string $provider,
+        ?string $reference,
+        string $method,
+        array $meta = [],
+        ?string $note = null
+    ): void {
+        $amount = round($amount, 2);
+        if ($amount <= 0) {
+            return;
+        }
+
+        $invoice->refresh();
+        $invoiceAmount = (float) $invoice->amount;
+        $amountPaid = (float) ($invoice->amount_paid ?? 0);
+        $balanceDue = (float) ($invoice->balance_due ?? $invoiceAmount);
+        if ($balanceDue <= 0) {
+            if ($invoice->status !== 'paid') {
+                $invoice->status = 'paid';
+                $invoice->paid_at = now();
+                $invoice->save();
+            }
+            return;
+        }
+
+        $amountToApply = min($amount, $balanceDue);
+        $newPaid = round($amountPaid + $amountToApply, 2);
+        $newBalance = max(round($invoiceAmount - $newPaid, 2), 0.0);
+
+        ClientInvoicePayment::create([
+            'client_invoice_id' => $invoice->id,
+            'created_by' => $actor?->id,
+            'amount' => $amountToApply,
+            'currency' => $invoice->currency,
+            'provider' => $provider,
+            'reference' => $reference,
+            'method' => $method,
+            'meta' => $meta,
+            'paid_at' => now(),
+        ]);
+
+        $invoice->amount_paid = $newPaid;
+        $invoice->balance_due = $newBalance;
+        $invoice->payment_provider = $provider;
+        $invoice->payment_reference = $reference;
+        $invoice->payment_method = $method;
+        $invoice->payment_meta = $meta;
+
+        if ($newBalance <= 0) {
+            $invoice->status = 'paid';
+            $invoice->paid_at = now();
+        } else {
+            $invoice->paid_at = null;
+            $invoice->status = $invoice->due_date && $invoice->due_date->isPast() ? 'overdue' : 'partial';
+        }
+
+        $invoice->save();
+
+        $invoice->loadMissing(['client']);
+        if ($invoice->client) {
+            ClientMessage::create([
+                'client_id' => $invoice->client_id,
+                'client_project_id' => $invoice->client_project_id,
+                'sender_user_id' => $actor?->id,
+                'sender_role' => $actor?->role ?: 'system',
+                'message' => trim('Payment received for invoice ' . $invoice->invoice_number . ' via ' . strtoupper($provider) . ': ' . number_format($amountToApply, 2) . ' ' . $invoice->currency . ($note ? (' (' . $note . ')') : '')),
+                'sent_at' => now(),
+            ]);
+        }
+
+        $this->notificationService()->notifyInternal(
+            'invoice_payment_recorded',
+            'Invoice payment recorded',
+            'Invoice ' . $invoice->invoice_number . ' received ' . number_format($amountToApply, 2) . ' ' . $invoice->currency . '.',
+            route('admin.invoices.index'),
+            ['invoice_id' => $invoice->id]
+        );
+
+        $this->logActivity(
+            request(),
+            'invoice',
+            $invoice->id,
+            $invoice->client_id,
+            $actor,
+            'payment',
+            'Payment recorded for invoice ' . $invoice->invoice_number,
+            [
+                'amount' => $amountToApply,
+                'currency' => $invoice->currency,
+                'method' => $method,
+            ]
+        );
+
+        app(OutboundWebhookService::class)->send('invoice.payment_recorded', [
+            'invoice_id' => $invoice->id,
+            'invoice_number' => $invoice->invoice_number,
+            'client_id' => $invoice->client_id,
+            'amount' => $amountToApply,
+            'currency' => $invoice->currency,
+            'status' => $invoice->status,
+            'balance_due' => $invoice->balance_due,
+            'paid_at' => $invoice->paid_at?->toIso8601String(),
+        ]);
+    }
+
+    private function paypalBaseUrl(): string
+    {
+        $useSandbox = $this->resolvePayPalSandbox();
+        return $useSandbox ? 'https://api-m.sandbox.paypal.com' : 'https://api-m.paypal.com';
+    }
+
+    private function isPaymentDemoMode(): bool
+    {
+        return filter_var(env('PAYMENTS_DEMO_MODE', true), FILTER_VALIDATE_BOOLEAN);
+    }
+
+
     private function generateInvoiceNumber(): string
     {
         $date = now()->format('Ymd');
@@ -6040,51 +8881,4 @@ public function userProjectCommentStore(Request $request, ClientProject $project
         return 'INV-' . $date . '-' . strtoupper(uniqid());
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 

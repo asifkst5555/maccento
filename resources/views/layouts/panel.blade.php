@@ -674,6 +674,76 @@
       gap: 0.6rem;
     }
 
+    .panel-toast {
+      position: fixed;
+      top: 96px;
+      right: 24px;
+      z-index: 1200;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 1rem;
+      align-items: center;
+      max-width: min(420px, calc(100vw - 48px));
+      background: #0f2137;
+      color: #ffffff;
+      border-radius: 16px;
+      padding: 0.85rem 1rem;
+      box-shadow: 0 18px 38px rgba(15, 33, 55, 0.25);
+      transform: translateY(-8px);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease, transform 0.2s ease;
+    }
+
+    .panel-toast.is-visible {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+    }
+
+    .panel-toast[data-panel-toast-kind="success"] {
+      background: linear-gradient(135deg, #0c3b2f 0%, #157347 100%);
+    }
+
+    .panel-toast[data-panel-toast-kind="error"] {
+      background: linear-gradient(135deg, #5c1120 0%, #a11b2f 100%);
+    }
+
+    .panel-toast-body {
+      display: grid;
+      gap: 0.25rem;
+      line-height: 1.4;
+    }
+
+    .panel-toast-title {
+      font-weight: 700;
+      font-size: 0.9rem;
+      letter-spacing: 0.01em;
+    }
+
+    .panel-toast-message {
+      font-size: 0.88rem;
+      color: rgba(255, 255, 255, 0.9);
+    }
+
+    .panel-toast-close {
+      border: 0;
+      background: rgba(255, 255, 255, 0.15);
+      color: #ffffff;
+      width: 34px;
+      height: 34px;
+      border-radius: 999px;
+      cursor: pointer;
+      font-size: 1.1rem;
+      display: grid;
+      place-items: center;
+      transition: background 0.2s ease;
+    }
+
+    .panel-toast-close:hover {
+      background: rgba(255, 255, 255, 0.28);
+    }
+
     .panel-btn-danger {
       background: #b71d34;
       border-color: #9f162b;
@@ -771,7 +841,7 @@
     .corp-admin-shell .panel-select {
       background-position: right 19px center !important;
       padding-right: 42px !important;
-      background-size: 18px 18px !important;
+      background-size: 14px 14px !important;
     }
 
     .corp-admin-shell .panel-multi {
@@ -1421,7 +1491,45 @@
         flex-wrap: wrap;
       }
     }
-  </style>
+      body.panel-page .panel-action-buttons {
+      display: inline-flex;
+      gap: 0.5rem;
+      align-items: center;
+      white-space: nowrap;
+    }
+
+    body.panel-page .panel-action-buttons > form {
+      margin: 0;
+      display: flex;
+      align-items: center;
+      flex: 0 0 auto;
+    }
+
+    body.panel-page .panel-action-buttons .panel-btn {
+      height: 2.25rem;
+      line-height: 2.25rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 0.85rem;
+    }
+
+    body.panel-page .panel-action-buttons-split {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.5rem;
+      width: 100%;
+    }
+
+    body.panel-page .panel-action-buttons-split > form {
+      margin: 0;
+      width: 100%;
+    }
+
+    body.panel-page .panel-action-buttons-split .panel-btn {
+      width: 100%;
+    }
+</style>
 </head>
 <body class="panel-page{{ auth()->check() ? (in_array(strtolower((string) auth()->user()->role), ['admin', 'owner', 'manager', 'photographer', 'editor'], true) ? ' panel-page-admin' : ' panel-page-client') : '' }}">
   @auth
@@ -1482,6 +1590,24 @@
                   $query->where('channel', 'package_builder');
                 })->count(),
                 'submissions' => \App\Models\WebsiteFormSubmission::query()->count(),
+                'service_requests' => \App\Models\ClientServiceRequest::query()->count(),
+              ];
+            });
+
+            $adminNavCounts = cache()->remember('panel_admin_nav_counts', now()->addSeconds(30), static function (): array {
+              $mediaCount = \App\Models\ClientProjectMedia::query()->count();
+              $projectCount = \App\Models\ClientProject::query()->count();
+              return [
+                'booking_requests' => \App\Models\BookingRequest::query()->count(),
+                'service_requests' => \App\Models\ClientServiceRequest::query()->count(),
+                'audit_logs' => \App\Models\RequestEditLog::query()->count(),
+                'quotes' => \App\Models\QuoteBuild::query()->count(),
+                'invoices' => \App\Models\ClientInvoice::query()->count(),
+                'messages' => \App\Models\ClientMessage::query()->count(),
+                'projects' => \App\Models\ClientProject::query()->count(),
+                'deliveries' => $mediaCount > 0 ? $mediaCount : $projectCount,
+                'watermarks' => \App\Models\WatermarkSetting::query()->count(),
+                'clients' => \App\Models\Client::query()->count(),
               ];
             });
           @endphp
@@ -1505,15 +1631,40 @@
             <span class="panel-nav-text">Website Submissions</span>
             <span class="panel-nav-count">{{ number_format((int) ($leadNavCounts['submissions'] ?? 0)) }}</span>
           </a>
+          <a class="panel-nav-link @if(request()->routeIs('admin.booking-requests.*')) is-active @endif" href="{{ route('admin.booking-requests.index') }}" title="Booking Requests">
+            <span class="panel-nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v3m10-3v3M5 7h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2zm2 5h4m-4 4h8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>
+            <span class="panel-nav-text">Booking Requests</span>
+            <span class="panel-nav-count">{{ number_format((int) ($adminNavCounts['booking_requests'] ?? 0)) }}</span>
+          </a>
+          <a class="panel-nav-link @if(request()->routeIs('admin.service-requests.*')) is-active @endif" href="{{ route('admin.service-requests.index') }}" title="Service Requests">
+            <span class="panel-nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h10M4 17h7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>
+            <span class="panel-nav-text">Service Requests</span>
+            <span class="panel-nav-count">{{ number_format((int) ($adminNavCounts['service_requests'] ?? 0)) }}</span>
+          </a>
+          <a class="panel-nav-link @if(request()->routeIs('admin.request-edit-logs.*')) is-active @endif" href="{{ route('admin.request-edit-logs.index') }}" title="Activity Log">
+            <span class="panel-nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>
+            <span class="panel-nav-text">Activity Log</span>
+            <span class="panel-nav-count">{{ number_format((int) ($adminNavCounts['audit_logs'] ?? 0)) }}</span>
+          </a>
+          <a class="panel-nav-link @if(request()->routeIs('admin.system-health.*')) is-active @endif" href="{{ route('admin.system-health.index') }}" title="System Health">
+            <span class="panel-nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h4l2-5 4 10 2-5h4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+            <span class="panel-nav-text">System Health</span>
+          </a>
 
           <p class="panel-nav-group-title">Sales & Billing</p>
           <a class="panel-nav-link @if(request()->routeIs('admin.quotes.*')) is-active @endif" href="{{ route('admin.quotes.index') }}" title="Quote Pipeline">
             <span class="panel-nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4V5zm3 3v2h10V8H7zm0 4v2h6v-2H7z" fill="currentColor"/></svg></span>
             <span class="panel-nav-text">Quote Pipeline</span>
+            <span class="panel-nav-count">{{ number_format((int) ($adminNavCounts['quotes'] ?? 0)) }}</span>
+          </a>
+          <a class="panel-nav-link @if(request()->routeIs('admin.reports.*')) is-active @endif" href="{{ route('admin.reports.index') }}" title="Reports">
+            <span class="panel-nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19h16M6 17V9m6 8V5m6 12v-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>
+            <span class="panel-nav-text">Reports</span>
           </a>
           <a class="panel-nav-link @if(request()->routeIs('admin.invoices.*')) is-active @endif" href="{{ route('admin.invoices.index') }}" title="Invoices">
             <span class="panel-nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h9l5 5v13a1 1 0 0 1-1 1H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zm8 1.5V9h4.5M8 13h8m-8 3h8m-8-6h5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
             <span class="panel-nav-text">Invoices</span>
+            <span class="panel-nav-count">{{ number_format((int) ($adminNavCounts['invoices'] ?? 0)) }}</span>
           </a>
 
           @php
@@ -1571,7 +1722,9 @@
           <a class="panel-nav-link @if(request()->routeIs('admin.messages.*')) is-active @endif" href="{{ route('admin.messages.index') }}" title="Messages/Chats">
             <span class="panel-nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v7A2.5 2.5 0 0 1 17.5 14H10l-4.5 4v-4H6.5A2.5 2.5 0 0 1 4 11.5v-5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg></span>
             <span class="panel-nav-text">Messages/Chats</span>
-          </a>          <p class="panel-nav-group-title">Delivery</p>
+            <span class="panel-nav-count">{{ number_format((int) ($adminNavCounts['messages'] ?? 0)) }}</span>
+          </a>
+          <p class="panel-nav-group-title">Delivery</p>
           @php
             $projectCreateActive = request()->routeIs('admin.projects.index') && (string) request()->query('project_action') === 'create';
             $projectCompletedActive = request()->routeIs('admin.projects.index') && (string) request()->query('project_scope', 'ongoing') === 'past';
@@ -1582,6 +1735,7 @@
               <a class="panel-nav-link @if(request()->routeIs('admin.projects.index')) is-active @endif" href="{{ route('admin.projects.index') }}" title="Projects">
                 <span class="panel-nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5a2 2 0 0 1 2-2h7l2 2h3a2 2 0 0 1 2 2v2H4V5zm0 5h16v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-9zm4 3h8m-8 3h5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
                 <span class="panel-nav-text">Projects</span>
+                <span class="panel-nav-count">{{ number_format((int) ($adminNavCounts['projects'] ?? 0)) }}</span>
               </a>
               <button class="panel-subnav-toggle" type="button" aria-label="Toggle Projects menu" aria-expanded="true" data-subnav-toggle="projects">
                 <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6 8l4 4 4-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -1607,11 +1761,13 @@
           <a class="panel-nav-link @if(request()->routeIs('admin.media-delivery.*') && !request()->routeIs('admin.media-delivery.watermark.*')) is-active @endif" href="{{ route('admin.media-delivery.index') }}" title="Media Delivery">
             <span class="panel-nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v3H4V6zm0 5h16v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-7zm3 2h10m-6 3h6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
             <span class="panel-nav-text">Media Delivery</span>
+            <span class="panel-nav-count">{{ number_format((int) ($adminNavCounts['deliveries'] ?? 0)) }}</span>
           </a>
-          @if($canManagePipeline)
+          @if($canManagePipeline && !$canManageUsers)
           <a class="panel-nav-link @if(request()->routeIs('admin.media-delivery.watermark.*')) is-active @endif" href="{{ route('admin.media-delivery.watermark.index') }}" title="Watermark Settings">
             <span class="panel-nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.2 6.4 20.2l1.1-6.2L3 9.6l6.2-.9L12 3z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg></span>
             <span class="panel-nav-text">Watermark Settings</span>
+            <span class="panel-nav-count">{{ number_format((int) ($adminNavCounts['watermarks'] ?? 0)) }}</span>
           </a>
           @endif
 
@@ -1620,6 +1776,7 @@
           <a class="panel-nav-link @if(request()->routeIs('admin.clients.*')) is-active @endif" href="{{ route('admin.clients.index') }}" title="Clients">
             <span class="panel-nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 11c1.66 0 2.99-1.57 2.99-3.5S17.66 4 16 4s-3 1.57-3 3.5S14.34 11 16 11zM8 11c1.66 0 3-1.57 3-3.5S9.66 4 8 4 5 5.57 5 7.5 6.34 11 8 11zm0 2c-2.33 0-7 1.17-7 3.5V20h14v-3.5C15 14.17 10.33 13 8 13zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.98 1.97 3.45V20h7v-3.5c0-2.33-4.67-3.5-7-3.5z" fill="currentColor"/></svg></span>
             <span class="panel-nav-text">Clients</span>
+            <span class="panel-nav-count">{{ number_format((int) ($adminNavCounts['clients'] ?? 0)) }}</span>
           </a>
           @endif
           @if($canManageUsers)
@@ -1627,6 +1784,53 @@
             <span class="panel-nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5zm-7 8a7 7 0 0 1 14 0H5zm12.5-9.5h4m-2-2v4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>
             <span class="panel-nav-text">User Accounts</span>
           </a>
+          @endif
+
+          @if($canManageUsers)
+          @php
+            $settingsActive = request()->routeIs('admin.settings.index')
+              || request()->routeIs('admin.api-integrations.*')
+              || request()->routeIs('admin.media-delivery.watermark.*')
+              || request()->routeIs('admin.invoices.*');
+          @endphp
+          <p class="panel-nav-group-title">Settings</p>
+          <div class="panel-nav-link-group @if($settingsActive) is-active @endif" data-subnav-group="settings">
+            <div class="panel-nav-head">
+              <a class="panel-nav-link @if($settingsActive) is-active @endif" href="{{ route('admin.settings.index') }}" title="Settings">
+                <span class="panel-nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l2 3.5 4 .6-2.9 2.8.7 4-3.8-2-3.8 2 .7-4L6 6.6l4-.6 2-3.5z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></span>
+                <span class="panel-nav-text">Settings</span>
+              </a>
+              <button class="panel-subnav-toggle" type="button" aria-label="Toggle Settings menu" aria-expanded="true" data-subnav-toggle="settings">
+                <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6 8l4 4 4-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </button>
+            </div>
+            <div class="panel-subnav" data-subnav="settings">
+              <a class="panel-subnav-link @if(request()->routeIs('admin.settings.index')) is-active @endif" href="{{ route('admin.settings.index') }}">
+                <span class="panel-subnav-icon"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 5h12v10H4V5zm2 2h8v6H6V7z" fill="none" stroke="currentColor" stroke-width="1.8"/></svg></span>
+                <span>Overview</span>
+              </a>
+              <a class="panel-subnav-link @if(request()->routeIs('admin.api-integrations.*')) is-active @endif" href="{{ route('admin.api-integrations.index') }}">
+                <span class="panel-subnav-icon"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 6h14M3 10h7M3 14h14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span>
+                <span>API Integrations</span>
+              </a>
+              <a class="panel-subnav-link @if(request()->routeIs('admin.media-delivery.watermark.*')) is-active @endif" href="{{ route('admin.media-delivery.watermark.index') }}">
+                <span class="panel-subnav-icon"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.5l2.3 4.6 5 .7-3.6 3.5.9 5-4.6-2.5-4.6 2.5.9-5-3.6-3.5 5-.7L10 2.5z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg></span>
+                <span>Watermark Settings</span>
+              </a>
+              <a class="panel-subnav-link" href="{{ route('admin.settings.index') }}#invoice-settings">
+                <span class="panel-subnav-icon"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6 3h8v14l-2-1.4L10 17l-2-1.4L6 17V3zm2 3h4m-4 3h4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                <span>Invoice Settings</span>
+              </a>
+              <a class="panel-subnav-link" href="{{ route('admin.settings.index') }}#currency-settings">
+                <span class="panel-subnav-icon"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 6h12M4 10h10M4 14h8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span>
+                <span>Currency Settings</span>
+              </a>
+              <a class="panel-subnav-link @if(request()->routeIs('admin.backup-restore.index')) is-active @endif" href="{{ route('admin.backup-restore.index') }}">
+                <span class="panel-subnav-icon"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 5h12v6H4V5zm0 8h8v2H4v-2zm10-1 2-2 2 2m-2-2v6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                <span>Backup & Restore</span>
+              </a>
+            </div>
+          </div>
           @endif
           @else
           <p class="panel-nav-group-title">Client Workspace</p>
@@ -1637,6 +1841,14 @@
           <a class="panel-nav-link @if(request()->routeIs('user.projects.*')) is-active @endif" href="{{ route('user.projects.index') }}" title="Projects">
             <span class="panel-nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v11a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 17.5v-11zm4 1.5h7m-7 4h7m-7 4h4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>
             <span class="panel-nav-text">Projects</span>
+          </a>
+          <a class="panel-nav-link @if(request()->routeIs('user.service-requests.*')) is-active @endif" href="{{ route('user.service-requests.index') }}" title="Service Request">
+            <span class="panel-nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h10M4 17h7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>
+            <span class="panel-nav-text">Service Request</span>
+          </a>
+          <a class="panel-nav-link @if(request()->routeIs('user.booking-requests.*')) is-active @endif" href="{{ route('user.booking-requests.index') }}" title="Booking Request">
+            <span class="panel-nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v3m10-3v3M5 7h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2zm2 5h4m-4 4h8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>
+            <span class="panel-nav-text">Booking Request</span>
           </a>
           <a class="panel-nav-link @if(request()->routeIs('user.deliveries.*')) is-active @endif" href="{{ route('user.deliveries.index') }}" title="Deliveries">
             <span class="panel-nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14v10a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V7zm3-3h8l1 3H7l1-3zm1 8h6m-3-3v6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
@@ -1773,7 +1985,33 @@
         </header>
 
         @if (session('status'))
-        <section class="panel-card"><span class="panel-badge">{{ session('status') }}</span></section>
+        <div class="panel-toast" data-panel-toast data-panel-toast-kind="success">
+          <div class="panel-toast-body">
+            <span class="panel-toast-title">Success</span>
+            <span class="panel-toast-message">{{ session('status') }}</span>
+          </div>
+          <button class="panel-toast-close" type="button" data-panel-toast-close aria-label="Close notification">Ã—</button>
+        </div>
+        @endif
+
+        @if (session('error'))
+        <div class="panel-toast" data-panel-toast data-panel-toast-kind="error">
+          <div class="panel-toast-body">
+            <span class="panel-toast-title">Error</span>
+            <span class="panel-toast-message">{{ session('error') }}</span>
+          </div>
+          <button class="panel-toast-close" type="button" data-panel-toast-close aria-label="Close notification">Ã—</button>
+        </div>
+        @endif
+
+        @if ($errors->any())
+        <div class="panel-toast" data-panel-toast data-panel-toast-kind="error">
+          <div class="panel-toast-body">
+            <span class="panel-toast-title">Fix required</span>
+            <span class="panel-toast-message">{{ $errors->first() }}</span>
+          </div>
+          <button class="panel-toast-close" type="button" data-panel-toast-close aria-label="Close notification">Ã—</button>
+        </div>
         @endif
 
         @if ($errors->any())
@@ -2527,9 +2765,270 @@
         if (ok) form.submit();
       });
     })();
-  </script>
-</body>
-</html>
+    </script>
+
+    <script>
+      (function () {
+        const toasts = Array.from(document.querySelectorAll('[data-panel-toast]'));
+        if (!toasts.length) return;
+
+        toasts.forEach((toast, index) => {
+          const closeBtn = toast.querySelector('[data-panel-toast-close]');
+          const hide = () => {
+            toast.classList.remove('is-visible');
+          };
+
+          toast.style.top = `${96 + index * 78}px`;
+
+          requestAnimationFrame(() => {
+            toast.classList.add('is-visible');
+          });
+
+          const timer = setTimeout(hide, 4200);
+
+          if (closeBtn) {
+            closeBtn.addEventListener('click', () => {
+              clearTimeout(timer);
+              hide();
+            });
+          }
+        });
+      })();
+    </script>
+
+    <script>
+      (function () {
+        const selects = Array.from(document.querySelectorAll('body.panel-page select.panel-select, body.panel-page select.panel-input'))
+          .filter((select) => !select.multiple && select.dataset.nativeSelect !== 'true');
+
+        if (!selects.length) return;
+
+        const flagClass = (value) => {
+          const code = String(value || '').trim().toLowerCase();
+          if (code === 'usd') return 'flag-usd';
+          if (code === 'eur') return 'flag-eur';
+          if (code === 'gbp') return 'flag-gbp';
+          if (code === 'inr') return 'flag-inr';
+          if (code === 'bdt') return 'flag-bdt';
+          if (code === 'aud') return 'flag-aud';
+          if (code === 'cad') return 'flag-cad';
+          if (code === 'sgd') return 'flag-sgd';
+          return '';
+        };
+
+        const closeAll = (except) => {
+          document.querySelectorAll('.panel-select-modern.is-open').forEach((node) => {
+            if (except && node === except) return;
+            const menu = node._panelMenu || node.querySelector('.panel-select-menu');
+            if (menu && menu.classList.contains('is-floating')) {
+              menu.style.display = 'none';
+              menu.classList.remove('is-floating');
+              node.appendChild(menu);
+            }
+            node.classList.remove('is-open');
+          });
+        };
+
+        selects.forEach((select) => {
+          if (select.dataset.customSelect === 'true') return;
+          select.dataset.customSelect = 'true';
+
+          const wrapper = document.createElement('div');
+          wrapper.className = 'panel-select-modern';
+          const trigger = document.createElement('button');
+          trigger.type = 'button';
+          trigger.className = 'panel-select-trigger';
+          const valueSpan = document.createElement('span');
+          valueSpan.className = 'panel-select-value';
+          const arrow = document.createElement('span');
+          arrow.className = 'panel-select-arrow';
+          arrow.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+          trigger.appendChild(valueSpan);
+          trigger.appendChild(arrow);
+
+          const menu = document.createElement('div');
+          menu.className = 'panel-select-menu';
+          wrapper._panelMenu = menu;
+
+          const needsFlags = select.dataset.selectFlags === 'currency';
+          const isDisabled = select.disabled;
+          if (isDisabled) {
+            wrapper.classList.add('is-disabled');
+            trigger.disabled = true;
+          }
+
+          const renderValue = (option) => {
+            valueSpan.innerHTML = '';
+            if (needsFlags) {
+              const flag = document.createElement('span');
+              flag.className = `currency-flag ${flagClass(option?.value)}`.trim();
+              valueSpan.appendChild(flag);
+            }
+            const text = document.createElement('span');
+            text.textContent = option?.textContent || 'Select';
+            valueSpan.appendChild(text);
+          };
+
+          const buildOptions = () => {
+            menu.innerHTML = '';
+            Array.from(select.options).forEach((option) => {
+              const button = document.createElement('button');
+              button.type = 'button';
+              button.className = 'panel-select-option';
+              if (option.disabled) {
+                button.classList.add('is-disabled');
+                button.disabled = true;
+              }
+              if (option.selected) {
+                button.classList.add('is-selected');
+              }
+              if (needsFlags) {
+                const flag = document.createElement('span');
+                flag.className = `currency-flag ${flagClass(option.value)}`.trim();
+                button.appendChild(flag);
+              }
+              const label = document.createElement('span');
+              label.textContent = option.textContent;
+              button.appendChild(label);
+              button.addEventListener('click', () => {
+                if (option.disabled) return;
+                select.value = option.value;
+                select.dispatchEvent(new Event('change', { bubbles: true }));
+                renderValue(option);
+                buildOptions();
+                closeMenu();
+              });
+              menu.appendChild(button);
+            });
+          };
+
+          select.classList.add('panel-select-native');
+          const parent = select.parentNode;
+          parent.insertBefore(wrapper, select);
+          wrapper.appendChild(select);
+          wrapper.appendChild(trigger);
+          wrapper.appendChild(menu);
+
+          renderValue(select.selectedOptions[0]);
+          buildOptions();
+
+          const positionMenu = () => {
+            const rect = trigger.getBoundingClientRect();
+            menu.style.minWidth = `${rect.width}px`;
+            const maxLeft = Math.max(8, window.innerWidth - rect.width - 8);
+            menu.style.left = `${Math.min(Math.max(8, rect.left), maxLeft)}px`;
+            menu.style.top = `${rect.bottom + 8}px`;
+            const menuRect = menu.getBoundingClientRect();
+            if (menuRect.bottom > window.innerHeight - 8) {
+              const top = Math.max(8, rect.top - menuRect.height - 8);
+              menu.style.top = `${top}px`;
+            }
+          };
+
+          const openMenu = () => {
+            closeAll(wrapper);
+            wrapper.classList.add('is-open');
+            menu.classList.add('is-floating');
+            menu.style.display = 'block';
+            menu.style.visibility = 'hidden';
+            document.body.appendChild(menu);
+            positionMenu();
+            menu.style.visibility = 'visible';
+          };
+
+          const closeMenu = () => {
+            wrapper.classList.remove('is-open');
+            if (menu.classList.contains('is-floating')) {
+              menu.style.display = 'none';
+              menu.classList.remove('is-floating');
+              wrapper.appendChild(menu);
+            }
+          };
+
+          trigger.addEventListener('click', (event) => {
+            event.preventDefault();
+            if (isDisabled) return;
+            if (wrapper.classList.contains('is-open')) {
+              closeMenu();
+              return;
+            }
+            openMenu();
+          });
+
+          trigger.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') {
+              closeMenu();
+            }
+            if (event.key === 'ArrowDown' || event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault();
+              openMenu();
+            }
+          });
+
+          select.addEventListener('change', () => {
+            renderValue(select.selectedOptions[0]);
+            buildOptions();
+          });
+
+          window.addEventListener('scroll', () => {
+            if (wrapper.classList.contains('is-open')) {
+              positionMenu();
+            }
+          }, true);
+          window.addEventListener('resize', () => {
+            if (wrapper.classList.contains('is-open')) {
+              positionMenu();
+            }
+          });
+        });
+
+        document.addEventListener('click', (event) => {
+          const target = event.target;
+          if (!(target instanceof HTMLElement)) return;
+          if (target.closest('.panel-select-menu')) {
+            return;
+          }
+          const container = target.closest('.panel-select-modern');
+          closeAll(container);
+        });
+
+        document.addEventListener('keydown', (event) => {
+          if (event.key === 'Escape') closeAll();
+        });
+      })();
+    </script>
+  </body>
+  </html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

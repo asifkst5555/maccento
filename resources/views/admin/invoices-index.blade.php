@@ -78,8 +78,23 @@
   .corp-admin-shell .panel-table-wrap {
     border: 1px solid var(--corp-line);
     border-radius: 12px;
-    overflow: hidden;
     background: #fff;
+    overflow-x: auto;
+    overflow-y: visible;
+  }
+  .corp-admin-shell .panel-table-wrap::-webkit-scrollbar {
+    height: 8px;
+  }
+  .corp-admin-shell .panel-table-wrap::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .corp-admin-shell .panel-table-wrap::-webkit-scrollbar-thumb {
+    background: rgba(193, 31, 55, 0.2);
+    border-radius: 999px;
+  }
+  .corp-admin-shell .panel-table-wrap {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(193, 31, 55, 0.25) transparent;
   }
 
   .corp-admin-shell .panel-table thead th {
@@ -114,34 +129,170 @@
     margin-bottom: 10px;
   }
 
-  .corp-admin-shell .tax-settings-form {
-    margin-bottom: 12px;
-    align-items: end;
-  }
-
-  .corp-admin-shell .inline-checkbox-label {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-  }
-
-  .corp-admin-shell .stacked-label {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-  }
-
-  .corp-admin-shell .tax-input {
-    max-width: 140px;
-  }
-
   .corp-admin-shell .status-form-tight {
-    margin-bottom: 6px;
+    margin-bottom: 0;
   }
 
   .corp-admin-shell .inline-delete-form {
     display: inline-block;
     margin-left: 8px;
+  }
+
+  .corp-admin-shell .invoice-table {
+    border-collapse: separate;
+    border-spacing: 0 12px;
+  }
+
+  .corp-admin-shell .invoice-row {
+    background: #ffffff;
+    box-shadow: 0 12px 24px rgba(16, 35, 58, 0.08);
+  }
+
+  .corp-admin-shell .invoice-row td {
+    background: #ffffff;
+    border-top: 1px solid #e3ecf5;
+    border-bottom: 1px solid #e3ecf5;
+  }
+
+  .corp-admin-shell .invoice-row td:first-child {
+    border-left: 1px solid #e3ecf5;
+    border-top-left-radius: 12px;
+    border-bottom-left-radius: 12px;
+  }
+
+  .corp-admin-shell .invoice-row td:last-child {
+    border-right: 1px solid #e3ecf5;
+    border-top-right-radius: 12px;
+    border-bottom-right-radius: 12px;
+  }
+
+  .corp-admin-shell .invoice-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .corp-admin-shell .invoice-action-form {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+  }
+
+  .corp-admin-shell .invoice-action-save {
+    background: linear-gradient(90deg, #b71d34 0%, #cc2741 100%);
+    border-color: #a5172d;
+    color: #ffffff;
+  }
+
+  .corp-admin-shell .invoice-action-save:hover {
+    background: #a3172b;
+  }
+
+  .corp-admin-shell .invoice-action-group {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .corp-admin-shell .invoice-action-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: var(--corp-ink-soft);
+    margin-right: 4px;
+  }
+
+  .corp-admin-shell .invoice-action-details {
+    border: 1px solid #d6e0ec;
+    border-radius: 12px;
+    padding: 8px;
+    background: #f7faff;
+  }
+
+  .corp-admin-shell .invoice-action-details summary {
+    list-style: none;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .corp-admin-shell .invoice-action-details summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .corp-admin-shell .invoice-action-details[open] summary {
+    margin-bottom: 8px;
+  }
+
+  .corp-admin-shell .invoice-quick-links {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .corp-admin-shell .inline-delete-form {
+    margin-left: 0;
+    display: flex;
+    align-items: center;
+  }
+
+  .corp-admin-shell .panel-btn-icon {
+    width: 35px;
+    height: 35px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .corp-admin-shell .panel-btn-icon svg {
+    width: 18px !important;
+    height: 18px !important;
+  }
+
+  .corp-admin-shell .panel-btn-danger.panel-btn-icon {
+    background: #b71d34;
+    border-color: #9f162b;
+    color: #ffffff;
+  }
+
+  .corp-admin-shell .panel-btn-danger.panel-btn-icon:hover {
+    transform: scale(1.08);
+  }
+
+  .corp-admin-shell .status-badge {
+    border-radius: 999px;
+    font-weight: 700;
+    text-transform: capitalize;
+  }
+
+  .corp-admin-shell .status-badge.status-paid {
+    background: #e5f6ee;
+    color: #1a7f4f;
+    border-color: #cfeedd;
+  }
+
+  .corp-admin-shell .status-badge.status-overdue {
+    background: #ffe8ec;
+    color: #b5243b;
+    border-color: #ffd1d9;
+  }
+
+  .corp-admin-shell .status-badge.status-sent,
+  .corp-admin-shell .status-badge.status-partial {
+    background: #e9f1ff;
+    color: #2f5aa8;
+    border-color: #d3e1fb;
+  }
+
+  .corp-admin-shell .status-badge.status-draft {
+    background: #f0f3f7;
+    color: #5a6c80;
+    border-color: #e2e7ef;
   }
 
   @media (max-width: 1024px) {
@@ -183,29 +334,6 @@
 </section>
 
 <section class="panel-card">
-  @php
-    $canManageInvoiceSettings = in_array(strtolower(trim((string) auth()->user()?->role)), ['owner', 'admin'], true);
-  @endphp
-  @if($canManageInvoiceSettings)
-  <div class="panel-form-row row-between-center">
-    <strong>Invoice PDF Tax Settings</strong>
-    <span class="panel-muted">Admin-controlled</span>
-  </div>
-  <form method="post" action="{{ route('admin.invoices.settings.update') }}" class="panel-form-row tax-settings-form">
-    @csrf
-    <label class="panel-muted inline-checkbox-label">
-      <input type="hidden" name="include_tax_on_pdf" value="0">
-      <input type="checkbox" name="include_tax_on_pdf" value="1" @checked((bool) ($invoiceSettings->include_tax_on_pdf ?? false))>
-      Include tax on admin invoice PDF
-    </label>
-    <label class="panel-muted stacked-label">
-      Tax %
-      <input class="panel-input tax-input" type="number" step="0.01" min="0" max="100" name="tax_rate_percent" value="{{ number_format((float) ($invoiceSettings->tax_rate_percent ?? 0), 2, '.', '') }}">
-    </label>
-    <button class="panel-btn panel-btn-primary" type="submit">Save Tax Settings</button>
-  </form>
-  @endif
-
   @if(!empty($filters['invoice_project']))
   <div class="panel-form-row row-between-center">
     <span class="panel-badge">Project Filter: {{ $filters['invoice_project_title'] ?: ('Project #' . $filters['invoice_project']) }}</span>
@@ -234,13 +362,15 @@
   </div>
 
   <div class="panel-table-wrap">
-    <table class="panel-table">
+    <table class="panel-table invoice-table">
       <thead>
         <tr>
           <th>Invoice</th>
           <th>Client</th>
           <th>Project</th>
           <th>Amount</th>
+          <th>Paid</th>
+          <th>Due Amount</th>
           <th>Status</th>
           <th>Issued</th>
           <th>Due</th>
@@ -253,7 +383,7 @@
         @php
           $isOverdue = $invoice->status !== 'paid' && $invoice->due_date && $invoice->due_date->isPast();
         @endphp
-        <tr class="{{ $isOverdue ? 'panel-row-overdue' : '' }}">
+        <tr class="invoice-row {{ $isOverdue ? 'panel-row-overdue' : '' }}">
           <td>{{ $invoice->invoice_number }}</td>
           <td>
             {{ $invoice->client?->name ?: '-' }}<br>
@@ -261,39 +391,71 @@
           </td>
           <td>{{ $invoice->project?->title ?: '-' }}</td>
           <td>{{ number_format((float) $invoice->amount, 2) }} {{ strtoupper((string) $invoice->currency) }}</td>
-          <td><span class="panel-badge">{{ $invoice->status }}</span></td>
+          <td>{{ number_format((float) ($invoice->amount_paid ?? 0), 2) }}</td>
+          <td>{{ number_format((float) ($invoice->balance_due ?? $invoice->amount), 2) }}</td>
+          <td><span class="panel-badge status-badge status-{{ $invoice->status }}">{{ $invoice->status }}</span></td>
           <td>{{ $invoice->issued_at?->format('Y-m-d') ?: '-' }}</td>
           <td>{{ $invoice->due_date?->format('Y-m-d') ?: '-' }}</td>
-          <td>{{ $invoice->paid_at?->format('Y-m-d H:i') ?: '-' }}</td>
+          <td>{{ $invoice->paid_at?->format('Y-m-d') ?: '-' }}</td>
           <td>
-            <form method="post" action="{{ route('admin.invoices.status', $invoice) }}" class="panel-form-row status-form-tight">
-              @csrf
-              <select class="panel-select" name="status">
-                @foreach(['draft','sent','partial','paid','overdue'] as $status)
-                <option value="{{ $status }}" @selected($invoice->status === $status)>{{ ucfirst($status) }}</option>
-                @endforeach
-              </select>
-              <button class="panel-btn" type="submit">Save</button>
-            </form>
-            @if($invoice->client)
-            <a class="panel-link" href="{{ route('admin.clients.show', $invoice->client) }}">Open client</a>
-            @endif
-            <br>
-            <a class="panel-link" href="{{ route('admin.invoices.download', $invoice) }}">Download PDF</a>
-            <form method="post" action="{{ route('admin.invoices.delete', $invoice) }}" data-app-confirm="1" data-confirm-message="Delete invoice {{ $invoice->invoice_number }}?" class="inline-delete-form">
-              @csrf
-              <button class="panel-btn panel-btn-danger panel-btn-icon" type="submit" title="Delete invoice" aria-label="Delete invoice"><span class="panel-icon-trash" aria-hidden="true"><x-panel-icon name="trash" /></span></button>
-            </form>
+            <div class="invoice-actions">
+              <div class="invoice-action-group">
+                <span class="invoice-action-label">Status</span>
+                <form method="post" action="{{ route('admin.invoices.status', $invoice) }}" class="invoice-action-form status-form-tight">
+                  @csrf
+                  <select class="panel-select" name="status">
+                    @foreach(['draft','sent','partial','paid','overdue'] as $status)
+                    <option value="{{ $status }}" @selected($invoice->status === $status)>{{ ucfirst($status) }}</option>
+                    @endforeach
+                  </select>
+                  <button class="panel-btn invoice-action-save" type="submit">Update</button>
+                </form>
+              </div>
+
+              <details class="invoice-action-details">
+                <summary class="panel-btn">Record Payment</summary>
+                <form method="post" action="{{ route('admin.invoices.payments.store', $invoice) }}" class="invoice-action-form status-form-tight">
+                  @csrf
+                  <input class="panel-input" style="max-width: 110px;" type="number" name="amount" min="0.01" step="0.01" placeholder="Amount" required>
+                  <select class="panel-select" name="method">
+                    <option value="manual">Manual</option>
+                    <option value="bank_transfer">Bank</option>
+                    <option value="cash">Cash</option>
+                    <option value="cheque">Cheque</option>
+                    <option value="stripe">Stripe</option>
+                    <option value="paypal">PayPal</option>
+                    <option value="other">Other</option>
+                  </select>
+                  <input class="panel-input" style="max-width: 120px;" type="text" name="reference" placeholder="Ref">
+                  <button class="panel-btn invoice-action-save" type="submit">Add Payment</button>
+                </form>
+              </details>
+
+              <div class="invoice-action-group">
+                <span class="invoice-action-label">Quick links</span>
+                <div class="invoice-quick-links">
+                  @if($invoice->client)
+                  <a class="panel-btn" href="{{ route('admin.clients.show', $invoice->client) }}">Client</a>
+                  @endif
+                  <a class="panel-btn" href="{{ route('admin.invoices.download', $invoice) }}">PDF</a>
+                  <form method="post" action="{{ route('admin.invoices.delete', $invoice) }}" data-confirm="Delete invoice {{ $invoice->invoice_number }}?" class="inline-delete-form">
+                    @csrf
+                    <button class="panel-btn panel-btn-danger panel-btn-icon" type="submit" title="Delete invoice" aria-label="Delete invoice"><span class="panel-icon-trash" aria-hidden="true"><x-panel-icon name="trash" /></span></button>
+                  </form>
+                </div>
+              </div>
+            </div>
           </td>
         </tr>
         @empty
-        <tr><td colspan="9" class="panel-muted">No invoices found.</td></tr>
+        <tr><td colspan="11" class="panel-muted">No invoices found.</td></tr>
         @endforelse
       </tbody>
     </table>
   </div>
   <x-panel-pagination :paginator="$invoices" />
 </section>
+
 </div>
 @endsection
 

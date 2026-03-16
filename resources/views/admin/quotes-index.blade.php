@@ -21,7 +21,11 @@
       <option value="other" selected>Other</option>
     </select>
     <input class="panel-input" type="number" name="estimated_total" min="0" placeholder="Estimated total" required>
-    <input class="panel-input" type="text" name="currency" value="USD" placeholder="Currency">
+    <select class="panel-input" name="currency" data-select-flags="currency">
+      @foreach($currencyOptions ?? ['USD' => 'US Dollar'] as $code => $label)
+        <option value="{{ $code }}" @selected(($defaultCurrency ?? 'USD') === $code)>{{ $code }} - {{ $label }}</option>
+      @endforeach
+    </select>
     <button class="panel-btn panel-btn-primary" type="submit">Create Quote</button>
     <textarea class="panel-textarea" name="notes" placeholder="Optional notes" style="flex-basis:100%;"></textarea>
   </form>
