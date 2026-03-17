@@ -2539,7 +2539,7 @@
         const assistantStatus = assistantPanel.querySelector('[data-admin-assistant-status]');
         const sessionUrl = assistantPanel.getAttribute('data-session-url') || '';
         const messageUrl = assistantPanel.getAttribute('data-message-url') || '';
-        const resetUrl = assistantPanel.getAttribute('data-reset-url') || '';
+        const resetUrl = assistantPanel.getAttribute('data-reset-url') || '/admin/assistant/reset';
         const csrfToken = assistantPanel.getAttribute('data-csrf') || '';
         let conversationId = '';
         let sessionLoaded = false;

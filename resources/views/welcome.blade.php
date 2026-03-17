@@ -1425,7 +1425,14 @@
             }),
           });
 
-          if (!response.ok) throw new Error('Could not reset chat session.');
+          if (!response.ok) {
+            localStorage.removeItem(storageKey);
+            conversationId = null;
+            await createSession();
+            chatLog.innerHTML = '';
+            appendMessage('bot', chatT('greeting'));
+            return;
+          }
           const data = await response.json();
           conversationId = String(data.conversation_id || '');
           localStorage.setItem(storageKey, conversationId);
