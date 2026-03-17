@@ -41,6 +41,39 @@
     </div>
 
     <div class="panel-stack">
+      <h3 class="panel-section-title" style="margin: 0;">Inbound Email (IMAP/POP3)</h3>
+      <label class="panel-inline-check" style="margin-top: 0.25rem;">
+        <input type="hidden" name="inbound_mail_enabled" value="0">
+        <input type="checkbox" name="inbound_mail_enabled" value="1" @checked((bool) $settings->inbound_mail_enabled)>
+        Enable inbound mailbox sync
+      </label>
+      <div class="panel-form-row">
+        <select class="panel-input" name="inbound_mail_provider">
+          @php($inboundProvider = strtolower(trim((string) ($settings->inbound_mail_provider ?? 'imap'))))
+          <option value="imap" @selected($inboundProvider === 'imap')>IMAP</option>
+          <option value="pop3" @selected($inboundProvider === 'pop3')>POP3</option>
+        </select>
+        <input class="panel-input" type="text" name="inbound_mail_host" value="{{ $settings->inbound_mail_host }}" placeholder="Incoming host">
+        <input class="panel-input" type="number" name="inbound_mail_port" value="{{ $settings->inbound_mail_port }}" placeholder="Port">
+      </div>
+      <div class="panel-form-row">
+        <input class="panel-input" type="text" name="inbound_mail_username" value="{{ $settings->inbound_mail_username }}" placeholder="Username">
+        <input class="panel-input" type="password" name="inbound_mail_password" value="{{ $settings->inbound_mail_password }}" placeholder="Password">
+        <input class="panel-input" type="text" name="inbound_mail_encryption" value="{{ $settings->inbound_mail_encryption }}" placeholder="Encryption (ssl/tls)">
+      </div>
+      <div class="panel-form-row">
+        <input class="panel-input" type="text" name="inbound_mail_mailbox" value="{{ $settings->inbound_mail_mailbox }}" placeholder="Mailbox (INBOX)">
+        <input class="panel-input" type="text" name="inbound_mail_search" value="{{ $settings->inbound_mail_search }}" placeholder="Search (UNSEEN)">
+        <input class="panel-input" type="number" name="inbound_mail_max_per_run" value="{{ $settings->inbound_mail_max_per_run }}" placeholder="Max per run">
+      </div>
+      <label class="panel-inline-check" style="margin-top: 0.5rem;">
+        <input type="hidden" name="inbound_mail_delete_after_process" value="0">
+        <input type="checkbox" name="inbound_mail_delete_after_process" value="1" @checked((bool) $settings->inbound_mail_delete_after_process)>
+        Delete messages after processing
+      </label>
+    </div>
+
+    <div class="panel-stack">
       <h3 class="panel-section-title" style="margin: 0;">Storage (S3)</h3>
       <div class="panel-form-row">
         <input class="panel-input" type="text" name="media_disk" value="{{ $settings->media_disk }}" placeholder="Media disk (public or s3)">

@@ -24,6 +24,8 @@ class Kernel extends ConsoleKernel
             ->dailyAt('08:15');
         $schedule->command('system:prune-data')
             ->weeklyOn(1, '03:00');
+        $schedule->command('inbound:pull')
+            ->everyFiveMinutes();
     }
 
     /**
