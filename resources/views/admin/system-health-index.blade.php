@@ -27,11 +27,6 @@
       <div class="panel-stat-value">{{ $failedEmailsCount ?? 'n/a' }}</div>
       <div class="panel-muted">Check the Email Center for delivery details.</div>
     </div>
-    <div class="panel-stat-card">
-      <div class="panel-stat-label">SendGrid failures (24h)</div>
-      <div class="panel-stat-value">{{ $sendgridFailuresCount ?? 'n/a' }}</div>
-      <div class="panel-muted">Bounces, drops, spam reports.</div>
-    </div>
   </section>
 
   <section class="panel-card panel-stack">
@@ -97,37 +92,6 @@
       </table>
     </div>
   </section>
-
-  <section class="panel-card panel-stack">
-    <h3 class="panel-section-title">SendGrid Failures</h3>
-    <div class="panel-table-wrap">
-      <table class="panel-table">
-        <thead>
-          <tr>
-            <th>When</th>
-            <th>Event</th>
-            <th>Email</th>
-            <th>Message Id</th>
-          </tr>
-        </thead>
-        <tbody>
-          @forelse($sendgridFailures as $event)
-            <tr>
-              <td data-label="When">{{ $event->occurred_at?->format('Y-m-d H:i') ?? '-' }}</td>
-              <td data-label="Event">{{ $event->event_type ?? '-' }}</td>
-              <td data-label="Email">{{ $event->email ?? '-' }}</td>
-              <td data-label="Message Id">{{ $event->sg_message_id ?? '-' }}</td>
-            </tr>
-          @empty
-            <tr>
-              <td colspan="4" class="panel-muted">No SendGrid failures found.</td>
-            </tr>
-          @endforelse
-        </tbody>
-      </table>
-    </div>
-  </section>
-
 
 </div>
 @endsection

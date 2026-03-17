@@ -86,7 +86,7 @@ class BackfillWelcomeEmailLogs extends Command
                             'mode' => 'auto_welcome',
                             'template_key' => 'lead_auto_' . Str::lower($source),
                             'recipient_email' => $recipient,
-                            'reply_to' => trim((string) env('SENDGRID_INBOUND_REPLY_TO', (string) config('mail.from.address'))) ?: null,
+                            'reply_to' => \App\Services\CrmReplyToResolver::resolve() ?: null,
                             'subject' => $subject,
                             'body_preview' => null,
                             'status' => 'sent',

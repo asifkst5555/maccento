@@ -2053,7 +2053,7 @@ class DashboardController extends Controller
             }
 
             report($exception);
-            return back()->withErrors(['recipient_email' => 'Email could not be sent. Please verify SendGrid and try again.'])->withInput();
+            return back()->withErrors(['recipient_email' => 'Email could not be sent. Please verify SMTP settings and try again.'])->withInput();
         }
 
         return redirect()->route('admin.emails.sent')->with('status', 'Email sent successfully.');
@@ -2873,28 +2873,12 @@ class DashboardController extends Controller
                 ->count();
         }
 
-        $sendgridFailures = [];
-        $sendgridFailuresCount = null;
-        if (Schema::hasTable('sendgrid_webhook_events')) {
-            $sendgridFailures = SendgridWebhookEvent::query()
-                ->whereIn('event_type', ['bounce', 'dropped', 'spamreport', 'blocked'])
-                ->orderByDesc('occurred_at')
-                ->limit(20)
-                ->get();
-            $sendgridFailuresCount = (int) SendgridWebhookEvent::query()
-                ->whereIn('event_type', ['bounce', 'dropped', 'spamreport', 'blocked'])
-                ->where('occurred_at', '>=', $windowStart)
-                ->count();
-        }
-
         return view('admin.system-health-index', [
             'failedJobs' => $failedJobs,
             'failedJobsCount' => $failedJobsCount,
             'latestFailedJobAt' => $latestFailedJobAt ? Carbon::parse((string) $latestFailedJobAt) : null,
             'failedEmails' => $failedEmails,
             'failedEmailsCount' => $failedEmailsCount,
-            'sendgridFailures' => $sendgridFailures,
-            'sendgridFailuresCount' => $sendgridFailuresCount,
         ]);
     }
 
@@ -7173,7 +7157,7 @@ public function userDeliveriesIndex(Request $request): View
             [
                 'key' => 'delivery_test',
                 'title' => 'Delivery Test',
-                'description' => 'Confirm SendGrid delivery and inbox routing in one click.',
+                'description' => 'Confirm SMTP delivery and inbox routing in one click.',
             ],
             [
                 'key' => 'pipeline_snapshot',
@@ -7486,23 +7470,7 @@ public function userDeliveriesIndex(Request $request): View
 
     private function crmInboundReplyToAddress(): string
     {
-        if (Schema::hasTable('api_integration_settings') && Schema::hasColumn('api_integration_settings', 'inbound_mail_username')) {
-            $settings = ApiIntegrationSetting::query()->first();
-            if ($settings) {
-                $inboundUser = trim((string) ($settings->inbound_mail_username ?? ''));
-                if ($inboundUser !== '') {
-                    return $inboundUser;
-                }
-            }
-        }
-
-        $replyTo = trim((string) env('SENDGRID_INBOUND_REPLY_TO', ''));
-        if ($replyTo !== '') {
-            return $replyTo;
-        }
-
-        $fallback = trim((string) env('MAIL_FROM_ADDRESS', ''));
-        return $fallback !== '' ? $fallback : 'crm@reply.maccento.ca';
+        return \App\Services\CrmReplyToResolver::resolve();
     }
 
     /**
@@ -7592,7 +7560,7 @@ public function userDeliveriesIndex(Request $request): View
 
             return [
                 'ok' => false,
-                'error' => 'Email could not be sent. Please verify SendGrid and try again.',
+                'error' => 'Email could not be sent. Please verify SMTP settings and try again.',
             ];
         }
     }

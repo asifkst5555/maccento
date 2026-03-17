@@ -130,7 +130,7 @@
       </label>
 
       <div class="panel-form-row" style="justify-content: space-between; align-items: center;">
-        <div class="panel-badge">Outbound channel: SendGrid SMTP</div>
+        <div class="panel-badge">Outbound channel: SMTP</div>
         <button class="panel-btn panel-btn-primary" type="submit">Send Custom Email</button>
       </div>
     </form>

@@ -131,7 +131,7 @@ return [
             'Leads' => 'Review lead details, AI-assisted leads, package leads, status updates, follow-ups, and outreach history.',
             'Quotes' => 'Build manual quotes, review quote requests, adjust line items, resend quote emails, and track quote status.',
             'Invoices' => 'Create invoices from clients/projects, update payment status, review invoice settings, and download PDFs.',
-            'Email Center' => 'Inbox, sent mail, drafts, automation settings, AI email writing, and SendGrid-linked message history.',
+            'Email Center' => 'Inbox, sent mail, drafts, automation settings, AI email writing, and message history.',
             'Projects' => 'Track project status, open client/project context, and move work from accepted through delivery stages.',
             'Media Delivery' => 'Upload gallery files, upload final ZIPs, preview media, and manage delivery readiness.',
             'Clients' => 'Create clients, open client workspaces, review requests, projects, invoices, and message timelines.',

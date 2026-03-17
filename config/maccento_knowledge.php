@@ -64,7 +64,7 @@ return [
         'email_center_rules' => [
             'Email Center includes inbox, sent, drafts, compose, automation settings, and AI-assisted drafting.',
             'Drafts can be autosaved, edited, sent, and deleted from the mailbox workspace.',
-            'SendGrid-linked inbound replies can be mapped into client timelines and project threads.',
+            'Inbound replies can be mapped into client timelines and project threads.',
         ],
         'client_management_rules' => [
             'Client workspaces bring together projects, invoices, requests, and message timelines.',

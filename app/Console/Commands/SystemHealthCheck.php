@@ -3,7 +3,6 @@
 namespace App\Console\Commands;
 
 use App\Models\EmailLog;
-use App\Models\SendgridWebhookEvent;
 use App\Services\PanelNotificationService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
@@ -40,14 +39,6 @@ class SystemHealthCheck extends Command
                 ->count();
         }
 
-        $sendgridFailureCount = null;
-        if (Schema::hasTable('sendgrid_webhook_events')) {
-            $sendgridFailureCount = (int) SendgridWebhookEvent::query()
-                ->whereIn('event_type', ['bounce', 'dropped', 'spamreport', 'blocked'])
-                ->where('occurred_at', '>=', $windowStart)
-                ->count();
-        }
-
         $backupFiles = Storage::disk('local')->exists('backups')
             ? Storage::disk('local')->files('backups')
             : [];
@@ -65,7 +56,6 @@ class SystemHealthCheck extends Command
 
         $failedJobsThreshold = (int) config('system_health.failed_jobs_threshold', 1);
         $failedEmailThreshold = (int) config('system_health.failed_email_threshold', 1);
-        $sendgridFailThreshold = (int) config('system_health.sendgrid_fail_threshold', 1);
         $backupMaxAgeDays = (int) config('system_health.backup_max_age_days', 2);
 
         if ($failedJobsCount !== null && $failedJobsCount >= $failedJobsThreshold) {
@@ -73,9 +63,6 @@ class SystemHealthCheck extends Command
         }
         if ($failedEmailCount !== null && $failedEmailCount >= $failedEmailThreshold) {
             $issues[] = "Failed emails in last 24h: {$failedEmailCount}";
-        }
-        if ($sendgridFailureCount !== null && $sendgridFailureCount >= $sendgridFailThreshold) {
-            $issues[] = "SendGrid failure events in last 24h: {$sendgridFailureCount}";
         }
         if ($backupLatestAt === null) {
             $issues[] = 'No database backup files found.';
@@ -86,7 +73,6 @@ class SystemHealthCheck extends Command
         $this->line('System Health Summary');
         $this->line('Failed jobs (24h): ' . ($failedJobsCount ?? 'n/a'));
         $this->line('Failed emails (24h): ' . ($failedEmailCount ?? 'n/a'));
-        $this->line('SendGrid failures (24h): ' . ($sendgridFailureCount ?? 'n/a'));
         $this->line('Latest backup: ' . ($backupLatestAt?->format('Y-m-d H:i') ?? 'none'));
         $this->line('Latest failed job: ' . ($latestFailedJobAt ? Carbon::parse((string) $latestFailedJobAt)->format('Y-m-d H:i') : 'none'));
 

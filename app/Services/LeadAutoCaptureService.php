@@ -175,7 +175,7 @@ class LeadAutoCaptureService
         $message = $this->fallbackMessage($lead, $source, $attributes);
         $providerName = 'fallback';
         $modelName = 'n/a';
-        $replyTo = trim((string) env('SENDGRID_INBOUND_REPLY_TO', ''));
+        $replyTo = \App\Services\CrmReplyToResolver::resolve();
         if ($replyTo === '') {
             $replyTo = 'crm@reply.maccento.ca';
         }

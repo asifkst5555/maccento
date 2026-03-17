@@ -22,7 +22,7 @@ class QuoteNotificationService
         $clientEmail = (string) data_get($quoteBuild->options, 'contact_email', '');
         $clientName = (string) data_get($quoteBuild->options, 'contact_name', 'Client');
         $adminEmail = (string) env('QUOTE_ADMIN_EMAIL', (string) config('mail.from.address'));
-        $replyTo = trim((string) env('SENDGRID_INBOUND_REPLY_TO', ''));
+        $replyTo = \App\Services\CrmReplyToResolver::resolve();
         if ($replyTo === '') {
             $replyTo = 'crm@reply.maccento.ca';
         }

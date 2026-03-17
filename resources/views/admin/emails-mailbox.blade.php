@@ -72,7 +72,7 @@
                   </td>
                 </tr>
                 @empty
-                <tr><td colspan="5" class="panel-muted">No inbound emails yet. Configure SendGrid inbound parse to populate Inbox.</td></tr>
+                <tr><td colspan="5" class="panel-muted">No inbound emails yet. Configure inbound mailbox sync to populate Inbox.</td></tr>
                 @endforelse
               </tbody>
               @elseif($activeFolder === 'drafts')

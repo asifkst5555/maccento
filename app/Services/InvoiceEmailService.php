@@ -149,7 +149,7 @@ class InvoiceEmailService
             return false;
         }
 
-        $replyTo = trim((string) env('SENDGRID_INBOUND_REPLY_TO', (string) config('mail.from.address')));
+        $replyTo = \App\Services\CrmReplyToResolver::resolve();
         $preview = Str::limit(implode(' ', $bodyLines), 700);
 
         $emailLog = $this->createEmailLog([
