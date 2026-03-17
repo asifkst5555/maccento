@@ -1274,6 +1274,7 @@ class DashboardController extends Controller
 
         return view('admin.api-integrations', [
             'settings' => $this->buildApiDisplaySettings(),
+            'rawSettings' => $this->resolveApiIntegrationSettings(),
         ]);
     }
 
