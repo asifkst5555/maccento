@@ -25,7 +25,7 @@ class Kernel extends ConsoleKernel
         $schedule->command('system:prune-data')
             ->weeklyOn(1, '03:00');
         $schedule->command('inbound:pull')
-            ->everyFiveMinutes();
+            ->everyMinute();
     }
 
     /**
