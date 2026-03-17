@@ -46,6 +46,8 @@ return [
             'This CRM combines lead capture, quote pipeline, invoicing, project tracking, media delivery, notifications, and client portal workflows.',
             'Lead sources include website AI chat, package builder, and website contact forms.',
             'Once deals progress, work moves into projects, invoices, and client communication timelines.',
+            'Email Center supports outbound SMTP and inbound mailbox sync for replies.',
+            'Automation settings control AI-generated welcome emails per lead source.',
         ],
         'workflow_facts' => [
             'Lead statuses include new, qualified, contacted, won, lost, and nurturing.',
@@ -53,6 +55,7 @@ return [
             'Project statuses include accepted, shooting, editing, and complete.',
             'Invoice statuses include draft, sent, partial, paid, and overdue.',
             'Client service request statuses include new, accepted, in_progress, completed, and closed.',
+            'Follow-ups track pending reminders tied to leads, clients, or projects.',
         ],
         'payment_and_delivery_rules' => [
             'Client project downloads are locked until the project has a paid invoice.',
@@ -65,6 +68,7 @@ return [
             'Email Center includes inbox, sent, drafts, compose, automation settings, and AI-assisted drafting.',
             'Drafts can be autosaved, edited, sent, and deleted from the mailbox workspace.',
             'Inbound replies can be mapped into client timelines and project threads.',
+            'Reply-to addresses should match the inbound mailbox so responses route back into CRM.',
         ],
         'client_management_rules' => [
             'Client workspaces bring together projects, invoices, requests, and message timelines.',
