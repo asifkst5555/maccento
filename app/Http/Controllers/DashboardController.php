@@ -7486,13 +7486,23 @@ public function userDeliveriesIndex(Request $request): View
 
     private function crmInboundReplyToAddress(): string
     {
-        $replyTo = trim((string) env('SENDGRID_INBOUND_REPLY_TO', ''));
+        if (Schema::hasTable('api_integration_settings') && Schema::hasColumn('api_integration_settings', 'inbound_mail_username')) {
+            $settings = ApiIntegrationSetting::query()->first();
+            if ($settings) {
+                $inboundUser = trim((string) ($settings->inbound_mail_username ?? ''));
+                if ($inboundUser !== '') {
+                    return $inboundUser;
+                }
+            }
+        }
 
+        $replyTo = trim((string) env('SENDGRID_INBOUND_REPLY_TO', ''));
         if ($replyTo !== '') {
             return $replyTo;
         }
 
-        return 'crm@reply.maccento.ca';
+        $fallback = trim((string) env('MAIL_FROM_ADDRESS', ''));
+        return $fallback !== '' ? $fallback : 'crm@reply.maccento.ca';
     }
 
     /**
