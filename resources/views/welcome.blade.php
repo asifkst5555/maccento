@@ -1146,7 +1146,7 @@
         </div>
         <div style="display:flex; gap:8px; align-items:center;">
           <button class="site-chat-send" type="button" data-chat-reset>Clear</button>
-          <button class="site-chat-close" type="button" data-chat-close aria-label="Close chat">?</button>
+          <button class="site-chat-close" type="button" data-chat-close aria-label="Close chat">&times;</button>
         </div>
       </div>
       <div class="site-chat-log" data-chat-log></div>
