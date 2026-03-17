@@ -58,4 +58,43 @@ class ChatSessionController extends Controller
             'status' => $conversation->status,
         ]);
     }
+
+    public function reset(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'channel' => ['nullable', 'string', 'max:30'],
+            'visitor_id' => ['nullable', 'string', 'max:100'],
+            'language' => ['nullable', 'in:en,fr'],
+            'conversation_id' => ['nullable', 'string', 'max:100'],
+        ]);
+
+        if (!empty($validated['conversation_id'])) {
+            Conversation::query()
+                ->whereKey($validated['conversation_id'])
+                ->update([
+                    'status' => 'closed',
+                    'closed_at' => now(),
+                ]);
+        }
+
+        $conversation = Conversation::create([
+            'channel' => $validated['channel'] ?? 'web',
+            'visitor_id' => $validated['visitor_id'] ?? null,
+            'status' => 'active',
+            'started_at' => now(),
+            'last_message_at' => now(),
+            'metadata' => [
+                'ip' => $request->ip(),
+                'user_id' => $request->user()?->id,
+                'language' => $validated['language'] ?? 'en',
+                'reset' => true,
+            ],
+        ]);
+
+        return response()->json([
+            'ok' => true,
+            'conversation_id' => $conversation->id,
+            'status' => $conversation->status,
+        ], 201);
+    }
 }

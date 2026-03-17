@@ -1144,7 +1144,10 @@
           <h2 class="site-chat-title">Maccento AI Assistant</h2>
           <p class="site-chat-sub">Ask about services, pricing ranges, and booking.</p>
         </div>
-        <button class="site-chat-close" type="button" data-chat-close aria-label="Close chat">×</button>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <button class="site-chat-send" type="button" data-chat-reset>New Chat</button>
+          <button class="site-chat-close" type="button" data-chat-close aria-label="Close chat">?</button>
+        </div>
       </div>
       <div class="site-chat-log" data-chat-log></div>
       <form class="site-chat-form" data-chat-form>
@@ -1180,6 +1183,7 @@
         const chatToggle = document.querySelector('[data-chat-toggle]');
         const chatPanel = document.querySelector('[data-chat-panel]');
         const chatClose = document.querySelector('[data-chat-close]');
+        const chatReset = document.querySelector('[data-chat-reset]');
         const chatLog = document.querySelector('[data-chat-log]');
         const chatForm = document.querySelector('[data-chat-form]');
         const chatInput = document.querySelector('[data-chat-input]');
@@ -1406,6 +1410,29 @@
           await createSession();
         };
 
+        const resetSession = async () => {
+          const visitorId = localStorage.getItem('maccento_chat_visitor') || `visitor-${Date.now().toString(36)}`;
+          localStorage.setItem('maccento_chat_visitor', visitorId);
+
+          const response = await fetch('/api/chat/reset', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify({
+              channel: 'website_widget',
+              visitor_id: visitorId,
+              language: getCurrentLanguage(),
+              conversation_id: conversationId || null,
+            }),
+          });
+
+          if (!response.ok) throw new Error('Could not reset chat session.');
+          const data = await response.json();
+          conversationId = String(data.conversation_id || '');
+          localStorage.setItem(storageKey, conversationId);
+          chatLog.innerHTML = '';
+          appendMessage('bot', chatT('greeting'));
+        };
+
         const sendMessage = async (text) => {
           setLoading(true);
           const thinkingMessage = appendThinking();
@@ -1460,6 +1487,16 @@
           chatClose.addEventListener('click', () => {
             chatPanel.classList.remove('is-open');
             chatToggle.setAttribute('aria-expanded', 'false');
+          });
+        }
+
+        if (chatReset) {
+          chatReset.addEventListener('click', async () => {
+            try {
+              await resetSession();
+            } catch (error) {
+              appendMessage('system', chatT('connectError'));
+            }
           });
         }
 

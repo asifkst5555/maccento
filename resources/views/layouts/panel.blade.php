@@ -2044,6 +2044,7 @@
         data-admin-assistant
         data-session-url="{{ route('admin.assistant.session') }}"
         data-message-url="{{ route('admin.assistant.message') }}"
+        data-reset-url="{{ route('admin.assistant.reset') }}"
         data-csrf="{{ csrf_token() }}"
         hidden
       >
@@ -2058,7 +2059,10 @@
               <p class="panel-assistant-sub">Workflow guidance, CRM navigation, and operational answers for internal staff.</p>
             </div>
           </div>
-          <button class="panel-assistant-close" type="button" aria-label="Close assistant" data-admin-assistant-close>&times;</button>
+          <div style="display:flex; gap:8px; align-items:center;">
+            <button class="panel-btn" type="button" data-admin-assistant-reset>New Chat</button>
+            <button class="panel-assistant-close" type="button" aria-label="Close assistant" data-admin-assistant-close>&times;</button>
+          </div>
         </div>
 
         <div class="panel-assistant-body" data-admin-assistant-body>
@@ -2526,6 +2530,7 @@
       const assistantPanel = document.querySelector('[data-admin-assistant]');
       if (assistantLaunch && assistantPanel) {
         const assistantClose = assistantPanel.querySelector('[data-admin-assistant-close]');
+        const assistantReset = assistantPanel.querySelector('[data-admin-assistant-reset]');
         const assistantBody = assistantPanel.querySelector('[data-admin-assistant-body]');
         const assistantMessages = assistantPanel.querySelector('[data-admin-assistant-messages]');
         const assistantForm = assistantPanel.querySelector('[data-admin-assistant-form]');
@@ -2534,6 +2539,7 @@
         const assistantStatus = assistantPanel.querySelector('[data-admin-assistant-status]');
         const sessionUrl = assistantPanel.getAttribute('data-session-url') || '';
         const messageUrl = assistantPanel.getAttribute('data-message-url') || '';
+        const resetUrl = assistantPanel.getAttribute('data-reset-url') || '';
         const csrfToken = assistantPanel.getAttribute('data-csrf') || '';
         let conversationId = '';
         let sessionLoaded = false;
@@ -2641,6 +2647,12 @@
         if (assistantClose) {
           assistantClose.addEventListener('click', function () {
             setAssistantOpen(false);
+          });
+        }
+
+        if (assistantReset) {
+          assistantReset.addEventListener('click', function () {
+            resetAssistantSession();
           });
         }
 
@@ -2814,6 +2826,34 @@
           if (code === 'cad') return 'flag-cad';
           if (code === 'sgd') return 'flag-sgd';
           return '';
+        };
+
+        const resetAssistantSession = async function () {
+          if (resetUrl === '') return;
+          setAssistantBusy(true, 'Resetting...');
+          try {
+            const response = await fetch(resetUrl, {
+              method: 'POST',
+              headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': csrfToken,
+                'X-Requested-With': 'XMLHttpRequest'
+              },
+              credentials: 'same-origin',
+              body: JSON.stringify({})
+            });
+            const data = await response.json();
+            if (!response.ok || !data.ok) {
+              throw new Error('Assistant reset failed.');
+            }
+            conversationId = String(data.conversation_id || '');
+            renderAssistantMessages(Array.isArray(data.messages) ? data.messages : []);
+            sessionLoaded = true;
+            setAssistantBusy(false, '');
+          } catch (error) {
+            setAssistantBusy(false, 'Reset failed');
+          }
         };
 
         const closeAll = (except) => {

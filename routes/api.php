@@ -25,6 +25,7 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 });
 
 Route::post('/chat/session', [ChatSessionController::class, 'store']);
+Route::post('/chat/reset', [ChatSessionController::class, 'reset']);
 Route::post('/chat/close/{conversation}', [ChatSessionController::class, 'close']);
 Route::post('/chat/message/{conversation}', [ChatMessageController::class, 'store']);
 Route::get('/chat/history/{conversation}', [ChatHistoryController::class, 'show']);

@@ -42,6 +42,7 @@ Route::middleware('auth')->group(function (): void {
         Route::get('/admin/dashboard', [DashboardController::class, 'adminDashboard'])->name('admin.dashboard');
         Route::get('/admin/assistant/session', [AdminAssistantController::class, 'session'])->name('admin.assistant.session');
         Route::post('/admin/assistant/message', [AdminAssistantController::class, 'message'])->name('admin.assistant.message');
+        Route::post('/admin/assistant/reset', [AdminAssistantController::class, 'reset'])->name('admin.assistant.reset');
         Route::get('/admin/projects', [DashboardController::class, 'adminProjectsIndex'])->name('admin.projects.index');
         Route::get('/admin/projects/{project}/workspace', [DashboardController::class, 'adminProjectWorkspace'])->name('admin.projects.workspace');
         Route::get('/admin/projects/{project}/calendar.ics', [DashboardController::class, 'adminProjectCalendarIcs'])->name('admin.projects.calendar');

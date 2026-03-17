@@ -31,6 +31,24 @@ class AdminAssistantController extends Controller
         ]);
     }
 
+    public function reset(Request $request): JsonResponse
+    {
+        $conversation = $this->assistantService->resetSession($request->user());
+
+        return response()->json([
+            'ok' => true,
+            'conversation_id' => (string) $conversation->id,
+            'messages' => $this->assistantService->recentMessages($conversation)->map(static function ($message): array {
+                return [
+                    'id' => $message->id,
+                    'role' => $message->role,
+                    'content' => (string) $message->content,
+                    'created_at' => $message->created_at?->toIso8601String(),
+                ];
+            })->values()->all(),
+        ]);
+    }
+
     public function message(Request $request): JsonResponse
     {
         $validated = $request->validate([

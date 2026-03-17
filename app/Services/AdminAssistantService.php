@@ -56,6 +56,29 @@ class AdminAssistantService
         return $conversation->fresh(['messages']);
     }
 
+    public function resetSession(User $user): Conversation
+    {
+        $conversation = $this->sessionForUser($user);
+
+        $conversation->messages()->delete();
+        $conversation->forceFill([
+            'status' => 'active',
+            'started_at' => now(),
+            'last_message_at' => now(),
+        ])->save();
+
+        $conversation->messages()->create([
+            'role' => 'assistant',
+            'content' => 'I can help with CRM workflows, invoices, clients, media delivery, leads, and email center. Ask a direct question and I will keep the answer practical.',
+            'metadata' => [
+                'type' => 'welcome',
+                'reset' => true,
+            ],
+        ]);
+
+        return $conversation->fresh(['messages']);
+    }
+
     public function recentMessages(Conversation $conversation, int $limit = 14): Collection
     {
         return $conversation->messages()
