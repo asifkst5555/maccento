@@ -2636,6 +2636,34 @@
           }
         };
 
+        const resetAssistantSession = async function () {
+          if (resetUrl === '') return;
+          setAssistantBusy(true, 'Resetting...');
+          try {
+            const response = await fetch(resetUrl, {
+              method: 'POST',
+              headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': csrfToken,
+                'X-Requested-With': 'XMLHttpRequest'
+              },
+              credentials: 'same-origin',
+              body: JSON.stringify({})
+            });
+            const data = await response.json();
+            if (!response.ok || !data.ok) {
+              throw new Error('Assistant reset failed.');
+            }
+            conversationId = String(data.conversation_id || '');
+            renderAssistantMessages(Array.isArray(data.messages) ? data.messages : []);
+            sessionLoaded = true;
+            setAssistantBusy(false, '');
+          } catch (error) {
+            setAssistantBusy(false, 'Reset failed');
+          }
+        };
+
         assistantLaunch.addEventListener('click', function () {
           const open = !assistantPanel.classList.contains('is-open');
           setAssistantOpen(open);
@@ -2826,34 +2854,6 @@
           if (code === 'cad') return 'flag-cad';
           if (code === 'sgd') return 'flag-sgd';
           return '';
-        };
-
-        const resetAssistantSession = async function () {
-          if (resetUrl === '') return;
-          setAssistantBusy(true, 'Resetting...');
-          try {
-            const response = await fetch(resetUrl, {
-              method: 'POST',
-              headers: {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': csrfToken,
-                'X-Requested-With': 'XMLHttpRequest'
-              },
-              credentials: 'same-origin',
-              body: JSON.stringify({})
-            });
-            const data = await response.json();
-            if (!response.ok || !data.ok) {
-              throw new Error('Assistant reset failed.');
-            }
-            conversationId = String(data.conversation_id || '');
-            renderAssistantMessages(Array.isArray(data.messages) ? data.messages : []);
-            sessionLoaded = true;
-            setAssistantBusy(false, '');
-          } catch (error) {
-            setAssistantBusy(false, 'Reset failed');
-          }
         };
 
         const closeAll = (except) => {
