@@ -110,6 +110,35 @@
 
     <aside class="automation-side panel-stack">
       <section class="panel-card automation-ops-card">
+        <p class="automation-eyebrow">Diagnostics</p>
+        <h3 class="automation-ops-card__title">Recent Automation Activity</h3>
+        <p class="automation-ops-card__desc">Last 15 welcome email attempts across all sources.</p>
+        <div class="automation-output" style="max-height: 240px; overflow: auto;">
+          @forelse($recentAutomationEvents as $event)
+            @php
+              $source = (string) data_get($event->payload, 'source', 'unknown');
+              $email = (string) ($event->leadProfile?->email ?? data_get($event->payload, 'email', ''));
+              $status = $event->event_type === 'welcome_email_failed' ? 'FAILED' : 'SENT';
+              $error = (string) data_get($event->payload, 'error', '');
+            @endphp
+            <div style="padding: 8px 0; border-bottom: 1px solid rgba(15, 23, 42, 0.08);">
+              <div style="display:flex; justify-content: space-between; gap: 8px;">
+                <strong>{{ $status }}</strong>
+                <span class="panel-muted">{{ $event->created_at?->format('Y-m-d H:i') ?? '-' }}</span>
+              </div>
+              <div class="panel-muted">Source: {{ $source }}</div>
+              <div class="panel-muted">Email: {{ $email !== '' ? $email : '-' }}</div>
+              @if($error !== '')
+                <div class="panel-muted">Error: {{ \Illuminate\Support\Str::limit($error, 120) }}</div>
+              @endif
+            </div>
+          @empty
+            <p class="panel-muted" style="margin: 0;">No automation events yet.</p>
+          @endforelse
+        </div>
+      </section>
+
+      <section class="panel-card automation-ops-card">
         <p class="automation-eyebrow">Operations</p>
         <h3 class="automation-ops-card__title">One-time Historical Backfill</h3>
         <p class="automation-ops-card__desc">Process historical leads with email that missed the welcome workflow. Start with dry run to inspect impact before live send.</p>

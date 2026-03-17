@@ -1499,6 +1499,12 @@ class DashboardController extends Controller
 
         return view('admin.emails-automation', [
             'sourceSettings' => $sourceSettings,
+            'recentAutomationEvents' => LeadEvent::query()
+                ->with('leadProfile:id,email,name')
+                ->whereIn('event_type', ['welcome_email_sent', 'welcome_email_failed'])
+                ->latest('id')
+                ->limit(15)
+                ->get(),
         ]);
     }
 
