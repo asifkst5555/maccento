@@ -39,35 +39,24 @@ class BrandedNotificationMail extends Mailable
         return $this->outboundAttachmentMeta;
     }
 
-    public function buildViewData(): array
-    {
-        $data = [
-            'subjectLine' => $this->subjectLine,
-            'heading' => $this->heading,
-            'intro' => $this->intro,
-            'bodyLines' => $this->bodyLines,
-            'ctaLabel' => $this->ctaLabel,
-            'ctaUrl' => $this->ctaUrl,
-            'footerNote' => $this->footerNote,
-            'brandName' => (string) config('app.name', 'Maccento'),
-            'brandLogoUrl' => $this->resolveBrandLogoUrl(),
-        ];
-
-        $inlineLogo = $this->resolveBrandLogoPath();
-        if ($inlineLogo !== null && is_file($inlineLogo)) {
-            $data['brandLogoUrl'] = $this->embedFromPath($inlineLogo);
-        }
-
-        return $data;
-    }
-
     public function build(): self
     {
         $mail = $this
             ->subject($this->subjectLine)
             ->view('emails.branded-notification')
             ->text('emails.branded-notification-text')
-            ->with($this->buildViewData());
+            ->with([
+                'subjectLine' => $this->subjectLine,
+                'heading' => $this->heading,
+                'intro' => $this->intro,
+                'bodyLines' => $this->bodyLines,
+                'ctaLabel' => $this->ctaLabel,
+                'ctaUrl' => $this->ctaUrl,
+                'footerNote' => $this->footerNote,
+                'brandName' => (string) config('app.name', 'Maccento'),
+                'brandLogoUrl' => $this->resolveBrandLogoUrl(),
+                'brandLogoPath' => $this->resolveBrandLogoPath(),
+            ]);
 
         if ($this->replyToAddress !== null && trim($this->replyToAddress) !== '') {
             $mail->replyTo($this->replyToAddress);
