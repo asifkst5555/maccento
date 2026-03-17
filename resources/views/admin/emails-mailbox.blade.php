@@ -283,7 +283,7 @@
       </div>
       </section>
 
-      <form id="composeForm" method="post" action="{{ route('admin.emails.send') }}" enctype="multipart/form-data" class="panel-stack crm-compose-form">
+      <form id="composeForm" method="post" action="{{ route('admin.emails.send') }}" enctype="multipart/form-data" class="panel-stack crm-compose-form" data-app-confirm="1" data-confirm-message="Send this email now?">
         @csrf
         <input type="hidden" name="mode" value="custom">
         <input id="composeDraftId" type="hidden" name="draft_id" value="{{ $compose['draft_id'] }}">
@@ -350,7 +350,7 @@
 
         <div class="panel-form-row" style="justify-content:space-between; align-items:center;">
           <div class="crm-compose-actions">
-            <button id="manualSaveDraftBtn" class="panel-btn crm-btn-icon" formaction="{{ route('admin.emails.drafts.save') }}" formmethod="post" type="submit"><span class="crm-ui-icon"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 4h10l2 2v10H4V4zm2 0v4h8V5.2L12.8 4H6zm1 9h6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></span>Save Draft</button>
+            <button id="manualSaveDraftBtn" class="panel-btn crm-btn-icon" formaction="{{ route('admin.emails.drafts.save') }}" formmethod="post" type="submit" data-confirm-skip="1"><span class="crm-ui-icon"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 4h10l2 2v10H4V4zm2 0v4h8V5.2L12.8 4H6zm1 9h6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></span>Save Draft</button>
             <button class="panel-btn panel-btn-primary crm-btn-icon" type="submit"><span class="crm-ui-icon"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 10l13-6-3.4 12-3.1-4.1L6 14l-3-4z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></span>Send Email</button>
             @if((int) ($compose['draft_id'] ?? 0) > 0)
             <button class="panel-btn panel-btn-danger panel-btn-icon crm-btn-icon" type="submit" form="draftDeleteForm" title="Delete draft" aria-label="Delete draft"><span class="crm-ui-icon"><x-panel-icon name="trash" /></span></button>
@@ -595,6 +595,9 @@
 
   confirmForms.forEach((form) => {
     form.addEventListener('submit', (event) => {
+      if (event.submitter && event.submitter.hasAttribute('data-confirm-skip')) {
+        return;
+      }
       if (form.dataset.confirmed === '1') {
         delete form.dataset.confirmed;
         return;
