@@ -39,23 +39,35 @@ class BrandedNotificationMail extends Mailable
         return $this->outboundAttachmentMeta;
     }
 
+    public function buildViewData(): array
+    {
+        $data = [
+            'subjectLine' => $this->subjectLine,
+            'heading' => $this->heading,
+            'intro' => $this->intro,
+            'bodyLines' => $this->bodyLines,
+            'ctaLabel' => $this->ctaLabel,
+            'ctaUrl' => $this->ctaUrl,
+            'footerNote' => $this->footerNote,
+            'brandName' => (string) config('app.name', 'Maccento'),
+            'brandLogoUrl' => $this->resolveBrandLogoUrl(),
+        ];
+
+        $inlineLogo = $this->resolveBrandLogoPath();
+        if ($inlineLogo !== null && is_file($inlineLogo)) {
+            $data['brandLogoUrl'] = $this->embedFromPath($inlineLogo);
+        }
+
+        return $data;
+    }
+
     public function build(): self
     {
         $mail = $this
             ->subject($this->subjectLine)
             ->view('emails.branded-notification')
             ->text('emails.branded-notification-text')
-            ->with([
-                'subjectLine' => $this->subjectLine,
-                'heading' => $this->heading,
-                'intro' => $this->intro,
-                'bodyLines' => $this->bodyLines,
-                'ctaLabel' => $this->ctaLabel,
-                'ctaUrl' => $this->ctaUrl,
-                'footerNote' => $this->footerNote,
-                'brandName' => (string) config('app.name', 'Maccento'),
-                'brandLogoUrl' => $this->resolveBrandLogoUrl(),
-            ]);
+            ->with($this->buildViewData());
 
         if ($this->replyToAddress !== null && trim($this->replyToAddress) !== '') {
             $mail->replyTo($this->replyToAddress);
@@ -107,6 +119,12 @@ class BrandedNotificationMail extends Mailable
         }
 
         return rtrim($baseUrl, '/') . '/assets/media/logo-footer.png';
+    }
+
+    private function resolveBrandLogoPath(): ?string
+    {
+        $publicPath = public_path('assets/media/logo-footer.png');
+        return is_file($publicPath) ? $publicPath : null;
     }
 
     private function isLocalUrl(string $url): bool
