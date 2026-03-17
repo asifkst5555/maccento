@@ -1145,7 +1145,7 @@
           <p class="site-chat-sub">Ask about services, pricing ranges, and booking.</p>
         </div>
         <div style="display:flex; gap:8px; align-items:center;">
-          <button class="site-chat-send" type="button" data-chat-reset>New Chat</button>
+          <button class="site-chat-send" type="button" data-chat-reset>Clear</button>
           <button class="site-chat-close" type="button" data-chat-close aria-label="Close chat">?</button>
         </div>
       </div>

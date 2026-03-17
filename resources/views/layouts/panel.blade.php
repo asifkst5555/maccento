@@ -2060,7 +2060,7 @@
             </div>
           </div>
           <div style="display:flex; gap:8px; align-items:center;">
-            <button class="panel-btn" type="button" data-admin-assistant-reset>New Chat</button>
+            <button class="panel-btn" type="button" data-admin-assistant-reset>Clear</button>
             <button class="panel-assistant-close" type="button" aria-label="Close assistant" data-admin-assistant-close>&times;</button>
           </div>
         </div>
