@@ -129,7 +129,7 @@ class PullInboundEmails extends Command
         return $stats['failed'] > 0 ? self::FAILURE : self::SUCCESS;
     }
 
-    private function isEnabled(): bool
+    public function isEnabled(): bool
     {
         $envEnabled = filter_var(env('INBOUND_MAIL_ENABLED', true), FILTER_VALIDATE_BOOLEAN);
 
