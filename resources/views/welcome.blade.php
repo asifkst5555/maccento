@@ -894,14 +894,19 @@
       <div class="container">
         <h2 class="section-title">Trusted by Leading Brands Worldwide</h2>
         @php
-            $logoDir = storage_path('app/assets/media/company_logo');
+            $logoDirs = [
+                public_path('assets/media/company_logo'),
+                storage_path('app/assets/media/company_logo'),
+            ];
             $logos = [];
-            if (is_dir($logoDir)) {
-                $files = scandir($logoDir);
-                foreach ($files as $file) {
-                    $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
-                    if (in_array($ext, ['webp', 'png', 'jpg', 'jpeg', 'gif', 'svg'])) {
-                        $logos[] = $file;
+            foreach ($logoDirs as $dir) {
+                if (is_dir($dir)) {
+                    $files = scandir($dir);
+                    foreach ($files as $file) {
+                        $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
+                        if (in_array($ext, ['webp', 'png', 'jpg', 'jpeg', 'gif', 'svg'])) {
+                            $logos[] = $file;
+                        }
                     }
                 }
             }
