@@ -7,13 +7,21 @@
   <link rel="icon" type="image/x-icon" href="{{ asset('assets/media/favicon.ico') }}">
   <link rel="stylesheet" href="{{ asset('assets/css/site.css') }}?v={{ @filemtime(public_path('assets/css/site.css')) ?: time() }}">
   <style>
+    .brand-strip .brand-track{
+      overflow:hidden;
+      width:100%;
+      mask-image:linear-gradient(to right,transparent 0,#000 6%,#000 94%,transparent 100%);
+      -webkit-mask-image:linear-gradient(to right,transparent 0,#000 6%,#000 94%,transparent 100%);
+    }
     .brand-strip .brand-grid{
       display:flex;
       flex-wrap:nowrap;
       align-items:center;
-      justify-content:center;
       gap:36px;
       padding:24px 0;
+      width:max-content;
+      animation:brand-scroll 30s linear infinite;
+      will-change:transform;
     }
     .brand-strip .brand-logo{
       flex:0 0 auto;
@@ -30,6 +38,10 @@
       height:auto;
       display:block;
       object-fit:contain;
+    }
+    @keyframes brand-scroll{
+      0%{transform:translateX(0)}
+      100%{transform:translateX(-50%)}
     }
     @media (max-width:900px){
       .brand-strip .brand-grid{gap:28px;}
@@ -915,10 +927,15 @@
         @endphp
 
         @if(count($logos) > 0)
-            <div class="brand-grid" aria-label="Partner logos">
-                @foreach($logos as $logo)
-                    <div class="brand-logo"><img loading="lazy" decoding="async" src="{{ asset('assets/media/company_logo/' . $logo) }}" alt="Partner logo"></div>
-                @endforeach
+            <div class="brand-track" aria-label="Partner logos">
+                <div class="brand-grid">
+                    @foreach($logos as $logo)
+                        <div class="brand-logo"><img loading="lazy" decoding="async" src="{{ asset('assets/media/company_logo/' . $logo) }}" alt="Partner logo"></div>
+                    @endforeach
+                    @foreach($logos as $logo)
+                        <div class="brand-logo"><img loading="lazy" decoding="async" src="{{ asset('assets/media/company_logo/' . $logo) }}" alt="Partner logo"></div>
+                    @endforeach
+                </div>
             </div>
         @else
             <p class="muted">No partner logos uploaded yet.</p>
