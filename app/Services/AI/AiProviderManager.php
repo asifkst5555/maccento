@@ -4,6 +4,7 @@ namespace App\Services\AI;
 
 use App\Services\AI\Providers\AiProvider;
 use App\Services\AI\Providers\GeminiProvider;
+use App\Services\AI\Providers\GroqProvider;
 use App\Services\AI\Providers\OpenAiProvider;
 use App\Services\AI\Providers\OpenRouterProvider;
 use App\Services\AI\Providers\StubAiProvider;
@@ -23,6 +24,10 @@ class AiProviderManager
             return $this->openAiOrStub();
         }
 
+        if ($provider === 'groq') {
+            return $this->groqOrStub();
+        }
+
         if ($provider === 'gemini') {
             return $this->geminiOrStub();
         }
@@ -31,9 +36,12 @@ class AiProviderManager
             return new StubAiProvider();
         }
 
-        // Auto mode (default): prefer OpenRouter, then OpenAI, then Gemini.
+        // Auto mode (default): prefer OpenRouter, then Groq, then OpenAI, then Gemini.
         if (filled(config('ai.openrouter.api_key'))) {
             return $this->openRouterOrStub();
+        }
+        if (filled(config('ai.groq.api_key'))) {
+            return $this->groqOrStub();
         }
         if (filled(config('ai.openai.api_key'))) {
             return $this->openAiOrStub();
@@ -59,6 +67,20 @@ class AiProviderManager
             (string) config('ai.openrouter.api_key'),
             (string) config('ai.openrouter.base_url', 'https://openrouter.ai/api/v1'),
             (int) config('ai.openrouter.timeout', 20),
+        );
+    }
+
+    private function groqOrStub(): AiProvider
+    {
+        if (!filled(config('ai.groq.api_key'))) {
+            Log::warning('AI provider groq requested but GROQ_API_KEY is missing. Falling back to stub.');
+            return new StubAiProvider();
+        }
+
+        return new GroqProvider(
+            (string) config('ai.groq.api_key'),
+            (string) config('ai.groq.base_url', 'https://api.groq.com/openai/v1'),
+            (int) config('ai.groq.timeout', 20),
         );
     }
 

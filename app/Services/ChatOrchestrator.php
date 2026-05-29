@@ -85,6 +85,8 @@ class ChatOrchestrator
             ], 'ai_chat_lead', $conversation) ?? $lead;
         }
 
+        $isCasual = $this->isCasualConversation($content);
+
         $lastAssistant = $conversation->messages()
             ->where('role', 'assistant')
             ->latest('id')
@@ -149,7 +151,9 @@ class ChatOrchestrator
             ? $this->buildPackageGuidance($packageDraft, $packageQuote, $lead, $missingFields, $assistantLanguage)
             : ($missingFields === []
                 ? $this->buildSummaryRequest($lead, $assistantLanguage)
-                : $this->followUpQuestion($missingFields[0], $lead, $assistantLanguage));
+                : ($isCasual
+                    ? $this->greetingResponse($assistantLanguage)
+                    : $this->followUpQuestion($missingFields[0], $lead, $assistantLanguage)));
 
         $provider = $this->aiProviderManager->provider();
         $durationMs = 0;
@@ -184,9 +188,9 @@ class ChatOrchestrator
             $assistantResponseText = $baseAssistantText;
         }
 
-        // Enforce strict one-question flow while required fields are still missing.
-        // This prevents LLM responses that ask multiple questions in a single message.
-        if ($missingFields !== []) {
+        // Enforce strict one-question flow while required fields are still missing,
+        // but allow casual conversation (greetings, how-are-you) to pass through naturally.
+        if ($missingFields !== [] && !$isCasual) {
             $assistantResponseText = $baseAssistantText;
         }
 
@@ -210,6 +214,50 @@ class ChatOrchestrator
             'completed' => false,
             'missing_fields' => $missingFields,
         ];
+    }
+
+    private function isCasualConversation(string $content): bool
+    {
+        $lower = mb_strtolower(trim($content));
+
+        if (strlen($lower) > 120) {
+            return false;
+        }
+
+        $greetingExact = [
+            'hi', 'hello', 'hey', 'howdy', 'hi there', 'hello there', 'hey there',
+            'good morning', 'good afternoon', 'good evening',
+            'bonjour', 'salut', 'bonsoir',
+        ];
+        foreach ($greetingExact as $phrase) {
+            if ($lower === $phrase || str_starts_with($lower, $phrase . ' ')) {
+                return true;
+            }
+        }
+
+        $casualKeywords = [
+            'how are you', 'how do you do', 'how\'s it going', 'how are you doing',
+            'what\'s up', 'sup', 'wassup', 'whassup', 'whats up',
+            'tell me about yourself', 'who are you', 'what is your name',
+            'what\'s your name', 'whats your name', 'your name',
+            'what can you do', 'how can you help', 'tell me first',
+            'answer me', 'just answer', 'i asked',
+        ];
+        foreach ($casualKeywords as $keyword) {
+            if (str_contains($lower, $keyword)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function greetingResponse(string $language = 'en'): string
+    {
+        if ($language === 'fr') {
+            return 'Bonjour! Je suis l\'assistant Maccento. Je peux vous aider avec nos services de photo, video, drone, home staging virtuel, et plus pour vos proprietes. Comment puis-je vous aider aujourd\'hui?';
+        }
+        return 'Hi there! I\'m the Maccento assistant. I can help you with photography, video, drone, virtual staging, and more for your property listings. How can I help you today?';
     }
 
     private function mergeLeadData(LeadProfile $lead, array $extracted): void
@@ -237,12 +285,6 @@ class ChatOrchestrator
     private function missingFields(LeadProfile $lead, bool $packageMode = false): array
     {
         $missing = [];
-        if (blank($lead->name)) {
-            $missing[] = 'name';
-        }
-        if (blank($lead->email)) {
-            $missing[] = 'email';
-        }
         if (blank($lead->service_type)) {
             $missing[] = 'service_type';
         }
@@ -251,6 +293,22 @@ class ChatOrchestrator
         }
         if (!$packageMode && blank($lead->timeline)) {
             $missing[] = 'timeline';
+        }
+
+        return $missing;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function missingContactFields(LeadProfile $lead): array
+    {
+        $missing = [];
+        if (blank($lead->name)) {
+            $missing[] = 'name';
+        }
+        if (blank($lead->email)) {
+            $missing[] = 'email';
         }
 
         return $missing;
@@ -281,7 +339,7 @@ class ChatOrchestrator
     private function followUpQuestion(string $field, LeadProfile $lead, string $language = 'en'): string
     {
         $fr = [
-            'name' => 'Puis-je avoir votre nom complet pour preparer votre demande?',
+            'name' => 'Puis-je avoir votre nom pour preparer votre demande?',
             'email' => 'Pouvez-vous partager votre email pour que nous puissions vous envoyer la confirmation?',
             'service_type' => 'De quel service avez-vous besoin: photo, drone, home staging virtuel, ou video walkthrough?',
             'location' => 'Quelle est l\'adresse ou la zone de la propriete?',
@@ -290,7 +348,7 @@ class ChatOrchestrator
         ];
 
         $en = [
-            'name' => 'Can I have your full name so I can prepare your request?',
+            'name' => 'Can I have your name so I can prepare your request?',
             'email' => 'Could you share your email so we can send your confirmation and next steps?',
             'service_type' => 'Which service do you need: photography, drone, virtual staging, or video walkthrough?',
             'location' => 'What is the property location?',
@@ -311,6 +369,11 @@ class ChatOrchestrator
 
     private function buildSummaryRequest(LeadProfile $lead, string $language = 'en'): string
     {
+        $contactMissing = $this->missingContactFields($lead);
+        if ($contactMissing !== []) {
+            return $this->followUpQuestion($contactMissing[0], $lead, $language);
+        }
+
         $contact = $lead->email ?: $lead->phone;
 
         if ($language === 'fr') {
@@ -386,8 +449,11 @@ class ChatOrchestrator
                 (string) ($packageQuote['currency'] ?? 'USD'),
             );
 
-            if ($missingFields !== []) {
-                $nextField = $missingFields[0];
+            $contactMissing = $this->missingContactFields($lead);
+            $allMissing = array_merge($missingFields, $contactMissing);
+
+            if ($allMissing !== []) {
+                $nextField = $allMissing[0];
                 $nextQuestion = $this->followUpQuestion($nextField, $lead, $language);
                 return $summary . ' ' . $nextQuestion;
             }

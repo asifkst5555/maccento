@@ -17,12 +17,21 @@ return [
         'timeout' => (int) env('OPENROUTER_TIMEOUT', 20),
     ],
 
+    'groq' => [
+        'api_key' => env('GROQ_API_KEY'),
+        'base_url' => env('GROQ_BASE_URL', 'https://api.groq.com/openai/v1'),
+        'model' => env('GROQ_MODEL', 'qwen/qwen3-32b'),
+        'timeout' => (int) env('GROQ_TIMEOUT', 20),
+    ],
+
     'gemini' => [
         'api_key' => env('GEMINI_API_KEY'),
         'base_url' => env('GEMINI_BASE_URL', 'https://generativelanguage.googleapis.com/v1beta'),
         'model' => env('GEMINI_MODEL', 'gemini-1.5-flash'),
         'timeout' => (int) env('GEMINI_TIMEOUT', 20),
     ],
+
+    'web_search_enabled' => env('AI_WEB_SEARCH_ENABLED', false),
 
     'limits' => [
         'max_turns' => (int) env('AI_MAX_TURNS', 20),

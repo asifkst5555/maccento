@@ -6,6 +6,41 @@
   <title>Maccento | Real Estate Media</title>
   <link rel="icon" type="image/x-icon" href="{{ asset('assets/media/favicon.ico') }}">
   <link rel="stylesheet" href="{{ asset('assets/css/site.css') }}?v={{ @filemtime(public_path('assets/css/site.css')) ?: time() }}">
+  <style>
+    .brand-strip .brand-grid{
+      display:flex;
+      flex-wrap:nowrap;
+      align-items:center;
+      justify-content:center;
+      gap:36px;
+      padding:24px 0;
+    }
+    .brand-strip .brand-logo{
+      flex:0 0 auto;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      width:150px;
+      max-width:150px;
+    }
+    .brand-strip .brand-logo img{
+      max-width:100%;
+      max-height:80px;
+      width:auto;
+      height:auto;
+      display:block;
+      object-fit:contain;
+    }
+    @media (max-width:900px){
+      .brand-strip .brand-grid{gap:28px;}
+      .brand-strip .brand-logo{width:130px;max-width:130px;}
+    }
+    @media (max-width:600px){
+      .brand-strip .brand-grid{gap:20px;}
+      .brand-strip .brand-logo{width:110px;max-width:110px;}
+      .brand-strip .brand-logo img{max-height:60px;}
+    }
+  </style>
 </head>
 <body>
   @php
@@ -798,48 +833,44 @@
           <div class="testimonial-track" data-testimonial-track>
             <article class="testimonial-slide is-active" data-index="0">
               <div class="stars"><svg viewBox="0 0 110 20" width="90" height="16" aria-hidden="true"><g fill="currentColor"><path d="M10 1.5l2.6 5.3 5.8.8-4.2 4 1 5.7-5.2-2.8-5.2 2.8 1-5.7-4.2-4 5.8-.8L10 1.5z"/><path d="M32 1.5l2.6 5.3 5.8.8-4.2 4 1 5.7-5.2-2.8-5.2 2.8 1-5.7-4.2-4 5.8-.8L32 1.5z"/><path d="M54 1.5l2.6 5.3 5.8.8-4.2 4 1 5.7-5.2-2.8-5.2 2.8 1-5.7-4.2-4 5.8-.8L54 1.5z"/><path d="M76 1.5l2.6 5.3 5.8.8-4.2 4 1 5.7-5.2-2.8-5.2 2.8 1-5.7-4.2-4 5.8-.8L76 1.5z"/><path d="M98 1.5l2.6 5.3 5.8.8-4.2 4 1 5.7-5.2-2.8-5.2 2.8 1-5.7-4.2-4 5.8-.8L98 1.5z"/></g></svg></div>
-              <p class="testimonial-copy">Fast turnarounds and polished visuals that make every listing stand out.</p>
+              <p class="testimonial-copy">"Fantastic service — the photos looked incredible and were delivered extremely quickly."</p>
               <div class="testimonial-client">
-                <span class="client-logo" aria-hidden="true">GP</span>
+                <span class="client-logo" aria-hidden="true">J</span>
                 <div>
-                  <div class="name">Groupe Petra</div>
-                  <div class="client-role">Residential Brokerage</div>
+                  <div class="name">Joey</div>
                 </div>
               </div>
             </article>
 
             <article class="testimonial-slide" data-index="1">
               <div class="stars"><svg viewBox="0 0 110 20" width="90" height="16" aria-hidden="true"><g fill="currentColor"><path d="M10 1.5l2.6 5.3 5.8.8-4.2 4 1 5.7-5.2-2.8-5.2 2.8 1-5.7-4.2-4 5.8-.8L10 1.5z"/><path d="M32 1.5l2.6 5.3 5.8.8-4.2 4 1 5.7-5.2-2.8-5.2 2.8 1-5.7-4.2-4 5.8-.8L32 1.5z"/><path d="M54 1.5l2.6 5.3 5.8.8-4.2 4 1 5.7-5.2-2.8-5.2 2.8 1-5.7-4.2-4 5.8-.8L54 1.5z"/><path d="M76 1.5l2.6 5.3 5.8.8-4.2 4 1 5.7-5.2-2.8-5.2 2.8 1-5.7-4.2-4 5.8-.8L76 1.5z"/><path d="M98 1.5l2.6 5.3 5.8.8-4.2 4 1 5.7-5.2-2.8-5.2 2.8 1-5.7-4.2-4 5.8-.8L98 1.5z"/></g></svg></div>
-              <p class="testimonial-copy">Consistent quality across every shoot. Easy team to work with.</p>
+              <p class="testimonial-copy">"La vidéo a dépassé mes attentes, et le client était extrêmement satisfait du résultat. Je vais certainement refaire affaire avec Maccento bientôt."</p>
               <div class="testimonial-client">
-                <span class="client-logo" aria-hidden="true">GM</span>
+                <span class="client-logo" aria-hidden="true">G</span>
                 <div>
-                  <div class="name">Groupe Mach</div>
-                  <div class="client-role">Commercial Real Estate</div>
+                  <div class="name">Gabriel</div>
                 </div>
               </div>
             </article>
 
             <article class="testimonial-slide" data-index="2">
               <div class="stars"><svg viewBox="0 0 110 20" width="90" height="16" aria-hidden="true"><g fill="currentColor"><path d="M10 1.5l2.6 5.3 5.8.8-4.2 4 1 5.7-5.2-2.8-5.2 2.8 1-5.7-4.2-4 5.8-.8L10 1.5z"/><path d="M32 1.5l2.6 5.3 5.8.8-4.2 4 1 5.7-5.2-2.8-5.2 2.8 1-5.7-4.2-4 5.8-.8L32 1.5z"/><path d="M54 1.5l2.6 5.3 5.8.8-4.2 4 1 5.7-5.2-2.8-5.2 2.8 1-5.7-4.2-4 5.8-.8L54 1.5z"/><path d="M76 1.5l2.6 5.3 5.8.8-4.2 4 1 5.7-5.2-2.8-5.2 2.8 1-5.7-4.2-4 5.8-.8L76 1.5z"/><path d="M98 1.5l2.6 5.3 5.8.8-4.2 4 1 5.7-5.2-2.8-5.2 2.8 1-5.7-4.2-4 5.8-.8L98 1.5z"/></g></svg></div>
-              <p class="testimonial-copy">Video and drone assets that elevate our brand presentation.</p>
+              <p class="testimonial-copy">"The photos and video turned out even better than I expected. 10/10 service and quality."</p>
               <div class="testimonial-client">
-                <span class="client-logo" aria-hidden="true">BTB</span>
+                <span class="client-logo" aria-hidden="true">N</span>
                 <div>
-                  <div class="name">BTB</div>
-                  <div class="client-role">Property Marketing Team</div>
+                  <div class="name">Nicola</div>
                 </div>
               </div>
             </article>
 
             <article class="testimonial-slide" data-index="3">
               <div class="stars"><svg viewBox="0 0 110 20" width="90" height="16" aria-hidden="true"><g fill="currentColor"><path d="M10 1.5l2.6 5.3 5.8.8-4.2 4 1 5.7-5.2-2.8-5.2 2.8 1-5.7-4.2-4 5.8-.8L10 1.5z"/><path d="M32 1.5l2.6 5.3 5.8.8-4.2 4 1 5.7-5.2-2.8-5.2 2.8 1-5.7-4.2-4 5.8-.8L32 1.5z"/><path d="M54 1.5l2.6 5.3 5.8.8-4.2 4 1 5.7-5.2-2.8-5.2 2.8 1-5.7-4.2-4 5.8-.8L54 1.5z"/><path d="M76 1.5l2.6 5.3 5.8.8-4.2 4 1 5.7-5.2-2.8-5.2 2.8 1-5.7-4.2-4 5.8-.8L76 1.5z"/><path d="M98 1.5l2.6 5.3 5.8.8-4.2 4 1 5.7-5.2-2.8-5.2 2.8 1-5.7-4.2-4 5.8-.8L98 1.5z"/></g></svg></div>
-              <p class="testimonial-copy">Booking is simple, delivery is reliable, and results stay premium.</p>
+              <p class="testimonial-copy">"Service incroyable du début à la fin. La qualité des photos et vidéos a largement dépassé mes attentes, et le client était extrêmement satisfait du résultat final. Équipe professionnelle, rapide et attentive aux détails. Je vais définitivement refaire affaire avec Maccento bientôt."</p>
               <div class="testimonial-client">
-                <span class="client-logo" aria-hidden="true">TD</span>
+                <span class="client-logo" aria-hidden="true">F</span>
                 <div>
-                  <div class="name">Tidan</div>
-                  <div class="client-role">Development Group</div>
+                  <div class="name">Francis</div>
                 </div>
               </div>
             </article>
@@ -862,26 +893,31 @@
     <section class="section brand-strip">
       <div class="container">
         <h2 class="section-title">Trusted by Leading Brands Worldwide</h2>
-        <div class="brand-marquee" aria-label="Partner logos">
-          <div class="brand-track">
-            <div class="brand-logo"><img loading="lazy" decoding="async" src="{{ asset('assets/media/company_logo/company_logo (1).webp') }}" alt="Partner logo 1"></div>
-            <div class="brand-logo"><img loading="lazy" decoding="async" src="{{ asset('assets/media/company_logo/company_logo (2).webp') }}" alt="Partner logo 2"></div>
-            <div class="brand-logo"><img loading="lazy" decoding="async" src="{{ asset('assets/media/company_logo/company_logo (3).webp') }}" alt="Partner logo 3"></div>
-            <div class="brand-logo"><img loading="lazy" decoding="async" src="{{ asset('assets/media/company_logo/company_logo (4).webp') }}" alt="Partner logo 4"></div>
-            <div class="brand-logo"><img loading="lazy" decoding="async" src="{{ asset('assets/media/company_logo/company_logo (5).webp') }}" alt="Partner logo 5"></div>
-            <div class="brand-logo"><img loading="lazy" decoding="async" src="{{ asset('assets/media/company_logo/company_logo (6).webp') }}" alt="Partner logo 6"></div>
-            <div class="brand-logo"><img loading="lazy" decoding="async" src="{{ asset('assets/media/company_logo/company_logo (7).webp') }}" alt="Partner logo 7"></div>
-          </div>
-          <div class="brand-track" aria-hidden="true">
-            <div class="brand-logo"><img loading="lazy" decoding="async" src="{{ asset('assets/media/company_logo/company_logo (1).webp') }}" alt=""></div>
-            <div class="brand-logo"><img loading="lazy" decoding="async" src="{{ asset('assets/media/company_logo/company_logo (2).webp') }}" alt=""></div>
-            <div class="brand-logo"><img loading="lazy" decoding="async" src="{{ asset('assets/media/company_logo/company_logo (3).webp') }}" alt=""></div>
-            <div class="brand-logo"><img loading="lazy" decoding="async" src="{{ asset('assets/media/company_logo/company_logo (4).webp') }}" alt=""></div>
-            <div class="brand-logo"><img loading="lazy" decoding="async" src="{{ asset('assets/media/company_logo/company_logo (5).webp') }}" alt=""></div>
-            <div class="brand-logo"><img loading="lazy" decoding="async" src="{{ asset('assets/media/company_logo/company_logo (6).webp') }}" alt=""></div>
-            <div class="brand-logo"><img loading="lazy" decoding="async" src="{{ asset('assets/media/company_logo/company_logo (7).webp') }}" alt=""></div>
-          </div>
-        </div>
+        @php
+            $logoDir = storage_path('app/assets/media/company_logo');
+            $logos = [];
+            if (is_dir($logoDir)) {
+                $files = scandir($logoDir);
+                foreach ($files as $file) {
+                    $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
+                    if (in_array($ext, ['webp', 'png', 'jpg', 'jpeg', 'gif', 'svg'])) {
+                        $logos[] = $file;
+                    }
+                }
+            }
+            $logos = array_values(array_unique($logos));
+            sort($logos, SORT_NATURAL | SORT_FLAG_CASE);
+        @endphp
+
+        @if(count($logos) > 0)
+            <div class="brand-grid" aria-label="Partner logos">
+                @foreach($logos as $logo)
+                    <div class="brand-logo"><img loading="lazy" decoding="async" src="{{ asset('assets/media/company_logo/' . $logo) }}" alt="Partner logo"></div>
+                @endforeach
+            </div>
+        @else
+            <p class="muted">No partner logos uploaded yet.</p>
+        @endif
       </div>
     </section>
     @endif

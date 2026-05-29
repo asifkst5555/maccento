@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'currency' => 'USD',
+    'currency' => 'CAD',
 
     'listing_base' => [
         'home' => 120,

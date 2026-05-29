@@ -1106,6 +1106,30 @@ class DashboardController extends Controller
         ]);
     }
 
+    public function publicPartnerLogoView(Request $request, string $filename)
+    {
+        $filename = basename($filename);
+        $path = 'assets/media/company_logo/' . $filename;
+
+        if ($filename === '' || !preg_match('/\.(webp|png|jpe?g|gif|svg)$/i', $filename) || !Storage::disk('local')->exists($path)) {
+            abort(404);
+        }
+
+        return response()->file(Storage::disk('local')->path($path));
+    }
+
+    public function publicMediaAssetView(Request $request, string $path)
+    {
+        $path = ltrim($path, '/');
+        $fullPath = 'assets/media/' . $path;
+
+        if ($path === '' || str_contains($path, '..') || !Storage::disk('local')->exists($fullPath)) {
+            abort(404);
+        }
+
+        return response()->file(Storage::disk('local')->path($fullPath));
+    }
+
     public function adminInvoicesIndex(Request $request): View
     {
         $statusFilter = trim((string) $request->string('invoice_status'));

@@ -133,16 +133,20 @@ class PullInboundEmails extends Command
     {
         $envEnabled = filter_var(env('INBOUND_MAIL_ENABLED', true), FILTER_VALIDATE_BOOLEAN);
 
-        if (!Schema::hasTable('api_integration_settings')) {
+        try {
+            if (!$this->hasApiIntegrationSettingsTable()) {
+                return $envEnabled;
+            }
+
+            $settings = ApiIntegrationSetting::query()->first();
+            if (!$settings || !Schema::hasColumn('api_integration_settings', 'inbound_mail_enabled')) {
+                return $envEnabled;
+            }
+
+            return $settings->inbound_mail_enabled !== null ? (bool) $settings->inbound_mail_enabled : $envEnabled;
+        } catch (Throwable $exception) {
             return $envEnabled;
         }
-
-        $settings = ApiIntegrationSetting::query()->first();
-        if (!$settings || !Schema::hasColumn('api_integration_settings', 'inbound_mail_enabled')) {
-            return $envEnabled;
-        }
-
-        return $settings->inbound_mail_enabled !== null ? (bool) $settings->inbound_mail_enabled : $envEnabled;
     }
 
     /**
@@ -163,47 +167,60 @@ class PullInboundEmails extends Command
             'delete_after' => filter_var(env('INBOUND_MAIL_DELETE_AFTER_PROCESS', false), FILTER_VALIDATE_BOOLEAN),
         ];
 
-        if (!Schema::hasTable('api_integration_settings')) {
-            return $config;
-        }
+        try {
+            if (!$this->hasApiIntegrationSettingsTable()) {
+                return $config;
+            }
 
-        $settings = ApiIntegrationSetting::query()->first();
-        if (!$settings) {
-            return $config;
-        }
+            $settings = ApiIntegrationSetting::query()->first();
+            if (!$settings) {
+                return $config;
+            }
 
-        if (Schema::hasColumn('api_integration_settings', 'inbound_mail_provider')) {
-            $config['provider'] = $this->pickSettingValue($settings->inbound_mail_provider, $config['provider']);
-        }
-        if (Schema::hasColumn('api_integration_settings', 'inbound_mail_host')) {
-            $config['host'] = $this->pickSettingValue($settings->inbound_mail_host, $config['host']);
-        }
-        if (Schema::hasColumn('api_integration_settings', 'inbound_mail_port') && !empty($settings->inbound_mail_port)) {
-            $config['port'] = (int) $settings->inbound_mail_port;
-        }
-        if (Schema::hasColumn('api_integration_settings', 'inbound_mail_encryption')) {
-            $config['encryption'] = $this->pickSettingValue($settings->inbound_mail_encryption, $config['encryption']);
-        }
-        if (Schema::hasColumn('api_integration_settings', 'inbound_mail_username')) {
-            $config['username'] = $this->pickSettingValue($settings->inbound_mail_username, $config['username']);
-        }
-        if (Schema::hasColumn('api_integration_settings', 'inbound_mail_password')) {
-            $config['password'] = $this->pickSettingValue($settings->inbound_mail_password, $config['password']);
-        }
-        if (Schema::hasColumn('api_integration_settings', 'inbound_mail_mailbox')) {
-            $config['mailbox'] = $this->pickSettingValue($settings->inbound_mail_mailbox, $config['mailbox']);
-        }
-        if (Schema::hasColumn('api_integration_settings', 'inbound_mail_search')) {
-            $config['search'] = $this->pickSettingValue($settings->inbound_mail_search, $config['search']);
-        }
-        if (Schema::hasColumn('api_integration_settings', 'inbound_mail_max_per_run') && !empty($settings->inbound_mail_max_per_run)) {
-            $config['max_per_run'] = (int) $settings->inbound_mail_max_per_run;
-        }
-        if (Schema::hasColumn('api_integration_settings', 'inbound_mail_delete_after_process') && $settings->inbound_mail_delete_after_process !== null) {
-            $config['delete_after'] = (bool) $settings->inbound_mail_delete_after_process;
+            if (Schema::hasColumn('api_integration_settings', 'inbound_mail_provider')) {
+                $config['provider'] = $this->pickSettingValue($settings->inbound_mail_provider, $config['provider']);
+            }
+            if (Schema::hasColumn('api_integration_settings', 'inbound_mail_host')) {
+                $config['host'] = $this->pickSettingValue($settings->inbound_mail_host, $config['host']);
+            }
+            if (Schema::hasColumn('api_integration_settings', 'inbound_mail_port') && !empty($settings->inbound_mail_port)) {
+                $config['port'] = (int) $settings->inbound_mail_port;
+            }
+            if (Schema::hasColumn('api_integration_settings', 'inbound_mail_encryption')) {
+                $config['encryption'] = $this->pickSettingValue($settings->inbound_mail_encryption, $config['encryption']);
+            }
+            if (Schema::hasColumn('api_integration_settings', 'inbound_mail_username')) {
+                $config['username'] = $this->pickSettingValue($settings->inbound_mail_username, $config['username']);
+            }
+            if (Schema::hasColumn('api_integration_settings', 'inbound_mail_password')) {
+                $config['password'] = $this->pickSettingValue($settings->inbound_mail_password, $config['password']);
+            }
+            if (Schema::hasColumn('api_integration_settings', 'inbound_mail_mailbox')) {
+                $config['mailbox'] = $this->pickSettingValue($settings->inbound_mail_mailbox, $config['mailbox']);
+            }
+            if (Schema::hasColumn('api_integration_settings', 'inbound_mail_search')) {
+                $config['search'] = $this->pickSettingValue($settings->inbound_mail_search, $config['search']);
+            }
+            if (Schema::hasColumn('api_integration_settings', 'inbound_mail_max_per_run') && !empty($settings->inbound_mail_max_per_run)) {
+                $config['max_per_run'] = (int) $settings->inbound_mail_max_per_run;
+            }
+            if (Schema::hasColumn('api_integration_settings', 'inbound_mail_delete_after_process') && $settings->inbound_mail_delete_after_process !== null) {
+                $config['delete_after'] = (bool) $settings->inbound_mail_delete_after_process;
+            }
+        } catch (Throwable $exception) {
+            return $config;
         }
 
         return $config;
+    }
+
+    private function hasApiIntegrationSettingsTable(): bool
+    {
+        try {
+            return Schema::hasTable('api_integration_settings');
+        } catch (Throwable $exception) {
+            return false;
+        }
     }
 
     private function pickSettingValue(?string $stored, string $fallback): string

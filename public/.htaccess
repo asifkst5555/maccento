@@ -3,6 +3,10 @@
         Options -MultiViews -Indexes
     </IfModule>
 
+    <IfModule mod_mime.c>
+        AddType image/webp .webp
+    </IfModule>
+
     RewriteEngine On
 
     # Handle Authorization Header

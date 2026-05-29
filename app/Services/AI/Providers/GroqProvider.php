@@ -5,7 +5,7 @@ namespace App\Services\AI\Providers;
 use GuzzleHttp\Client;
 use RuntimeException;
 
-class OpenRouterProvider implements AiProvider
+class GroqProvider implements AiProvider
 {
     private Client $client;
 
@@ -22,38 +22,19 @@ class OpenRouterProvider implements AiProvider
 
     public function chat(array $messages): array
     {
-        $model = (string) config('ai.openrouter.model', config('ai.default_model', 'openai/gpt-4o-mini'));
-        $webSearchEnabled = config('ai.web_search_enabled', false);
+        $model = (string) config('ai.groq.model', config('ai.default_model', 'qwen/qwen3-32b'));
         $startedAt = microtime(true);
-
-        $payload = [
-            'model' => $model,
-            'messages' => $messages,
-            'temperature' => 0.2,
-        ];
-
-        if ($webSearchEnabled) {
-            $payload['tools'] = [
-                [
-                    'type' => 'openrouter:web_search',
-                    'parameters' => [
-                        'engine' => 'auto',
-                        'max_results' => 5,
-                        'max_total_results' => 10,
-                        'search_context_size' => 'medium',
-                    ],
-                ],
-            ];
-        }
 
         $response = $this->client->post('chat/completions', [
             'headers' => [
                 'Authorization' => 'Bearer ' . $this->apiKey,
                 'Content-Type' => 'application/json',
-                'HTTP-Referer' => (string) config('app.url', 'http://localhost'),
-                'X-Title' => (string) config('app.name', 'maccento'),
             ],
-            'json' => $payload,
+            'json' => [
+                'model' => $model,
+                'messages' => $messages,
+                'temperature' => 0.2,
+            ],
         ]);
 
         $durationMs = (int) ((microtime(true) - $startedAt) * 1000);
@@ -61,7 +42,7 @@ class OpenRouterProvider implements AiProvider
 
         $content = (string) data_get($responseData, 'choices.0.message.content', '');
         if ($content === '') {
-            throw new RuntimeException('OpenRouter response content is empty.');
+            throw new RuntimeException('Groq response content is empty.');
         }
 
         return [
@@ -75,6 +56,6 @@ class OpenRouterProvider implements AiProvider
 
     public function name(): string
     {
-        return 'openrouter';
+        return 'groq';
     }
 }

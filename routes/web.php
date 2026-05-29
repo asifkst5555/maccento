@@ -16,6 +16,35 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
+Route::get('/assets/{path}', function (string $path) {
+    $assetPath = rtrim(storage_path('app/assets'), '/') . '/' . ltrim($path, '/');
+
+    if (!is_file($assetPath)) {
+        abort(404);
+    }
+
+    $extension = strtolower(pathinfo($assetPath, PATHINFO_EXTENSION));
+    $mimeType = match ($extension) {
+        'css' => 'text/css; charset=UTF-8',
+        'js' => 'application/javascript; charset=UTF-8',
+        'mjs' => 'application/javascript; charset=UTF-8',
+        'json' => 'application/json; charset=UTF-8',
+        'svg' => 'image/svg+xml',
+        'ico' => 'image/x-icon',
+        'png' => 'image/png',
+        'jpg', 'jpeg' => 'image/jpeg',
+        'webp' => 'image/webp',
+        'gif' => 'image/gif',
+        'woff' => 'font/woff',
+        'woff2' => 'font/woff2',
+        default => mime_content_type($assetPath) ?: 'application/octet-stream',
+    };
+
+    return response()->file($assetPath, [
+        'Content-Type' => $mimeType,
+    ]);
+})->where('path', '.*');
+
 Route::view('/', 'welcome', ['page' => 'home'])->name('home');
 Route::view('/about-us', 'welcome', ['page' => 'about'])->name('about');
 Route::view('/our-services', 'welcome', ['page' => 'services'])->name('services');
@@ -116,6 +145,8 @@ Route::middleware('auth')->group(function (): void {
         Route::post('/admin/projects/{project}/tasks/{task}/delete', [DashboardController::class, 'adminProjectTaskDestroy'])->name('admin.projects.tasks.delete');
         Route::get('/admin/media-delivery/watermark', [DashboardController::class, 'adminMediaWatermarkSettingsIndex'])->name('admin.media-delivery.watermark.index');
         Route::get('/admin/media-delivery/watermark/logo', [DashboardController::class, 'adminMediaWatermarkLogoView'])->name('admin.media-delivery.watermark.logo');
+        Route::get('/media/assets/{path}', [DashboardController::class, 'publicMediaAssetView'])->where('path', '.*')->name('media.asset');
+        Route::get('/media/company-logo/{filename}', [DashboardController::class, 'publicPartnerLogoView'])->name('media.company-logo');
         Route::post('/admin/media-delivery/watermark', [DashboardController::class, 'adminMediaWatermarkSettingsUpdate'])->name('admin.media-delivery.watermark.update');
         Route::post('/admin/media-delivery/watermark/rebuild', [DashboardController::class, 'adminMediaWatermarkRebuild'])->name('admin.media-delivery.watermark.rebuild');
         Route::post('/admin/media-delivery/folders/migrate', [DashboardController::class, 'adminMediaFolderMigrationRun'])->name('admin.media-delivery.folders.migrate');
