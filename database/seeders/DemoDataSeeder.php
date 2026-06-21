@@ -311,8 +311,8 @@ class DemoDataSeeder extends Seeder
                     'services' => $spec['package'] === 'essential'
                         ? ['photo']
                         : ($spec['package'] === 'signature'
-                            ? ['photo', 'video', 'drone']
-                            : ['photo', 'video', 'drone', 'floor_plan']),
+                            ? ['photo', 'drone']
+                            : ['photo', 'drone']),
                     'options' => [
                         'package_code' => $spec['package'],
                         'contact_name' => $spec['client']->name,

@@ -38,15 +38,15 @@ return [
     'packages' => [
         'Essential' => [
             'price' => '',
-            'summary' => 'Ideal for condos and standard listings. Includes HDR photos and drone images with fast delivery.',
+            'summary' => 'Ideal for condos and standard listings. Includes up to 20 HDR photos, basic retouching, and 24-hour delivery.',
         ],
         'Signature' => [
             'price' => '',
-            'summary' => 'For stronger marketing needs. Includes HDR photos and video teaser.',
+            'summary' => 'For listings that need stronger marketing. Includes up to 30 HDR photos, up to 7 drone photos, exterior photos, and 24-hour delivery.',
         ],
         'Prestige' => [
             'price' => '',
-            'summary' => 'Premium full media coverage: HDR, drone, cinematic walkthrough, social cut, and floor plan.',
+            'summary' => 'Premium full media coverage: Up to 40 HDR photos, up to 10 drone photos, interior & exterior images, and twilight images.',
         ],
         'Custom Build' => [
             'price' => 'Custom',

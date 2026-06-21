@@ -3,6 +3,8 @@
 namespace App\Console\Commands;
 
 use App\Models\EmailLog;
+use App\Models\PanelNotification;
+use App\Models\User;
 use App\Services\PanelNotificationService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
@@ -58,16 +60,26 @@ class SystemHealthCheck extends Command
         $failedEmailThreshold = (int) config('system_health.failed_email_threshold', 1);
         $backupMaxAgeDays = (int) config('system_health.backup_max_age_days', 2);
 
+        $backupsEnabled = true;
+        if (Schema::hasTable('backup_settings')) {
+            $settings = DB::table('backup_settings')->first();
+            if (!$settings || !(bool) $settings->enabled) {
+                $backupsEnabled = false;
+            }
+        }
+
         if ($failedJobsCount !== null && $failedJobsCount >= $failedJobsThreshold) {
             $issues[] = "Failed jobs in last 24h: {$failedJobsCount}";
         }
         if ($failedEmailCount !== null && $failedEmailCount >= $failedEmailThreshold) {
             $issues[] = "Failed emails in last 24h: {$failedEmailCount}";
         }
-        if ($backupLatestAt === null) {
-            $issues[] = 'No database backup files found.';
-        } elseif ($backupAgeDays !== null && $backupAgeDays >= $backupMaxAgeDays) {
-            $issues[] = "Last database backup is {$backupAgeDays} day(s) old.";
+        if ($backupsEnabled) {
+            if ($backupLatestAt === null) {
+                $issues[] = 'No database backup files found.';
+            } elseif ($backupAgeDays !== null && $backupAgeDays >= $backupMaxAgeDays) {
+                $issues[] = "Last database backup is {$backupAgeDays} day(s) old.";
+            }
         }
 
         $this->line('System Health Summary');
@@ -77,14 +89,35 @@ class SystemHealthCheck extends Command
         $this->line('Latest failed job: ' . ($latestFailedJobAt ? Carbon::parse((string) $latestFailedJobAt)->format('Y-m-d H:i') : 'none'));
 
         if ($this->option('notify') && $issues !== []) {
-            $cacheKey = 'system_health.notify:' . md5(implode('|', $issues));
+            $issuesString = implode(' | ', $issues);
+            $cacheKey = 'system_health.notify:' . md5($issuesString);
             if (!Cache::has($cacheKey)) {
-                $notificationService->notifyInternal(
-                    'system_health_alert',
-                    'System health needs attention',
-                    implode(' | ', $issues),
-                    route('admin.system-health.index')
-                );
+                $staffIds = User::query()
+                    ->whereIn('role', ['owner', 'admin', 'manager', 'photographer', 'editor'])
+                    ->pluck('id')
+                    ->all();
+
+                foreach ($staffIds as $userId) {
+                    $existingUnread = PanelNotification::query()
+                        ->where('user_id', $userId)
+                        ->where('type', 'system_health_alert')
+                        ->whereNull('read_at')
+                        ->first();
+
+                    if ($existingUnread) {
+                        $existingUnread->body = $issuesString;
+                        $existingUnread->updated_at = now();
+                        $existingUnread->save();
+                    } else {
+                        $notificationService->notifyUser(
+                            (int) $userId,
+                            'system_health_alert',
+                            'System health needs attention',
+                            $issuesString,
+                            route('admin.system-health.index')
+                        );
+                    }
+                }
                 Cache::put($cacheKey, true, now()->addMinutes(90));
             }
         }

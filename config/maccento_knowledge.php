@@ -26,8 +26,8 @@ return [
         ],
         'recommendations' => [
             'condo' => 'Essential usually fits standard condo listings that mainly need polished HDR photography.',
-            'home' => 'Signature is a strong fit when the listing benefits from both stills and motion coverage.',
-            'premium' => 'Prestige is best when the marketing strategy needs photo, drone, cinematic video, social cut, and floor plan support.',
+            'home' => 'Signature is a strong fit when the listing needs professional photos, exterior photos, and drone coverage.',
+            'premium' => 'Prestige is best when the marketing strategy needs premium photo, drone, and twilight/day-to-dusk coverage.',
         ],
         'faq_answers' => [
             'package_builder' => 'The package builder supports both preset packages and custom service combinations.',

@@ -611,10 +611,10 @@
               <p class="package-amount">$249.99</p>
               <p class="package-sub">Perfect for condos and standard listings.</p>
               <ul class="package-list">
-                <li>Up to 30 HDR images</li>
-                <li>Basic retouching</li>
-                <li>24h delivery</li>
-                <li>MLS-ready formatting</li>
+                <li>Up to 20 Photos</li>
+                <li>Basic Retouching</li>
+                <li>24 Hour Delivery</li>
+                <li>MLS Ready Formatting</li>
               </ul>
               <button class="btn package-cta" type="button" data-pbx-package="essential">Get Started</button>
             </div>
@@ -628,10 +628,10 @@
               <p class="package-amount">$349.99</p>
               <p class="package-sub">For listings that need stronger marketing.</p>
               <ul class="package-list">
-                <li>Up to 25 HDR images</li>
-                <li>Up to 7 drone images</li>
-                <li>Video teaser (MLS + social)</li>
-                <li>24h delivery</li>
+                <li>Up to 30 Photos</li>
+                <li>Up to 7 Drone Photos</li>
+                <li>Exterior Photos</li>
+                <li>24 Hour Delivery</li>
               </ul>
               <button class="btn package-cta" type="button" data-pbx-package="signature">Get Started</button>
             </div>
@@ -645,10 +645,10 @@
               <p class="package-amount">$499.99</p>
               <p class="package-sub">Full media coverage for premium properties.</p>
               <ul class="package-list">
-                <li>Up to 30 HDR images</li>
-                <li>Up to 10 drone images</li>
-                <li>Cinematic walkthrough video</li>
-                <li>Social reel cut + floor plan</li>
+                <li>Up to 40 Photos</li>
+                <li>Up to 10 Drone Photos</li>
+                <li>Interior & Exterior Images</li>
+                <li>Twilight Images</li>
               </ul>
               <button class="btn package-cta" type="button" data-pbx-package="prestige">Get Started</button>
             </div>
@@ -2408,8 +2408,22 @@
         '24h delivery': 'Livraison 24 h',
         'MLS-ready formatting': 'Formatage pret pour MLS',
         'Basic retouching': 'Retouche de base',
+        'Up to 20 Photos': 'Jusqu a 20 photos',
+        'Basic Retouching': 'Retouche de base',
+        '24 Hour Delivery': 'Livraison 24 heures',
+        'MLS Ready Formatting': 'Formatage pret pour MLS',
+        'Up to 30 Photos': 'Jusqu a 30 photos',
+        'Up to 7 Drone Photos': 'Jusqu a 7 photos drone',
+        'Exterior Photos': 'Photos exterieures',
+        'Up to 40 Photos': 'Jusqu a 40 photos',
+        'Up to 10 Drone Photos': 'Jusqu a 10 photos drone',
+        'Interior & Exterior Images': 'Images interieures & exterieures',
+        'Twilight Images': 'Images crepusculaires',
         'Select package': 'Choisir ce forfait',
         '$250': '250 $',
+        '$249.99': '249.99 $',
+        '$349.99': '349.99 $',
+        '$499.99': '499.99 $',
         'Most Popular': 'Le plus populaire',
         'Premium': 'Premium',
         'Signature': 'Signature',
@@ -2977,10 +2991,10 @@
         signature: {
           package_code: 'signature',
           listing_type: 'home',
-          services: ['photo', 'drone', 'video'],
+          services: ['photo', 'drone'],
           photo_count: '',
-          video_type: 'reel',
-          drone_mode: '',
+          video_type: '',
+          drone_mode: 'photo',
           add_ons: {
             virtual_staging: false,
             day_to_dusk: false,
@@ -2990,13 +3004,13 @@
         prestige: {
           package_code: 'prestige',
           listing_type: 'home',
-          services: ['photo', 'drone', 'video', 'floor_plan', 'social_media'],
+          services: ['photo', 'drone'],
           photo_count: '',
-          video_type: 'cinematic',
-          drone_mode: '',
+          video_type: '',
+          drone_mode: 'photo',
           add_ons: {
             virtual_staging: false,
-            day_to_dusk: false,
+            day_to_dusk: true,
             priority_editing: false,
           },
         },
