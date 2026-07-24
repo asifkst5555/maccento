@@ -372,6 +372,14 @@
       @if($canOpenWatermarkSettings)
       <a class="panel-link" href="{{ route('admin.media-delivery.watermark.index') }}">Watermark Settings</a>
       @endif
+       <button class="panel-btn panel-btn-primary" type="button" data-dropbox-modal-trigger style="background-color: #0061ff; border-color: #0061ff; display: inline-flex; align-items: center; gap: 6px; color: #fff; border-radius: 6px; font-weight: 600;">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M5.008 3.513l6.99 4.417-6.99 4.416L5.008 3.513zm13.984 0l-6.99 4.417 6.99 4.416.002-8.833zm-13.984 17.06l6.99-4.417-6.99-4.416-.002 8.833zm13.984 0l-6.99-4.417 6.99-4.416.002 8.833zM11.998 12.35l6.99-4.417-6.99-4.42-6.99 4.42 6.99 4.417z"/></svg>
+        Import from Dropbox
+      </button>
+      <a class="panel-link shadow-sm border" href="{{ route('admin.media-delivery.import-history') }}" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: #475569; background: #fff; padding: 6px 12px; border-radius: 6px; text-decoration: none; border-color: #e2e8f0; font-size: 0.85rem; height: 36px;">
+        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" width="14" height="14"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+        Import History
+      </a>
     </form>
   </div>
 
@@ -457,8 +465,8 @@
           @endif
         </div>
       </div>
-      <div class="media-project-details" data-project-details> data-project-details>
-
+      <div class="media-project-details" data-project-details>
+ 
       @if($canUploadProjectMedia)
       <div class="media-stage-section">
         <div class="media-delivery-upload-grid">
@@ -471,7 +479,8 @@
               <input class="panel-input" type="file" name="media_files[]" accept="image/*,video/*" multiple required>
               <button class="panel-btn panel-btn-primary" type="submit">Upload Raw Footage</button>
             </form>
-            <form method="post" action="{{ route('admin.projects.raw-zip.store', $project) }}" class="panel-stack" enctype="multipart/form-data">
+            <button class="panel-btn" type="button" data-dropbox-modal-trigger data-preselect-project="{{ $project->id }}" data-preselect-stage="raw" style="border: 1px solid #0061ff; color: #0061ff; background: transparent; width:100%; margin-top:8px; font-weight:600;">Import from Dropbox</button>
+            <form method="post" action="{{ route('admin.projects.raw-zip.store', $project) }}" class="panel-stack" enctype="multipart/form-data" style="margin-top:12px;">
               @csrf
               <label class="panel-muted">Upload Raw Footage ZIP</label>
               <input class="panel-input" type="file" name="raw_zip" accept=".zip,application/zip" required>
@@ -481,7 +490,7 @@
 
           <section class="panel-card media-file-list-card">
             <h4 class="panel-section-title">Raw Footage Media</h4>
-            <div class="media-file-list">
+            <div class="media-file-list" id="raw-media-list">
               @forelse($rawItems as $index => $mediaItem)
               @php
                 $mediaName = $mediaItem->original_name;
@@ -553,12 +562,13 @@
               <input class="panel-input" type="file" name="media_files[]" accept="image/*,video/*" multiple required>
               <button class="panel-btn panel-btn-primary" type="submit">Upload Edited/Final Media</button>
             </form>
+            <button class="panel-btn" type="button" data-dropbox-modal-trigger data-preselect-project="{{ $project->id }}" data-preselect-stage="edited" style="border: 1px solid #0061ff; color: #0061ff; background: transparent; width:100%; margin-top:8px; font-weight:600;">Import from Dropbox</button>
           </article>
           @endif
 
           <section class="panel-card media-file-list-card">
             <h4 class="panel-section-title">Edited/Final Media Files</h4>
-            <div class="media-file-list">
+            <div class="media-file-list" id="edited-media-list">
               @forelse($editedItems as $index => $mediaItem)
               @php
                 $mediaName = $mediaItem->original_name;
@@ -610,7 +620,7 @@
 
           <section class="panel-card media-file-list-card">
             <h4 class="panel-section-title">Final Delivery ZIP</h4>
-            <div class="media-file-list">
+            <div class="media-file-list" id="other-media-list">
               @forelse($zipItems as $zipItem)
               @php
                 $zipName = $zipItem->original_name;
@@ -937,6 +947,620 @@
         select.value = select.options[0].value;
         showPanel(select.value);
       }
+    }
+  })();
+</script>
+
+@if($canUploadMedia ?? false)
+<div class="dropbox-modal-overlay" id="dropbox-import-modal" role="dialog" aria-modal="true" aria-labelledby="dropbox-modal-title">
+  <div class="dropbox-modal-container" style="max-width: 550px;">
+    <header class="dropbox-modal-header">
+      <h3 id="dropbox-modal-title" style="margin:0; font-size:1.15rem; font-weight:700; color:#1e293b; display:inline-flex; align-items:center; gap:8px;">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="#0061ff"><path d="M5.008 3.513l6.99 4.417-6.99 4.416L5.008 3.513zm13.984 0l-6.99 4.417 6.99 4.416.002-8.833zm-13.984 17.06l6.99-4.417-6.99-4.416-.002 8.833zm13.984 0l-6.99-4.417 6.99-4.416.002 8.833zM11.998 12.35l6.99-4.417-6.99-4.42-6.99 4.42 6.99 4.417z"/></svg>
+        Import Gallery from Dropbox
+      </h3>
+      <button class="dropbox-modal-close" type="button" data-dropbox-modal-close aria-label="Close modal">&times;</button>
+    </header>
+
+    <!-- FORM STATE -->
+    <div class="dropbox-modal-body" id="dropbox-form-state">
+      <div class="panel-stack" style="gap:14px; margin-bottom:0;">
+        <div class="panel-stack" style="gap:4px; margin-bottom:0;">
+          <label class="panel-muted" style="font-weight:600; color:#475569;">Dropbox Shared Folder Link</label>
+          <input class="panel-input" type="text" id="dropbox-folder-link" placeholder="https://www.dropbox.com/scl/fo/..." style="width:100%;">
+          <div id="dropbox-link-error" class="panel-muted" style="color:#ef4444; font-size:0.85rem; display:none; margin-top:2px;"></div>
+        </div>
+
+        <div class="panel-stack" style="gap:4px; margin-bottom:0;">
+          <label class="panel-muted" style="font-weight:600; color:#475569;">Gallery / Project</label>
+          <select class="panel-input" id="dropbox-project-select" style="width:100%; height:42px; padding:0 12px;">
+            <option value="">Select Project / Gallery...</option>
+            @foreach($allProjects ?? [] as $proj)
+              <option value="{{ $proj->id }}">{{ $proj->title }} (#{{ $proj->id }})</option>
+            @endforeach
+          </select>
+          <div id="dropbox-project-error" class="panel-muted" style="color:#ef4444; font-size:0.85rem; display:none; margin-top:2px;"></div>
+        </div>
+
+        <div class="panel-stack" style="gap:4px; margin-bottom:0;">
+          <label class="panel-muted" style="font-weight:600; color:#475569;">Media Upload Stage</label>
+          <select class="panel-input" id="dropbox-stage-select" style="width:100%; height:42px; padding:0 12px;">
+            <option value="raw">Raw Footage</option>
+            <option value="edited">Edited Photos</option>
+            <option value="video">Videos</option>
+            <option value="document">Documents</option>
+          </select>
+        </div>
+
+        <!-- Scan Preview Box -->
+        <div id="dropbox-preview-box" style="display:none; background:#f8fafc; border:1px solid #cbd5e1; border-radius:8px; padding:16px; margin-top:4px;">
+          <h4 style="margin:0 0 10px 0; font-size:0.95rem; font-weight:700; color:#334155; border-bottom:1px solid #e2e8f0; padding-bottom:6px;">Dropbox Scan Results</h4>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; font-size:0.85rem; color:#475569;">
+            <div>Images: <span id="preview-images-count" style="font-weight:700; color:#1e293b;">0</span></div>
+            <div>Videos: <span id="preview-videos-count" style="font-weight:700; color:#1e293b;">0</span></div>
+            <div>Documents/PDFs: <span id="preview-docs-count" style="font-weight:700; color:#1e293b;">0</span></div>
+            <div>Duplicates (to skip): <span id="preview-duplicates-count" style="font-weight:700; color:#ef4444;">0</span></div>
+            <div style="grid-column: span 2; border-top:1px solid #e2e8f0; padding-top:8px; margin-top:4px;">
+              Total Transfer Size: <span id="preview-total-size" style="font-weight:700; color:#1e293b;">0 MB</span>
+            </div>
+            <div style="grid-column: span 2;">
+              Estimated Duration: <span id="preview-est-time" style="font-weight:700; color:#1e293b;">0 seconds</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel-form-row" style="margin-bottom:0; justify-content:flex-end; gap:8px; margin-top:12px;">
+          <button class="panel-btn" type="button" data-dropbox-modal-close style="border:1px solid #cbd5e1; background:#fff; color:#475569;">Cancel</button>
+          <button class="panel-btn panel-btn-primary" type="button" id="dropbox-scan-btn" style="background:#475569; border-color:#475569; color:#fff;">Scan Folder Preview</button>
+          <button class="panel-btn panel-btn-primary" type="button" id="dropbox-submit-btn" style="display:none; background:#0061ff; border-color:#0061ff; color:#fff;">Start Background Import</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- PROGRESS STATE -->
+    <div class="dropbox-modal-body" id="dropbox-progress-state" style="display:none;">
+      <div class="panel-stack" style="gap:16px; margin-bottom:0;">
+        <div id="dropbox-status-title" style="font-weight:700; color:#1e293b; font-size:1.05rem;">Queue Job Initializing...</div>
+        
+        <div style="background:#f1f5f9; height:10px; border-radius:999px; overflow:hidden; width:100%;">
+          <div id="dropbox-progress-bar" style="background:#0061ff; height:100%; width:0%; transition:width 0.2s ease;"></div>
+        </div>
+
+        <!-- Metrics Dashboard row -->
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; font-size:0.85rem; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:12px; color:#475569;">
+          <div>Remaining Files: <span id="dropbox-remaining-count" style="font-weight:700; color:#1e293b;">--</span></div>
+          <div>Speed: <span id="dropbox-speed-text" style="font-weight:700; color:#1e293b;">-- MB/s</span></div>
+          <div style="grid-column: span 2;">ETA (Estimated Time): <span id="dropbox-eta-text" style="font-weight:700; color:#1e293b;">--</span></div>
+        </div>
+
+        <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.85rem; color:#475569;">
+          <span id="dropbox-progress-text">0% (0 / 0 files)</span>
+          <span id="dropbox-progress-counter" style="font-weight:600;">0 Imported</span>
+        </div>
+
+        <!-- Scrollable Log Box -->
+        <div id="dropbox-log-box" style="background:#0f172a; color:#f8fafc; font-family:monospace; font-size:0.82rem; padding:12px; border-radius:8px; height:140px; overflow-y:auto; display:grid; gap:4px; align-content:start;">
+          <div style="color:#94a3b8;">&gt;_ Initializing import session...</div>
+        </div>
+
+        <p class="text-xs text-gray-400 text-center" style="margin:0;">
+          This import job runs on the server queue. You can safely close this modal or browser tab. Monitor history in the <strong>Import History</strong> dashboard.
+        </p>
+
+        <div class="panel-form-row" style="margin-bottom:0; justify-content:flex-end; gap:8px; margin-top:4px;">
+          <button class="panel-btn" type="button" id="dropbox-cancel-import-btn" style="border:1px solid #fca5a5; background:#fee2e2; color:#b91c1c; font-weight:600;">Cancel Import</button>
+          <button class="panel-btn" type="button" id="dropbox-retry-failed-btn" style="display:none; border:1px solid #c7d2fe; background:#e0e7ff; color:#4338ca; font-weight:600;">Retry Failed</button>
+          <a class="panel-btn" href="#" id="dropbox-download-duplicates-link" style="display:none; border:1px solid #cbd5e1; background:#f8fafc; color:#475569; font-weight:600; text-decoration:none; display:inline-flex; align-items:center; justify-content:center;" target="_blank">Download Duplicate Report</a>
+          <button class="panel-btn" type="button" id="dropbox-close-progress-btn" style="border:1px solid #cbd5e1; background:#fff; color:#475569;">Close Window</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+@endif
+
+<style>
+  .dropbox-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.65);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease;
+  }
+
+  .dropbox-modal-overlay.is-active {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .dropbox-modal-container {
+    background: #ffffff;
+    border-radius: 16px;
+    width: 100%;
+    max-width: 520px;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    border: 1px solid #e2e8f0;
+    overflow: hidden;
+    transform: scale(0.95);
+    transition: transform 0.25s ease;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .dropbox-modal-overlay.is-active .dropbox-modal-container {
+    transform: scale(1);
+  }
+
+  .dropbox-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid #f1f5f9;
+  }
+
+  .dropbox-modal-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    line-height: 1;
+    color: #94a3b8;
+    cursor: pointer;
+    padding: 4px;
+    transition: color 0.15s ease;
+  }
+
+  .dropbox-modal-close:hover {
+    color: #475569;
+  }
+
+  .dropbox-modal-body {
+    padding: 20px;
+  }
+
+  /* Custom log scrollbar */
+  #dropbox-log-box::-webkit-scrollbar {
+    width: 6px;
+  }
+  #dropbox-log-box::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  #dropbox-log-box::-webkit-scrollbar-thumb {
+    background: #475569;
+    border-radius: 3px;
+  }
+</style>
+
+<script>
+  (function () {
+    const modalOverlay = document.getElementById('dropbox-import-modal');
+    const closeTriggers = document.querySelectorAll('[data-dropbox-modal-close]');
+    const scanBtn = document.getElementById('dropbox-scan-btn');
+    const submitBtn = document.getElementById('dropbox-submit-btn');
+    const closeProgressBtn = document.getElementById('dropbox-close-progress-btn');
+    const cancelImportBtn = document.getElementById('dropbox-cancel-import-btn');
+    const retryFailedBtn = document.getElementById('dropbox-retry-failed-btn');
+    const downloadDuplicatesLink = document.getElementById('dropbox-download-duplicates-link');
+
+    const folderLinkInput = document.getElementById('dropbox-folder-link');
+    const projectSelect = document.getElementById('dropbox-project-select');
+    const stageSelect = document.getElementById('dropbox-stage-select');
+
+    const linkError = document.getElementById('dropbox-link-error');
+    const projectError = document.getElementById('dropbox-project-error');
+
+    const formState = document.getElementById('dropbox-form-state');
+    const progressState = document.getElementById('dropbox-progress-state');
+    const previewBox = document.getElementById('dropbox-preview-box');
+
+    const statusTitle = document.getElementById('dropbox-status-title');
+    const progressBar = document.getElementById('dropbox-progress-bar');
+    const progressText = document.getElementById('dropbox-progress-text');
+    const progressCounter = document.getElementById('dropbox-progress-counter');
+    const logBox = document.getElementById('dropbox-log-box');
+
+    const remainingCountText = document.getElementById('dropbox-remaining-count');
+    const speedText = document.getElementById('dropbox-speed-text');
+    const etaText = document.getElementById('dropbox-eta-text');
+
+    let importInProgress = false;
+    let currentSessionUuid = null;
+    let pollInterval = null;
+
+    if (!modalOverlay) return;
+
+    // Listen for data-dropbox-modal-trigger
+    document.querySelectorAll('[data-dropbox-modal-trigger]').forEach(trigger => {
+      trigger.addEventListener('click', () => {
+        modalOverlay.classList.add('is-active');
+        resetForm();
+
+        const preselectProj = trigger.getAttribute('data-preselect-project');
+        const preselectStage = trigger.getAttribute('data-preselect-stage');
+
+        if (preselectProj) {
+          projectSelect.value = preselectProj;
+        }
+        if (preselectStage) {
+          stageSelect.value = preselectStage;
+        }
+      });
+    });
+
+    closeTriggers.forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (importInProgress) {
+          if (!confirm('An import job is running in the background. Closing the modal will not stop background processing. Are you sure?')) {
+            return;
+          }
+        }
+        closeModal();
+      });
+    });
+
+    closeProgressBtn.addEventListener('click', () => {
+      closeModal();
+    });
+
+    function closeModal() {
+      modalOverlay.classList.remove('is-active');
+      if (pollInterval) {
+        clearInterval(pollInterval);
+        pollInterval = null;
+      }
+      if (importInProgress) {
+        window.location.reload();
+      }
+    }
+
+    // Step 1: Scan Preview
+    scanBtn.addEventListener('click', async () => {
+      if (!validateInputs()) return;
+
+      scanBtn.disabled = true;
+      scanBtn.textContent = 'Scanning...';
+      previewBox.style.display = 'none';
+      submitBtn.style.display = 'none';
+
+      const url = folderLinkInput.value.trim();
+      const projectId = projectSelect.value;
+
+      try {
+        const response = await fetch(`/admin/projects/${projectId}/dropbox/scan-preview`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+          },
+          body: JSON.stringify({ dropbox_url: url })
+        });
+
+        const data = await response.json();
+        if (!response.ok || data.error) {
+          throw new Error(data.error || 'Failed to scan Dropbox folder.');
+        }
+
+        document.getElementById('preview-images-count').textContent = data.counts.images;
+        document.getElementById('preview-videos-count').textContent = data.counts.videos;
+        document.getElementById('preview-docs-count').textContent = data.counts.documents;
+        document.getElementById('preview-duplicates-count').textContent = data.counts.duplicates;
+        document.getElementById('preview-total-size').textContent = (data.total_size / (1024 * 1024)).toFixed(2) + ' MB';
+        document.getElementById('preview-est-time').textContent = formatRemainingTime(data.estimated_time_seconds);
+
+        previewBox.style.display = 'block';
+        scanBtn.style.display = 'none';
+        submitBtn.style.display = 'block';
+
+      } catch (err) {
+        alert(err.message);
+      } finally {
+        scanBtn.disabled = false;
+        scanBtn.textContent = 'Scan Folder Preview';
+      }
+    });
+
+    // Step 2: Start Background Import
+    submitBtn.addEventListener('click', async () => {
+      if (!validateInputs()) return;
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Queuing...';
+
+      const url = folderLinkInput.value.trim();
+      const projectId = projectSelect.value;
+      const stage = stageSelect.value;
+
+      try {
+        const response = await fetch(`/admin/projects/${projectId}/dropbox/start-queue-import`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+          },
+          body: JSON.stringify({
+            dropbox_url: url,
+            media_stage: stage
+          })
+        });
+
+        const data = await response.json();
+        if (!response.ok || data.error) {
+          throw new Error(data.error || 'Failed to start queue import.');
+        }
+
+        currentSessionUuid = data.session_uuid;
+        importInProgress = true;
+
+        // Switch to progress view
+        formState.style.display = 'none';
+        progressState.style.display = 'block';
+        cancelImportBtn.style.display = 'block';
+        retryFailedBtn.style.display = 'none';
+        downloadDuplicatesLink.style.display = 'none';
+
+        logBox.innerHTML = '<div style="color:#38bdf8;">&gt;_ Background import job initialized! Waiting for queue worker...</div>';
+        scrollLogBox();
+
+        // Start polling
+        pollInterval = setInterval(() => pollProgress(projectId, currentSessionUuid), 2000);
+
+      } catch (err) {
+        alert(err.message);
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Start Background Import';
+      }
+    });
+
+    // Cancel Active Session
+    cancelImportBtn.addEventListener('click', async () => {
+      if (!currentSessionUuid) return;
+      if (!confirm('Are you sure you want to cancel the running import session?')) return;
+
+      cancelImportBtn.disabled = true;
+      cancelImportBtn.textContent = 'Cancelling...';
+
+      const projectId = projectSelect.value;
+
+      try {
+        const response = await fetch(`/admin/projects/${projectId}/dropbox/cancel-import/${currentSessionUuid}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+          }
+        });
+
+        if (response.ok) {
+          logBox.innerHTML += '<div style="color:#f59e0b;">&gt;_ Cancel request submitted! Processing...</div>';
+          scrollLogBox();
+        }
+      } catch (err) {
+        console.error('Cancel failed', err);
+      } finally {
+        cancelImportBtn.disabled = false;
+        cancelImportBtn.textContent = 'Cancel Import';
+      }
+    });
+
+    // Retry Failed Files
+    retryFailedBtn.addEventListener('click', async () => {
+      if (!currentSessionUuid) return;
+
+      retryFailedBtn.disabled = true;
+      retryFailedBtn.textContent = 'Retrying...';
+
+      const projectId = projectSelect.value;
+
+      try {
+        const response = await fetch(`/admin/projects/${projectId}/dropbox/retry-failed/${currentSessionUuid}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+          }
+        });
+
+        if (response.ok) {
+          logBox.innerHTML += '<div style="color:#38bdf8;">&gt;_ Retry dispatched to queue! Restarting monitor...</div>';
+          scrollLogBox();
+          
+          progressBar.style.backgroundColor = '#0061ff';
+          statusTitle.textContent = 'Retrying Failed Files...';
+          retryFailedBtn.style.display = 'none';
+          cancelImportBtn.style.display = 'block';
+
+          if (pollInterval) clearInterval(pollInterval);
+          pollInterval = setInterval(() => pollProgress(projectId, currentSessionUuid), 2000);
+        }
+      } catch (err) {
+        alert('Retry request failed.');
+      } finally {
+        retryFailedBtn.disabled = false;
+        retryFailedBtn.textContent = 'Retry Failed';
+      }
+    });
+
+    // Poll Progress API
+    async function pollProgress(projectId, uuid) {
+      try {
+        const response = await fetch(`/admin/projects/${projectId}/dropbox/import-progress/${uuid}`);
+        const data = await response.json();
+
+        if (!response.ok) return;
+
+        const total = data.total_files || 0;
+        const processed = data.processed_files || 0;
+        const imported = data.imported_files || 0;
+        const duplicates = data.duplicate_files || 0;
+        const failed = data.failed_files || 0;
+
+        const percent = total > 0 ? Math.round((processed / total) * 100) : 0;
+
+        progressBar.style.width = `${percent}%`;
+        progressText.textContent = `${percent}% (${processed} / ${total} files)`;
+        progressCounter.textContent = `${imported} Imported`;
+
+        remainingCountText.textContent = total - processed;
+        speedText.textContent = data.speed_bytes_per_sec > 0 ? (data.speed_bytes_per_sec / (1024 * 1024)).toFixed(2) + ' MB/s' : '-- MB/s';
+        etaText.textContent = formatRemainingTime(data.estimated_remaining_seconds);
+
+        if (data.current_file) {
+          statusTitle.textContent = `Processing: ${data.current_file}`;
+          if (!logBox.innerHTML.includes(data.current_file)) {
+            logBox.innerHTML += `<div>&gt;_ Downloading ${data.current_file}...</div>`;
+            scrollLogBox();
+          }
+        }
+
+        // Live newly completed media prepends (Feature 8)
+        if (data.newly_imported && data.newly_imported.length > 0) {
+          data.newly_imported.forEach(item => {
+            const containerId = item.stage === 'raw' ? 'raw-media-list' : 'edited-media-list';
+            const container = document.getElementById(containerId);
+            if (!container) return;
+
+            const existingRow = container.querySelector(`[href="${item.view_url}"]`);
+            if (existingRow) return;
+
+            const emptyPlaceholder = container.querySelector('.panel-muted');
+            if (emptyPlaceholder) {
+              emptyPlaceholder.remove();
+            }
+
+            const article = document.createElement('article');
+            article.className = 'media-file-row';
+            article.innerHTML = `
+              <div class="media-file-meta">
+                <span class="media-file-kind">${item.type}</span>
+                <span class="media-file-name">${item.original_name}</span>
+                <span class="panel-muted">Uploaded by ${item.uploader_name} &bull; ${item.uploader_role}</span>
+              </div>
+              <div class="media-file-actions">
+                <a class="panel-link" href="${item.view_url}" target="_blank" rel="noopener">View</a>
+              </div>
+            `;
+            container.insertBefore(article, container.firstChild);
+          });
+        }
+
+        // Handle states
+        if (data.status === 'completed') {
+          stopPolling();
+          progressBar.style.backgroundColor = '#4ade80';
+          statusTitle.textContent = 'Import Completed!';
+          logBox.innerHTML += `<div style="color:#4ade80; font-weight:bold; margin-top:8px;">&gt;_ Workflow Completed! Imported: ${imported}, Duplicates: ${duplicates}, Failed: ${failed}</div>`;
+          scrollLogBox();
+          
+          cancelImportBtn.style.display = 'none';
+          if (duplicates > 0) {
+            downloadDuplicatesLink.href = `/admin/projects/${projectId}/dropbox/export-duplicates/${uuid}`;
+            downloadDuplicatesLink.style.display = 'inline-flex';
+          }
+        } else if (data.status === 'failed') {
+          stopPolling();
+          progressBar.style.backgroundColor = '#f87171';
+          statusTitle.textContent = 'Import Failed';
+          logBox.innerHTML += `<div style="color:#ef4444; font-weight:bold; margin-top:8px;">&gt;_ Queue worker encountered error. Check database error logs.</div>`;
+          scrollLogBox();
+
+          cancelImportBtn.style.display = 'none';
+          retryFailedBtn.style.display = 'block';
+        } else if (data.status === 'cancelled') {
+          stopPolling();
+          progressBar.style.backgroundColor = '#fbbf24';
+          statusTitle.textContent = 'Import Cancelled';
+          logBox.innerHTML += `<div style="color:#fbbf24; font-weight:bold; margin-top:8px;">&gt;_ Import execution terminated by user request.</div>`;
+          scrollLogBox();
+
+          cancelImportBtn.style.display = 'none';
+        }
+
+      } catch (err) {
+        console.error('Polling error', err);
+      }
+    }
+
+    function stopPolling() {
+      if (pollInterval) {
+        clearInterval(pollInterval);
+        pollInterval = null;
+      }
+    }
+
+    function validateInputs() {
+      let hasError = false;
+      const url = folderLinkInput.value.trim();
+      const projectId = projectSelect.value;
+
+      if (!url) {
+        linkError.textContent = 'Please enter a Dropbox shared folder link.';
+        linkError.style.display = 'block';
+        hasError = true;
+      } else if (!url.match(/^https?:\/\/(www\.)?dropbox\.com\/(sh|scl\/fo|scl\/fi|s)\/.+/)) {
+        linkError.textContent = 'Please enter a valid Dropbox shared link.';
+        linkError.style.display = 'block';
+        hasError = true;
+      } else {
+        linkError.style.display = 'none';
+      }
+
+      if (!projectId) {
+        projectError.textContent = 'Please select a project / gallery.';
+        projectError.style.display = 'block';
+        hasError = true;
+      } else {
+        projectError.style.display = 'none';
+      }
+
+      return !hasError;
+    }
+
+    function resetForm() {
+      folderLinkInput.value = '';
+      projectSelect.value = '';
+      stageSelect.value = 'raw';
+      linkError.style.display = 'none';
+      projectError.style.display = 'none';
+      
+      previewBox.style.display = 'none';
+      scanBtn.style.display = 'block';
+      submitBtn.style.display = 'none';
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Start Background Import';
+
+      formState.style.display = 'block';
+      progressState.style.display = 'none';
+      progressBar.style.width = '0%';
+      progressBar.style.backgroundColor = '#0061ff';
+      progressText.textContent = '0% (0 / 0 files)';
+      progressCounter.textContent = '0 Imported';
+      logBox.innerHTML = '<div style="color:#94a3b8;">&gt;_ Initializing import session...</div>';
+      
+      remainingCountText.textContent = '--';
+      speedText.textContent = '-- MB/s';
+      etaText.textContent = '--';
+
+      importInProgress = false;
+      currentSessionUuid = null;
+      stopPolling();
+    }
+
+    function scrollLogBox() {
+      logBox.scrollTop = logBox.scrollHeight;
+    }
+
+    function formatRemainingTime(seconds) {
+      if (!seconds || seconds <= 0) return '--';
+      if (seconds < 60) return `${seconds} seconds`;
+      const mins = Math.floor(seconds / 60);
+      const secs = seconds % 60;
+      return `${mins}m ${secs}s`;
     }
   })();
 </script>

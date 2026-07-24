@@ -879,8 +879,18 @@ class DashboardController extends Controller
         $canViewInvoices = in_array($role, ['owner', 'admin', 'manager'], true);
         $galleryPayloadByProject = $this->buildProjectGalleryPayloadMap($projects->getCollection(), false, true, false);
 
+        $allProjects = ClientProject::query()
+            ->when($isScopedMediaUser, function ($query) use ($userId): void {
+                $query->whereHas('assignments', function ($assignmentQuery) use ($userId): void {
+                    $assignmentQuery->where('user_id', $userId);
+                });
+            })
+            ->latest('id')
+            ->get(['id', 'title']);
+
         return view('admin.media-delivery-index', [
             'projects' => $projects,
+            'allProjects' => $allProjects,
             'filters' => [
                 'media_search' => $search,
             ],
@@ -3196,13 +3206,38 @@ class DashboardController extends Controller
             ->paginate(20)
             ->withQueryString();
 
+        $roleLogs = \DB::table('role_change_logs')
+            ->join('users as target', 'role_change_logs.user_id', '=', 'target.id')
+            ->leftJoin('users as actor', 'role_change_logs.actor_id', '=', 'actor.id')
+            ->select([
+                'role_change_logs.*',
+                'target.name as target_name',
+                'target.email as target_email',
+                'actor.name as actor_name',
+            ])
+            ->latest('role_change_logs.id')
+            ->limit(15)
+            ->get();
+
+        $loginRecords = \App\Models\LoginRecord::with('user:id,name,email')
+            ->latest('id')
+            ->limit(20)
+            ->get();
+
+        $dbRoles = \App\Models\Role::pluck('name')->all();
+        if (empty($dbRoles)) {
+            $dbRoles = ['super_admin', 'admin', 'manager', 'photographer', 'editor', 'client', 'user'];
+        }
+
         return view('admin.users-index', [
             'users' => $users,
             'filters' => [
                 'role' => $roleFilter,
                 'search' => $search,
             ],
-            'roles' => ['admin', 'manager', 'photographer', 'editor', 'client'],
+            'roles' => $dbRoles,
+            'roleLogs' => $roleLogs,
+            'loginRecords' => $loginRecords,
         ]);
     }
 
@@ -3228,11 +3263,15 @@ class DashboardController extends Controller
             $passwordForAdmin = 'Maccento@' . random_int(100000, 999999);
         }
 
+        $roleModel = \App\Models\Role::where('name', $validated['role'])->first();
+
         $user = User::create([
             'name' => $validated['name'],
             'email' => $email,
             'phone' => $validated['phone'] ?? null,
             'role' => $validated['role'],
+            'role_id' => $roleModel?->id,
+            'status' => 'active',
             'password' => $passwordForAdmin,
         ]);
 
@@ -3280,6 +3319,18 @@ class DashboardController extends Controller
             return back()->withErrors(['user' => 'You cannot delete your own account while logged in.']);
         }
 
+        // Safeguard: Prevent deleting the last active administrator or owner account
+        $isAdminOrOwner = in_array(strtolower(trim($user->role)), ['admin', 'owner', 'super_admin'], true);
+        if ($isAdminOrOwner) {
+            $otherAdminsOrOwnersCount = User::whereIn('role', ['admin', 'owner', 'super_admin'])
+                ->where('id', '!=', $user->id)
+                ->where('status', 'active')
+                ->count();
+            if ($otherAdminsOrOwnersCount === 0) {
+                return back()->withErrors(['user' => 'You cannot delete the last active administrator or owner account.']);
+            }
+        }
+
         $display = $user->email ?: $user->name;
         $snapshot = [
             'name' => $user->name,
@@ -3301,6 +3352,308 @@ class DashboardController extends Controller
         );
 
         return back()->with('status', "User {$display} deleted successfully.");
+    }
+
+    public function adminUserUpdate(Request $request, User $user): RedirectResponse
+    {
+        $this->ensureOwnerAdminAccess($request);
+
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'email', 'max:255', 'unique:users,email,' . $user->id],
+            'phone' => ['nullable', 'string', 'max:30'],
+            'role' => ['required', 'in:super_admin,admin,manager,photographer,editor,client,user'],
+            'status' => ['required', 'in:active,suspended,locked,archived,pending_verification'],
+            'company' => ['nullable', 'string', 'max:255'],
+            'notes' => ['nullable', 'string', 'max:1500'],
+        ]);
+
+        $oldRole = $user->role;
+        $newRole = $validated['role'];
+        $oldStatus = $user->status;
+        $newStatus = $validated['status'];
+
+        // Safeguard demoting or deactivating the last admin/owner/super_admin
+        if ($oldRole !== $newRole || $newStatus !== 'active') {
+            $isAdminOrOwner = in_array(strtolower(trim($user->role)), ['admin', 'owner', 'super_admin'], true);
+            if ($isAdminOrOwner) {
+                $otherAdminsOrOwnersCount = User::whereIn('role', ['admin', 'owner', 'super_admin'])
+                    ->where('id', '!=', $user->id)
+                    ->where('status', 'active')
+                    ->count();
+                if ($otherAdminsOrOwnersCount === 0) {
+                    return back()->withErrors(['role' => 'You cannot demote or deactivate the last active administrator or owner account.']);
+                }
+            }
+        }
+
+        // Audit role change in role_change_logs
+        if ($oldRole !== $newRole) {
+            \DB::table('role_change_logs')->insert([
+                'actor_id' => $request->user()?->id,
+                'user_id' => $user->id,
+                'old_role' => $oldRole,
+                'new_role' => $newRole,
+                'ip_address' => $request->ip(),
+                'user_agent' => substr((string) $request->userAgent(), 0, 255),
+                'reason' => $request->input('reason') ?: 'Admin updated user details',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        // Audit status changes
+        if ($oldStatus !== $newStatus) {
+            \DB::table('role_change_logs')->insert([
+                'actor_id' => $request->user()?->id,
+                'user_id' => $user->id,
+                'old_role' => $oldRole,
+                'new_role' => $newRole,
+                'ip_address' => $request->ip(),
+                'user_agent' => substr((string) $request->userAgent(), 0, 255),
+                'reason' => 'Status changed from ' . $oldStatus . ' to ' . $newStatus,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        $roleModel = \App\Models\Role::where('name', $newRole)->first();
+
+        $user->update([
+            'name' => $validated['name'],
+            'email' => strtolower(trim($validated['email'])),
+            'phone' => $validated['phone'] ?? null,
+            'role' => $newRole,
+            'role_id' => $roleModel?->id,
+            'status' => $newStatus,
+        ]);
+
+        $user->clearPermissionCache();
+
+        // If client, link or create client profile
+        if ($newRole === 'client') {
+            \App\Models\Client::updateOrCreate(
+                ['user_id' => $user->id],
+                [
+                    'name' => $validated['name'],
+                    'email' => strtolower(trim($validated['email'])),
+                    'phone' => $validated['phone'] ?? null,
+                    'company' => $validated['company'] ?? null,
+                    'status' => 'active',
+                    'notes' => $validated['notes'] ?? 'Updated from user details form.',
+                ]
+            );
+        }
+
+        return back()->with('status', 'User details updated successfully.');
+    }
+
+    public function adminUserResetPassword(Request $request, User $user): RedirectResponse
+    {
+        $this->ensureOwnerAdminAccess($request);
+
+        $validated = $request->validate([
+            'password' => [
+                'required',
+                'string',
+                'confirmed',
+                Password::min(8)->mixedCase()->letters()->numbers()->symbols()->uncompromised(),
+            ],
+        ]);
+
+        $user->update([
+            'password' => $validated['password'],
+        ]);
+
+        return back()->with('status', 'Password reset successfully for ' . ($user->email ?: $user->name));
+    }
+
+    public function adminUserBulkAction(Request $request): RedirectResponse
+    {
+        $this->ensureOwnerAdminAccess($request);
+
+        $validated = $request->validate([
+            'user_ids' => ['required', 'array'],
+            'user_ids.*' => ['required', 'exists:users,id'],
+            'action' => ['required', 'in:activate,suspend,change_role,reset_password,delete'],
+            'bulk_role' => ['nullable', 'string', 'in:super_admin,admin,manager,photographer,editor,client,user'],
+            'bulk_password' => [
+                'nullable',
+                'string',
+                Password::min(8)->mixedCase()->letters()->numbers()->symbols()->uncompromised(),
+            ],
+        ]);
+
+        $userIds = $validated['user_ids'];
+        $action = $validated['action'];
+        $actorId = $request->user()?->id;
+
+        $targetUsers = User::whereIn('id', $userIds)->get();
+
+        if ($action === 'delete') {
+            // Safeguard last admin deletion
+            foreach ($targetUsers as $u) {
+                if (in_array(strtolower(trim($u->role)), ['admin', 'owner', 'super_admin'], true)) {
+                    $otherAdminsOrOwnersCount = User::whereIn('role', ['admin', 'owner', 'super_admin'])
+                        ->where('id', '!=', $u->id)
+                        ->where('status', 'active')
+                        ->count();
+                    if ($otherAdminsOrOwnersCount === 0) {
+                        return back()->withErrors(['bulk' => 'Bulk action failed: You cannot delete the last active administrator or owner account.']);
+                    }
+                }
+            }
+
+            foreach ($targetUsers as $u) {
+                if ((int) $actorId === (int) $u->id) {
+                    continue; // Skip self deletion
+                }
+                $u->delete();
+            }
+            return back()->with('status', 'Bulk delete successfully executed on selected users (skipped self if selected).');
+        }
+
+        if ($action === 'activate') {
+            foreach ($targetUsers as $u) {
+                $u->update(['status' => 'active']);
+            }
+            return back()->with('status', 'Bulk activation completed.');
+        }
+
+        if ($action === 'suspend') {
+            // Safeguard last admin suspension
+            foreach ($targetUsers as $u) {
+                if (in_array(strtolower(trim($u->role)), ['admin', 'owner', 'super_admin'], true)) {
+                    $otherAdminsOrOwnersCount = User::whereIn('role', ['admin', 'owner', 'super_admin'])
+                        ->where('id', '!=', $u->id)
+                        ->where('status', 'active')
+                        ->count();
+                    if ($otherAdminsOrOwnersCount === 0) {
+                        return back()->withErrors(['bulk' => 'Bulk suspend failed: You cannot suspend the last active administrator or owner account.']);
+                    }
+                }
+            }
+
+            foreach ($targetUsers as $u) {
+                $u->update(['status' => 'suspended']);
+            }
+            return back()->with('status', 'Bulk suspension completed.');
+        }
+
+        if ($action === 'change_role') {
+            $newRole = $validated['bulk_role'];
+            if (!$newRole) {
+                return back()->withErrors(['bulk_role' => 'A role must be specified for bulk role change.']);
+            }
+
+            // Safeguard last admin demotion
+            foreach ($targetUsers as $u) {
+                if (in_array(strtolower(trim($u->role)), ['admin', 'owner', 'super_admin'], true)) {
+                    $otherAdminsOrOwnersCount = User::whereIn('role', ['admin', 'owner', 'super_admin'])
+                        ->where('id', '!=', $u->id)
+                        ->where('status', 'active')
+                        ->count();
+                    if ($otherAdminsOrOwnersCount === 0) {
+                        return back()->withErrors(['bulk' => 'Bulk change role failed: You cannot demote the last active administrator or owner account.']);
+                    }
+                }
+            }
+
+            $roleModel = \App\Models\Role::where('name', $newRole)->first();
+
+            foreach ($targetUsers as $u) {
+                $oldRole = $u->role;
+                if ($oldRole !== $newRole) {
+                    \DB::table('role_change_logs')->insert([
+                        'actor_id' => $actorId,
+                        'user_id' => $u->id,
+                        'old_role' => $oldRole,
+                        'new_role' => $newRole,
+                        'ip_address' => $request->ip(),
+                        'user_agent' => substr((string) $request->userAgent(), 0, 255),
+                        'reason' => 'Bulk role change',
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+                }
+
+                $u->update([
+                    'role' => $newRole,
+                    'role_id' => $roleModel?->id,
+                ]);
+
+                $u->clearPermissionCache();
+            }
+            return back()->with('status', 'Bulk role change completed.');
+        }
+
+        if ($action === 'reset_password') {
+            $password = $validated['bulk_password'];
+            if (empty($password)) {
+                return back()->withErrors(['bulk_password' => 'A password must be provided for bulk password resets.']);
+            }
+
+            foreach ($targetUsers as $u) {
+                $u->update([
+                    'password' => $password,
+                ]);
+            }
+            return back()->with('status', 'Bulk password reset completed.');
+        }
+
+        return back();
+    }
+
+    public function adminPermissionsIndex(Request $request): View
+    {
+        $this->ensureOwnerAdminAccess($request);
+
+        $roles = \App\Models\Role::with('permissions')->get();
+        $permissions = \App\Models\Permission::all();
+
+        return view('admin.permissions-index', [
+            'roles' => $roles,
+            'permissions' => $permissions,
+        ]);
+    }
+
+    public function adminPermissionsUpdate(Request $request): RedirectResponse
+    {
+        $this->ensureOwnerAdminAccess($request);
+
+        $validated = $request->validate([
+            'matrix' => ['nullable', 'array'],
+            'matrix.*' => ['nullable', 'array'],
+        ]);
+
+        $matrix = $validated['matrix'] ?? [];
+
+        $roles = \App\Models\Role::all();
+        foreach ($roles as $role) {
+            if ($role->name === 'super_admin') {
+                continue; // Prevent editing super_admin permissions for security stability
+            }
+
+            $permissionIds = isset($matrix[$role->id]) ? array_keys($matrix[$role->id]) : [];
+            $role->permissions()->sync($permissionIds);
+
+            // Clear permission cache for all users of this role
+            $role->users->each->clearPermissionCache();
+        }
+
+        // Log matrix update
+        \DB::table('role_change_logs')->insert([
+            'actor_id' => $request->user()?->id,
+            'user_id' => $request->user()?->id,
+            'old_role' => $request->user()?->role,
+            'new_role' => $request->user()?->role,
+            'ip_address' => $request->ip(),
+            'user_agent' => substr((string) $request->userAgent(), 0, 255),
+            'reason' => 'Updated global Role-Permission Matrix',
+            'created_at' => now(),
+        ]);
+
+        return back()->with('status', 'Role-Permission Matrix updated successfully.');
     }
 
     public function adminClientDestroy(Request $request, Client $client): RedirectResponse
@@ -4337,7 +4690,7 @@ public function adminClientMessagesCenterStore(Request $request): RedirectRespon
                 }
             }
 
-            ClientProjectMedia::create([
+            $mediaItem = ClientProjectMedia::create([
                 'client_project_id' => $project->id,
                 'uploaded_by' => $request->user()?->id,
                 'type' => $type,
@@ -4351,6 +4704,17 @@ public function adminClientMessagesCenterStore(Request $request): RedirectRespon
                 'mime_type' => $mimeType !== '' ? $mimeType : null,
                 'size_bytes' => (int) $file->getSize(),
             ]);
+
+            // Extract metadata for local image uploads
+            if ($type === 'image' && $mediaDisk === 'public') {
+                try {
+                    $absolutePath = Storage::disk($mediaDisk)->path($storedPath);
+                    $metaDataArray = $this->extractMediaMetadata($absolutePath, $mimeType);
+                    $mediaItem->metadata()->create($metaDataArray);
+                } catch (\Throwable $eex) {
+                    // Fail silently
+                }
+            }
 
             $saved++;
         }
@@ -4376,6 +4740,463 @@ public function adminClientMessagesCenterStore(Request $request): RedirectRespon
         );
 
         return back()->with('status', "{$saved} {$stageLabel} file(s) uploaded.");
+    }
+
+    public function adminProjectDropboxScan(Request $request, ClientProject $project): JsonResponse
+    {
+        try {
+            $this->ensureInternalUserCanUploadProjectMedia($request, $project);
+
+            $validated = $request->validate([
+                'dropbox_url' => ['required', 'string', 'url'],
+            ]);
+
+            $url = trim((string) $validated['dropbox_url']);
+
+            $this->logDropboxImport('Scan Started', [
+                'user' => $request->user()?->email,
+                'project_id' => $project->id,
+                'dropbox_url' => $url,
+            ]);
+
+            // Simple regex validation of Dropbox shared folder links
+            if (!preg_match('#^https?://(www\.)?dropbox\.com/(sh|scl/fo|scl/fi|s)/.+#', $url)) {
+                $this->logDropboxImport('Scan Failed', [
+                    'project_id' => $project->id,
+                    'reason' => 'Invalid Dropbox Shared Link URL',
+                ]);
+                return response()->json(['error' => 'Invalid Dropbox Shared Link URL.'], 422);
+            }
+
+            $token = trim((string) config('services.dropbox.access_token'));
+            if ($token === '') {
+                return response()->json(['error' => 'Dropbox Integration is not configured. Please define DROPBOX_ACCESS_TOKEN in the environment.'], 422);
+            }
+
+            $allFiles = [];
+            $hasMore = true;
+            $cursor = null;
+            $loopLimit = 20; // Safeguard against massive pagination loops
+            $loopCount = 0;
+
+            $imagesCount = 0;
+            $videosCount = 0;
+            $documentsCount = 0;
+            $unsupportedCount = 0;
+
+            while ($hasMore && $loopCount < $loopLimit) {
+                $loopCount++;
+                if ($cursor === null) {
+                    // Start scanning shared link
+                    $response = Http::withHeaders([
+                        'Authorization' => "Bearer {$token}",
+                        'Content-Type' => 'application/json',
+                    ])
+                    ->timeout(20)
+                    ->post('https://api.dropboxapi.com/2/sharing/list_shared_link_files', [
+                        'url' => $url,
+                        'limit' => 100,
+                    ]);
+                } else {
+                    // Continue scanning using cursor
+                    $response = Http::withHeaders([
+                        'Authorization' => "Bearer {$token}",
+                        'Content-Type' => 'application/json',
+                    ])
+                    ->timeout(20)
+                    ->post('https://api.dropboxapi.com/2/sharing/list_shared_link_files/continue', [
+                        'cursor' => $cursor,
+                    ]);
+                }
+
+                if ($response->failed()) {
+                    $status = $response->status();
+                    $err = $response->json('error_summary') ?: $response->body();
+                    $this->logDropboxImport('Scan Failed', [
+                        'project_id' => $project->id,
+                        'status' => $status,
+                        'reason' => $err,
+                    ]);
+
+                    if ($status === 400 || $status === 409) {
+                        return response()->json(['error' => "Dropbox URL scanning failed: {$err}"], 400);
+                    }
+                    if ($status === 401 || $status === 403) {
+                        return response()->json(['error' => 'Unauthorized. Dropbox Access Token is invalid or expired.'], 403);
+                    }
+                    return response()->json(['error' => 'Unable to read files from the provided Dropbox link. Ensure the folder is public and accessible.'], 400);
+                }
+
+                $data = $response->json();
+                $entries = $data['entries'] ?? [];
+                
+                foreach ($entries as $entry) {
+                    if (($entry['.tag'] ?? '') !== 'file') {
+                        continue;
+                    }
+
+                    $name = (string) ($entry['name'] ?? '');
+                    $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+                    
+                    // Filter supported extensions
+                    $imageExts = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'heic', 'tiff', 'bmp'];
+                    $videoExts = ['mp4', 'mov', 'avi', 'mkv'];
+                    $docExts = ['pdf', 'zip'];
+
+                    if (in_array($ext, $imageExts, true)) {
+                        $type = 'image';
+                        $imagesCount++;
+                    } elseif (in_array($ext, $videoExts, true)) {
+                        $type = 'video';
+                        $videosCount++;
+                    } elseif (in_array($ext, $docExts, true)) {
+                        $type = 'document';
+                        $documentsCount++;
+                    } else {
+                        $unsupportedCount++;
+                        continue;
+                    }
+
+                    $fileId = (string) ($entry['id'] ?? '');
+                    $size = (int) ($entry['size'] ?? 0);
+                    $path = (string) ($entry['path_lower'] ?? $entry['path_display'] ?? '/' . $name);
+
+                    $allFiles[] = [
+                        'id' => $fileId,
+                        'name' => $name,
+                        'path' => $path,
+                        'size' => $size,
+                        'type' => $type,
+                    ];
+                }
+
+                $cursor = $data['cursor'] ?? null;
+                $hasMore = (bool) ($data['has_more'] ?? false) && ($cursor !== null);
+            }
+
+            if ($allFiles === []) {
+                $this->logDropboxImport('Scan Failed', [
+                    'project_id' => $project->id,
+                    'reason' => 'No supported media files found',
+                ]);
+                return response()->json(['error' => 'No supported image, video, or document files were found in the shared folder.'], 422);
+            }
+
+            // Perform pre-download duplicate check in current project
+            $existingMedia = ClientProjectMedia::query()
+                ->where('client_project_id', $project->id)
+                ->get(['original_name', 'size_bytes', 'dropbox_file_id'])
+                ->all();
+
+            $existingIds = collect($existingMedia)->pluck('dropbox_file_id')->filter()->all();
+            $existingNamesAndSizes = collect($existingMedia)->map(fn($item) => $item->original_name . '|' . $item->size_bytes)->all();
+
+            foreach ($allFiles as &$f) {
+                $isDuplicate = false;
+                if ($f['id'] !== '' && in_array($f['id'], $existingIds, true)) {
+                    $isDuplicate = true;
+                } elseif (in_array($f['name'] . '|' . $f['size'], $existingNamesAndSizes, true)) {
+                    $isDuplicate = true;
+                }
+                $f['is_duplicate'] = $isDuplicate;
+            }
+            unset($f);
+
+            $this->logDropboxImport('Scan Completed', [
+                'project_id' => $project->id,
+                'images' => $imagesCount,
+                'videos' => $videosCount,
+                'documents' => $documentsCount,
+                'unsupported' => $unsupportedCount,
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'files' => $allFiles,
+                'counts' => [
+                    'images' => $imagesCount,
+                    'videos' => $videosCount,
+                    'documents' => $documentsCount,
+                    'unsupported' => $unsupportedCount,
+                ]
+            ]);
+
+        } catch (\Throwable $e) {
+            report($e);
+            return response()->json(['error' => 'An error occurred during scan: ' . $e->getMessage()], 500);
+        }
+    }
+
+    public function adminProjectDropboxImportFile(Request $request, ClientProject $project): JsonResponse
+    {
+        $tempLocalPath = null;
+        try {
+            $this->ensureInternalUserCanUploadProjectMedia($request, $project);
+
+            $validated = $request->validate([
+                'dropbox_url' => ['required', 'string', 'url'],
+                'file_id' => ['required', 'string'],
+                'name' => ['required', 'string'],
+                'path' => ['required', 'string'],
+                'size' => ['required', 'integer'],
+                'type' => ['required', 'string', 'in:image,video,document'],
+                'media_stage' => ['required', 'string', 'in:raw,edited,video,document'],
+            ]);
+
+            $dropboxUrl = trim((string) $validated['dropbox_url']);
+            $fileId = trim((string) $validated['file_id']);
+            $name = trim((string) $validated['name']);
+            $path = trim((string) $validated['path']);
+            $size = (int) $validated['size'];
+            $type = (string) $validated['type'];
+            $selectedStage = (string) $validated['media_stage'];
+
+            $this->logDropboxImport('Downloading', [
+                'project_id' => $project->id,
+                'file_name' => $name,
+                'size_bytes' => $size,
+            ]);
+
+            $token = trim((string) config('services.dropbox.access_token'));
+            if ($token === '') {
+                return response()->json(['error' => 'Dropbox access token is not configured.'], 422);
+            }
+
+            // Create temporary file path
+            $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+            $tempLocalPath = sys_get_temp_dir() . '/dropbox_import_' . Str::random(16) . ($ext !== '' ? '.' . $ext : '');
+
+            // Download file directly to local disk (stream / sink)
+            $response = Http::withHeaders([
+                'Authorization' => "Bearer {$token}",
+                'Dropbox-API-Arg' => json_encode([
+                    'url' => $dropboxUrl,
+                    'path' => $path,
+                ]),
+            ])
+            ->withOptions([
+                'sink' => $tempLocalPath,
+            ])
+            ->timeout(180)
+            ->post('https://content.dropboxapi.com/2/sharing/get_shared_link_file');
+
+            if ($response->failed() || !file_exists($tempLocalPath) || filesize($tempLocalPath) === 0) {
+                if ($tempLocalPath && file_exists($tempLocalPath)) {
+                    @unlink($tempLocalPath);
+                }
+                $errorMsg = $response->header('Dropbox-API-Conflict-Error') ?: $response->body();
+                $this->logDropboxImport('Failed', [
+                    'project_id' => $project->id,
+                    'file_name' => $name,
+                    'reason' => "Download failed: {$errorMsg}",
+                ]);
+                return response()->json(['error' => "Download failed from Dropbox: {$errorMsg}"], 400);
+            }
+
+            $actualSize = filesize($tempLocalPath);
+            $fileHash = hash_file('sha256', $tempLocalPath);
+
+            // Phase 2: Duplicate Check using content Hash
+            $duplicate = ClientProjectMedia::query()
+                ->where('client_project_id', $project->id)
+                ->where(function ($query) use ($fileId, $fileHash, $name, $actualSize) {
+                    $query->where('dropbox_file_id', $fileId)
+                        ->orWhere('file_hash', $fileHash)
+                        ->orWhere(function ($q) use ($name, $actualSize) {
+                            $q->where('original_name', $name)
+                              ->where('size_bytes', $actualSize);
+                        });
+                })
+                ->first();
+
+            if ($duplicate) {
+                @unlink($tempLocalPath);
+                $this->logDropboxImport('Completed', [
+                    'project_id' => $project->id,
+                    'file_name' => $name,
+                    'status' => 'skipped (duplicate hash)',
+                ]);
+                return response()->json([
+                    'status' => 'skipped',
+                    'message' => 'Duplicate file detected by file content hash.',
+                ]);
+            }
+
+            // Secure MIME and Extension Verification
+            $mimeType = @mime_content_type($tempLocalPath) ?: '';
+            $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+
+            // Prevent Executable Uploads
+            $executableMimes = [
+                'application/x-msdownload', 'application/x-sh', 'application/x-bash', 
+                'application/x-executable', 'text/x-php', 'text/x-python', 'text/x-javascript'
+            ];
+            $executableExts = ['exe', 'bat', 'sh', 'php', 'js', 'py', 'pl', 'cgi', 'cmd', 'msi'];
+            if (in_array($mimeType, $executableMimes, true) || in_array($ext, $executableExts, true)) {
+                @unlink($tempLocalPath);
+                $this->logDropboxImport('Failed', [
+                    'project_id' => $project->id,
+                    'file_name' => $name,
+                    'reason' => 'Executable file blocked',
+                ]);
+                return response()->json(['error' => 'Executable uploads are strictly prohibited for security reasons.'], 400);
+            }
+
+            // Map Extension categories
+            $imageExts = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'heic', 'tiff', 'bmp'];
+            $videoExts = ['mp4', 'mov', 'avi', 'mkv'];
+
+            $finalType = 'other';
+            if (in_array($ext, $imageExts, true)) {
+                $finalType = 'image';
+            } elseif (in_array($ext, $videoExts, true)) {
+                $finalType = 'video';
+            } elseif ($ext === 'zip') {
+                $finalType = ($selectedStage === 'raw') ? 'raw_zip' : 'final_zip';
+            }
+
+            // Resolve stage mapping for storage logic consistency
+            $mediaStage = ($selectedStage === 'raw') ? 'raw' : 'edited';
+
+            // Store files using EXACTLY the same storage logic as the normal uploader
+            $mediaDisk = $this->resolveMediaDisk();
+            $projectMediaBasePath = $this->projectMediaBasePath($project);
+            
+            // Re-resolve bucket directories based on types
+            $targetBucket = $this->projectMediaBucketForStage($mediaStage);
+            if ($finalType === 'raw_zip') {
+                $targetBucket = 'raw-zip';
+            } elseif ($finalType === 'final_zip') {
+                $targetBucket = 'delivery';
+            }
+
+            $galleryUploadPath = $this->projectMediaUploadPath($project, $request->user(), $targetBucket);
+
+            $storedName = Str::random(40) . ($ext !== '' ? '.' . $ext : '');
+            $storedPath = Storage::disk($mediaDisk)->putFileAs($galleryUploadPath, new \Illuminate\Http\File($tempLocalPath), $storedName);
+            if (!$storedPath) {
+                @unlink($tempLocalPath);
+                return response()->json(['error' => 'Failed to store imported file in system storage.'], 500);
+            }
+
+            if ($mimeType === '') {
+                if ($finalType === 'image') $mimeType = 'image/jpeg';
+                elseif ($finalType === 'video') $mimeType = 'video/mp4';
+                elseif ($finalType === 'raw_zip' || $finalType === 'final_zip') $mimeType = 'application/zip';
+                else $mimeType = 'application/octet-stream';
+            }
+
+            // Watermarking logic (reusing existing code)
+            $watermarkDisk = null;
+            $watermarkPath = null;
+            $mediaWatermarkSignature = null;
+            
+            // Only generate watermarks for images in unpaid galleries
+            if ($finalType === 'image') {
+                $this->logDropboxImport('Processing', [
+                    'project_id' => $project->id,
+                    'file_name' => $name,
+                    'task' => 'Generating Preview/Watermark',
+                ]);
+
+                $watermarkSettings = $this->getWatermarkSettings();
+                $watermarkRenderConfig = $this->resolveWatermarkRenderConfig($watermarkSettings);
+                $watermarkSignature = (string) ($watermarkRenderConfig['signature'] ?? '');
+
+                $watermarked = $this->generateHardWatermarkVariant($mediaDisk, $storedPath, $projectMediaBasePath, $watermarkRenderConfig);
+                if (is_array($watermarked)) {
+                    $watermarkDisk = (string) ($watermarked['disk'] ?? 'public');
+                    $watermarkPath = (string) ($watermarked['path'] ?? '');
+                    if ($watermarkPath === '') {
+                        $watermarkDisk = null;
+                        $watermarkPath = null;
+                    } else {
+                        $mediaWatermarkSignature = $watermarkSignature;
+                    }
+                }
+            }
+
+            // Map DB delivery_stage column value
+            $dbDeliveryStage = $mediaStage;
+            if ($finalType === 'final_zip') {
+                $dbDeliveryStage = 'final_zip';
+            }
+
+            $mediaItem = ClientProjectMedia::create([
+                'client_project_id' => $project->id,
+                'uploaded_by' => $request->user()?->id,
+                'type' => $finalType,
+                'delivery_stage' => $dbDeliveryStage,
+                'disk' => $mediaDisk,
+                'path' => $storedPath,
+                'watermark_disk' => $watermarkDisk,
+                'watermark_path' => $watermarkPath,
+                'watermark_signature' => $mediaWatermarkSignature,
+                'original_name' => $name,
+                'mime_type' => $mimeType !== '' ? $mimeType : null,
+                'size_bytes' => $actualSize,
+                'dropbox_file_id' => $fileId,
+                'file_hash' => $fileHash,
+                'dropbox_shared_link' => $dropboxUrl,
+                'import_source' => 'dropbox',
+            ]);
+
+            $stageLabel = $mediaStage === 'edited' ? 'edited/final media' : 'raw footage media';
+            $this->logActivity(
+                $request,
+                'media',
+                $project->id,
+                $project->client_id,
+                $request->user(),
+                'upload',
+                "Imported Dropbox file {$name} ({$stageLabel}) to project: " . ($project->title ?: ('Project #' . $project->id)),
+                [
+                    'stage' => $mediaStage,
+                    'file_name' => $name,
+                    'dropbox_file_id' => $fileId,
+                ]
+            );
+
+            $this->logDropboxImport('Completed', [
+                'project_id' => $project->id,
+                'file_name' => $name,
+                'status' => 'success',
+            ]);
+
+            if ($tempLocalPath && file_exists($tempLocalPath)) {
+                @unlink($tempLocalPath);
+            }
+
+            return response()->json([
+                'status' => 'success',
+                'media_id' => $mediaItem->id,
+                'type' => $finalType,
+            ]);
+
+        } catch (\Throwable $e) {
+            if ($tempLocalPath && file_exists($tempLocalPath)) {
+                @unlink($tempLocalPath);
+            }
+            $this->logDropboxImport('Failed', [
+                'project_id' => $project->id,
+                'reason' => $e->getMessage(),
+            ]);
+            report($e);
+            return response()->json(['error' => 'An error occurred during import: ' . $e->getMessage()], 500);
+        }
+    }
+
+    private function logDropboxImport(string $message, array $context = []): void
+    {
+        try {
+            $context['time'] = now()->toIso8601String();
+            \Illuminate\Support\Facades\Log::build([
+                'driver' => 'single',
+                'path' => storage_path('logs/dropbox_import.log'),
+            ])->info($message, $context);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::info("Dropbox Import [Fallback]: " . $message, $context);
+        }
     }
 
     public function adminProjectRawZipStore(Request $request, ClientProject $project): RedirectResponse
@@ -7858,7 +8679,7 @@ public function userDeliveriesIndex(Request $request): View
         RequestEditLog::create($payload);
     }
 
-    private function logActivity(Request $request, string $entityType, int $entityId, ?int $clientId, ?User $actor, string $action, string $summary, array $changes = []): void
+    public function logActivity(Request $request, string $entityType, int $entityId, ?int $clientId, ?User $actor, string $action, string $summary, array $changes = []): void
     {
         if (!Schema::hasTable('request_edit_logs')) {
             return;
@@ -8175,7 +8996,7 @@ public function userDeliveriesIndex(Request $request): View
             ->all();
     }
 
-    private function getWatermarkSettings(): WatermarkSetting
+    public function getWatermarkSettings(): WatermarkSetting
     {
         $settings = WatermarkSetting::query()->first();
         if ($settings) {
@@ -8194,7 +9015,7 @@ public function userDeliveriesIndex(Request $request): View
     /**
      * @return array{logo_absolute_path:?string,position:string,size:string,opacity_percent:int,signature:string}
      */
-    private function resolveWatermarkRenderConfig(?WatermarkSetting $settings = null): array
+    public function resolveWatermarkRenderConfig(?WatermarkSetting $settings = null): array
     {
         $settings ??= $this->getWatermarkSettings();
 
@@ -8448,7 +9269,7 @@ public function userDeliveriesIndex(Request $request): View
         return $enabled !== [] ? $enabled : $options;
     }
 
-    private function resolveMediaDisk(): string
+    public function resolveMediaDisk(): string
     {
         try {
             if (Schema::hasTable('api_integration_settings')) {
@@ -8479,8 +9300,12 @@ public function userDeliveriesIndex(Request $request): View
         return 0.24;
     }
 
-    private function projectMediaBasePath(ClientProject $project): string
+    public function projectMediaBasePath(ClientProject $project): string
     {
+        if ($project->client && !empty($project->client->folder_name) && !empty($project->folder_name)) {
+            return 'clients/' . $project->client->folder_name . '/' . $project->folder_name;
+        }
+
         $projectTitle = trim((string) ($project->title ?? ''));
         $slug = Str::slug($projectTitle);
         if ($slug === '') {
@@ -8490,16 +9315,38 @@ public function userDeliveriesIndex(Request $request): View
         return 'media/' . $slug . '-' . (int) $project->id;
     }
 
-    private function projectMediaUploadPath(ClientProject $project, ?User $user, string $bucket): string
+    public function getStorageStageFolder(string $stage): string
+    {
+        return match (strtolower(trim($stage))) {
+            'raw', 'raw-footage', 'raw_footage', 'raw-zip' => '01_raw',
+            'culling' => '02_culling',
+            'editing', 'edited', 'edited-final' => '03_editing',
+            'final' => '04_final',
+            'delivery', 'delivery-zip', 'final-zip', 'final_zip' => '05_delivery',
+            'documents', 'document' => '06_documents',
+            'exports', 'export' => '07_exports',
+            'watermarked', 'gallery-watermarked', 'watermark' => '08_watermarked',
+            'social' => '09_social',
+            'video' => '10_video',
+            default => '01_raw',
+        };
+    }
+
+    public function projectMediaUploadPath(ClientProject $project, ?User $user, string $bucket): string
     {
         $roleFolder = $this->projectMediaRoleFolder((string) ($user?->role ?? 'staff'));
         $userSlug = Str::slug((string) ($user?->name ?? ('user-' . (int) ($user?->id ?? 0))));
         $userSegment = 'user-' . (int) ($user?->id ?? 0) . ($userSlug !== '' ? '-' . $userSlug : '');
 
+        if ($project->client && !empty($project->client->folder_name) && !empty($project->folder_name)) {
+            $stageFolder = $this->getStorageStageFolder($bucket);
+            return 'clients/' . $project->client->folder_name . '/' . $project->folder_name . '/' . $stageFolder . '/' . $roleFolder . '/' . $userSegment;
+        }
+
         return $this->projectMediaBasePath($project) . '/' . trim($bucket, '/') . '/' . $roleFolder . '/' . $userSegment;
     }
 
-    private function projectMediaBucketForStage(string $stage): string
+    public function projectMediaBucketForStage(string $stage): string
     {
         return match (strtolower(trim($stage))) {
             'edited' => 'edited-final',
@@ -8553,7 +9400,7 @@ public function userDeliveriesIndex(Request $request): View
     * @param array{logo_absolute_path:?string,position:string,size:string,opacity_percent:int,signature:string} $renderConfig
      * @return array{disk:string,path:string}|null
      */
-    private function generateHardWatermarkVariant(string $disk, string $originalPath, string $projectMediaBasePath, array $renderConfig): ?array
+    public function generateHardWatermarkVariant(string $disk, string $originalPath, string $projectMediaBasePath, array $renderConfig): ?array
     {
         try {
             $driver = (string) config("filesystems.disks.{$disk}.driver", 'local');
@@ -8571,7 +9418,8 @@ public function userDeliveriesIndex(Request $request): View
                 $extension = 'jpg';
             }
 
-            $targetPath = trim($projectMediaBasePath, '/') . '/gallery-watermarked/' . Str::random(20) . '.' . $extension;
+            $watermarkFolder = str_starts_with($projectMediaBasePath, 'clients/') ? '08_watermarked' : 'gallery-watermarked';
+            $targetPath = trim($projectMediaBasePath, '/') . '/' . $watermarkFolder . '/' . Str::random(20) . '.' . $extension;
             $absoluteTargetPath = Storage::disk($disk)->path($targetPath);
             $targetDir = dirname($absoluteTargetPath);
             if (!is_dir($targetDir)) {
@@ -8921,6 +9769,650 @@ public function userDeliveriesIndex(Request $request): View
         }
 
         return 'INV-' . $date . '-' . strtoupper(uniqid());
+    }
+
+    public function adminProjectDropboxScanPreview(Request $request, ClientProject $project): JsonResponse
+    {
+        try {
+            $this->ensureInternalUserCanUploadProjectMedia($request, $project);
+            $validated = $request->validate([
+                'dropbox_url' => ['required', 'string', 'url'],
+            ]);
+
+            $url = trim((string) $validated['dropbox_url']);
+
+            // Simple regex validation of Dropbox shared folder links
+            if (!preg_match('#^https?://(www\.)?dropbox\.com/(sh|scl/fo|scl/fi|s)/.+#', $url)) {
+                return response()->json(['error' => 'Invalid Dropbox Shared Link URL.'], 422);
+            }
+
+            $provider = app(\App\Services\DropboxProvider::class);
+            $result = $provider->scan($url);
+
+            $files = $result['files'] ?? [];
+            $counts = $result['counts'] ?? [
+                'images' => 0,
+                'videos' => 0,
+                'documents' => 0,
+                'unsupported' => 0,
+            ];
+
+            // Perform pre-download duplicate check in current project
+            $existingMedia = ClientProjectMedia::query()
+                ->where('client_project_id', $project->id)
+                ->get(['original_name', 'size_bytes', 'dropbox_file_id'])
+                ->all();
+
+            $existingIds = collect($existingMedia)->pluck('dropbox_file_id')->filter()->all();
+            $existingNamesAndSizes = collect($existingMedia)->map(fn($item) => $item->original_name . '|' . $item->size_bytes)->all();
+
+            $duplicateCount = 0;
+            $totalSize = 0;
+
+            foreach ($files as $f) {
+                $isDuplicate = false;
+                if ($f['id'] !== '' && in_array($f['id'], $existingIds, true)) {
+                    $isDuplicate = true;
+                } elseif (in_array($f['name'] . '|' . $f['size'], $existingNamesAndSizes, true)) {
+                    $isDuplicate = true;
+                }
+                if ($isDuplicate) {
+                    $duplicateCount++;
+                }
+                $totalSize += $f['size'];
+            }
+
+            // Estimate time based on avg speed of 5MB/s
+            $estimatedTimeSec = (int) max(10, round($totalSize / (5 * 1024 * 1024)));
+
+            return response()->json([
+                'success' => true,
+                'counts' => [
+                    'images' => $counts['images'] ?? 0,
+                    'videos' => $counts['videos'] ?? 0,
+                    'documents' => $counts['documents'] ?? 0,
+                    'unsupported' => $counts['unsupported'] ?? 0,
+                    'duplicates' => $duplicateCount,
+                ],
+                'total_files' => count($files),
+                'total_size' => $totalSize,
+                'estimated_time_seconds' => $estimatedTimeSec,
+            ]);
+
+        } catch (\Throwable $e) {
+            return response()->json(['error' => 'Scan failed: ' . $e->getMessage()], 400);
+        }
+    }
+
+    public function adminProjectDropboxStartQueueImport(Request $request, ClientProject $project): JsonResponse
+    {
+        try {
+            $this->ensureInternalUserCanUploadProjectMedia($request, $project);
+            $validated = $request->validate([
+                'dropbox_url' => ['required', 'string', 'url'],
+                'media_stage' => ['required', 'string', 'in:raw,edited,video,document'],
+            ]);
+
+            $url = trim((string) $validated['dropbox_url']);
+            $mediaStage = (string) $validated['media_stage'];
+
+            if (!preg_match('#^https?://(www\.)?dropbox\.com/(sh|scl/fo|scl/fi|s)/.+#', $url)) {
+                return response()->json(['error' => 'Invalid Dropbox Shared Link URL.'], 422);
+            }
+
+            $provider = app(\App\Services\DropboxProvider::class);
+            $result = $provider->scan($url);
+
+            $files = $result['files'] ?? [];
+            if ($files === []) {
+                return response()->json(['error' => 'No supported media files found in the shared folder.'], 422);
+            }
+
+            // Storage management quota verification (Feature 11)
+            $totalSize = array_sum(array_column($files, 'size'));
+            $storageService = app(\App\Services\StorageManagementService::class);
+            if (!$storageService->hasAvailableQuotaForProject($project->id, $totalSize)) {
+                $quotaGb = round(\App\Services\StorageManagementService::DEFAULT_PROJECT_QUOTA / 1073741824, 1);
+                $usedGb = round($storageService->getProjectStorageUsage($project->id) / 1073741824, 1);
+                return response()->json([
+                    'error' => "Storage Quota Exceeded. Project limit is {$quotaGb} GB. Already used: {$usedGb} GB. Trying to import: " . round($totalSize / 1048576, 1) . " MB."
+                ], 422);
+            }
+
+            // Precheck duplicates
+            $filesQueue = [];
+            $existingMedia = ClientProjectMedia::query()
+                ->where('client_project_id', $project->id)
+                ->get(['original_name', 'size_bytes', 'dropbox_file_id'])
+                ->all();
+
+            $existingIds = collect($existingMedia)->pluck('dropbox_file_id')->filter()->all();
+            $existingNamesAndSizes = collect($existingMedia)->map(fn($item) => $item->original_name . '|' . $item->size_bytes)->all();
+
+            foreach ($files as $f) {
+                $isDuplicate = false;
+                if ($f['id'] !== '' && in_array($f['id'], $existingIds, true)) {
+                    $isDuplicate = true;
+                } elseif (in_array($f['name'] . '|' . $f['size'], $existingNamesAndSizes, true)) {
+                    $isDuplicate = true;
+                }
+                
+                $filesQueue[] = [
+                    'id' => $f['id'],
+                    'name' => $f['name'],
+                    'path' => $f['path'],
+                    'size' => $f['size'],
+                    'type' => $f['type'],
+                    'status' => $isDuplicate ? 'skipped' : 'pending',
+                    'error' => null,
+                ];
+            }
+
+            $uuid = (string) Str::uuid();
+
+            $session = \App\Models\DropboxImportSession::create([
+                'uuid' => $uuid,
+                'client_project_id' => $project->id,
+                'user_id' => $request->user()?->id,
+                'folder_url' => $url,
+                'provider' => 'dropbox',
+                'status' => 'pending',
+                'total_files' => count($filesQueue),
+                'processed_files' => 0,
+                'imported_files' => 0,
+                'duplicate_files' => 0,
+                'failed_files' => 0,
+                'total_size' => $totalSize,
+                'media_stage' => $mediaStage,
+                'files_queue' => $filesQueue,
+                'ip_address' => $request->ip(),
+                'user_agent' => substr((string) $request->userAgent(), 0, 255),
+            ]);
+
+            // Build Batch (Feature 1)
+            $jobs = [];
+            foreach ($filesQueue as $file) {
+                if ($file['status'] === 'pending') {
+                    $jobs[] = new \App\Jobs\ProcessImportedFileJob($session->id, $file);
+                } else {
+                    // Log pre-identified duplicates directly to file logs
+                    \App\Models\DropboxImportFileLog::create([
+                        'dropbox_import_session_id' => $session->id,
+                        'filename' => $file['name'],
+                        'dropbox_file_id' => $file['id'],
+                        'status' => 'skipped',
+                        'error_message' => 'Pre-download name/size duplicate check match.',
+                        'file_size' => $file['size'],
+                    ]);
+                    $session->increment('processed_files');
+                    $session->increment('duplicate_files');
+                }
+            }
+
+            if ($jobs === []) {
+                $session->update([
+                    'status' => 'completed',
+                    'completed_at' => now(),
+                    'duration' => 0,
+                ]);
+                return response()->json([
+                    'success' => true,
+                    'session_uuid' => $uuid,
+                    'message' => 'All files are duplicates. Scan completed.',
+                ]);
+            }
+
+            $batch = \Illuminate\Support\Facades\Bus::batch($jobs)
+                ->then(function (\Illuminate\Bus\Batch $batch) use ($session) {
+                    $session->refresh();
+                    if ($session->status === 'importing') {
+                        $session->update([
+                            'status' => 'completed',
+                            'completed_at' => now(),
+                            'duration' => now()->diffInSeconds($session->started_at),
+                        ]);
+                        // Dispatch notifications
+                        $job = new \App\Jobs\CloudImportJob($session->id);
+                        $job->sendMilestoneNotifications($session, 'completed');
+                    }
+                })
+                ->catch(function (\Illuminate\Bus\Batch $batch, \Throwable $e) use ($session) {
+                    $session->update(['status' => 'failed']);
+                    $errLog = $session->error_log ?? [];
+                    $errLog[] = ['filename' => 'Queue Batch', 'error' => $e->getMessage()];
+                    $session->update(['error_log' => $errLog]);
+
+                    $job = new \App\Jobs\CloudImportJob($session->id);
+                    $job->sendMilestoneNotifications($session, 'failed');
+                })
+                ->dispatch();
+
+            $session->update([
+                'batch_id' => $batch->id,
+                'status' => 'importing',
+                'started_at' => now(),
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'session_uuid' => $uuid,
+                'message' => 'Dropbox Import batch successfully queued in background.',
+            ]);
+
+        } catch (\Throwable $e) {
+            return response()->json(['error' => 'Failed to start queue import: ' . $e->getMessage()], 400);
+        }
+    }
+
+    public function adminProjectDropboxImportProgress(Request $request, ClientProject $project, string $uuid): JsonResponse
+    {
+        $session = \App\Models\DropboxImportSession::query()->where('uuid', $uuid)->firstOrFail();
+
+        $percent = 0;
+        $total = $session->total_files;
+        $processed = $session->processed_files;
+
+        if ($session->batch_id) {
+            $batch = \Illuminate\Support\Facades\Bus::findBatch($session->batch_id);
+            if ($batch) {
+                $percent = $batch->progress();
+                $processed = $batch->processedJobs() + $session->duplicate_files;
+            }
+        }
+
+        if ($percent === 0 && $total > 0) {
+            $percent = (int) round(($processed / $total) * 100);
+        }
+
+        // Speed & ETA calculations
+        $speedBytesPerSec = 0;
+        $estimatedRemainingSec = 0;
+
+        if ($session->started_at) {
+            $elapsedSec = (int) now()->diffInSeconds($session->started_at);
+            if ($elapsedSec > 0) {
+                $processedSize = \App\Models\DropboxImportFileLog::where('dropbox_import_session_id', $session->id)
+                    ->where('status', 'completed')
+                    ->sum('file_size');
+
+                $speedBytesPerSec = round($processedSize / $elapsedSec);
+                $remainingSize = max(0, $session->total_size - $processedSize);
+                if ($speedBytesPerSec > 0) {
+                    $estimatedRemainingSec = (int) round($remainingSize / $speedBytesPerSec);
+                }
+            }
+        }
+
+        // Live newly imported media elements (Feature 8)
+        $newlyImported = ClientProjectMedia::query()
+            ->where('client_project_id', $project->id)
+            ->where('dropbox_shared_link', $session->folder_url)
+            ->where('created_at', '>=', $session->started_at)
+            ->with('uploader:id,name,role')
+            ->get()
+            ->map(function ($item) use ($project) {
+                return [
+                    'id' => $item->id,
+                    'type' => strtoupper($item->type),
+                    'original_name' => $item->original_name,
+                    'uploader_name' => $item->uploader?->name ?: 'System',
+                    'uploader_role' => $item->uploader?->role ? ucfirst($item->uploader->role) : '',
+                    'view_url' => route('admin.projects.media.view', ['project' => $project, 'media' => $item]),
+                    'delete_url' => route('admin.projects.media.delete', ['project' => $project, 'media' => $item]),
+                    'stage' => $item->delivery_stage,
+                ];
+            });
+
+        return response()->json([
+            'status' => $session->status,
+            'total_files' => $total,
+            'processed_files' => $processed,
+            'imported_files' => $session->imported_files,
+            'duplicate_files' => $session->duplicate_files,
+            'failed_files' => $session->failed_files,
+            'current_file' => $session->current_file,
+            'percent' => $percent,
+            'speed_bytes_per_sec' => $speedBytesPerSec,
+            'estimated_remaining_seconds' => $estimatedRemainingSec,
+            'duration' => $session->duration,
+            'completed_at' => $session->completed_at ? $session->completed_at->toIso8601String() : null,
+            'total_size' => $session->total_size,
+            'newly_imported' => $newlyImported,
+        ]);
+    }
+
+    public function adminProjectDropboxCancelImport(Request $request, ClientProject $project, string $uuid): JsonResponse
+    {
+        $session = \App\Models\DropboxImportSession::query()->where('uuid', $uuid)->firstOrFail();
+        $session->update(['status' => 'cancelled']);
+
+        if ($session->batch_id) {
+            $batch = \Illuminate\Support\Facades\Bus::findBatch($session->batch_id);
+            if ($batch) {
+                $batch->cancel();
+            }
+        }
+
+        return response()->json(['success' => true]);
+    }
+
+    public function adminProjectDropboxRetryFailed(Request $request, ClientProject $project, string $uuid): JsonResponse
+    {
+        $session = \App\Models\DropboxImportSession::query()->where('uuid', $uuid)->firstOrFail();
+
+        // Get completed and skipped file IDs
+        $completedFileIds = \App\Models\DropboxImportFileLog::where('dropbox_import_session_id', $session->id)
+            ->whereIn('status', ['completed', 'skipped'])
+            ->pluck('dropbox_file_id')
+            ->filter()
+            ->all();
+
+        // Remove previous failure logs so they can be re-logged cleanly
+        \App\Models\DropboxImportFileLog::where('dropbox_import_session_id', $session->id)
+            ->where('status', 'failed')
+            ->delete();
+
+        $files = $session->files_queue ?? [];
+        $jobs = [];
+        foreach ($files as &$file) {
+            if (in_array($file['id'], $completedFileIds, true)) {
+                $file['status'] = 'completed';
+            } else {
+                $file['status'] = 'pending';
+                $file['error'] = null;
+                $jobs[] = new \App\Jobs\ProcessImportedFileJob($session->id, $file);
+            }
+        }
+        unset($file);
+
+        if ($jobs === []) {
+            return response()->json(['error' => 'No failed files found to retry.'], 400);
+        }
+
+        $batch = \Illuminate\Support\Facades\Bus::batch($jobs)
+            ->then(function (\Illuminate\Bus\Batch $batch) use ($session) {
+                $session->refresh();
+                if ($session->status === 'importing') {
+                    $session->update([
+                        'status' => 'completed',
+                        'completed_at' => now(),
+                        'duration' => now()->diffInSeconds($session->started_at),
+                    ]);
+                    $job = new \App\Jobs\CloudImportJob($session->id);
+                    $job->sendMilestoneNotifications($session, 'completed');
+                }
+            })
+            ->catch(function (\Illuminate\Bus\Batch $batch, \Throwable $e) use ($session) {
+                $session->update(['status' => 'failed']);
+                $errLog = $session->error_log ?? [];
+                $errLog[] = ['filename' => 'Queue Batch Retry', 'error' => $e->getMessage()];
+                $session->update(['error_log' => $errLog]);
+
+                $job = new \App\Jobs\CloudImportJob($session->id);
+                $job->sendMilestoneNotifications($session, 'failed');
+            })
+            ->dispatch();
+
+        $session->update([
+            'batch_id' => $batch->id,
+            'status' => 'importing',
+            'files_queue' => $files,
+            'failed_files' => 0,
+        ]);
+
+        return response()->json(['success' => true]);
+    }
+
+    public function adminProjectDropboxExportDuplicates(Request $request, ClientProject $project, string $uuid): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        $session = \App\Models\DropboxImportSession::query()->where('uuid', $uuid)->firstOrFail();
+        $report = $session->duplicate_report ?? [];
+
+        $headers = [
+            'Content-Type' => 'text/csv',
+            'Content-Disposition' => "attachment; filename=\"dropbox-import-duplicates-{$uuid}.csv\"",
+            'Pragma' => 'no-cache',
+            'Cache-Control' => 'must-revalidate, post-check=0, pre-check=0',
+            'Expires' => '0'
+        ];
+
+        return response()->stream(function () use ($report) {
+            $handle = fopen('php://output', 'w');
+            fputcsv($handle, ['Filename', 'Dropbox ID', 'SHA-256 Content Hash', 'Reason']);
+
+            foreach ($report as $r) {
+                fputcsv($handle, [
+                    $r['filename'] ?? '',
+                    $r['dropbox_id'] ?? '',
+                    $r['sha256'] ?? '',
+                    $r['reason'] ?? '',
+                ]);
+            }
+            fclose($handle);
+        }, 200, $headers);
+    }
+
+    public function adminProjectDropboxImportHistory(Request $request): \Illuminate\View\View
+    {
+        $query = \App\Models\DropboxImportSession::query()->with('project:id,title');
+
+        if ($request->filled('status')) {
+            $query->where('status', $request->input('status'));
+        }
+
+        if ($request->filled('search')) {
+            $search = '%' . $request->input('search') . '%';
+            $query->where(function ($q) use ($search) {
+                $q->where('folder_url', 'like', $search)
+                  ->orWhereHas('project', function ($qp) use ($search) {
+                      $qp->where('title', 'like', $search);
+                  });
+            });
+        }
+
+        $sessions = $query->latest('id')->paginate(15);
+        $allProjects = ClientProject::query()->get(['id', 'title']);
+
+        return view('admin.dropbox-import-history', [
+            'sessions' => $sessions,
+            'allProjects' => $allProjects,
+        ]);
+    }
+
+    public function extractMediaMetadata(string $path, string $mimeType): array
+    {
+        $metadata = [
+            'camera_make' => null,
+            'camera_model' => null,
+            'lens' => null,
+            'iso' => null,
+            'shutter_speed' => null,
+            'aperture' => null,
+            'capture_date' => null,
+            'gps_latitude' => null,
+            'gps_longitude' => null,
+            'width' => null,
+            'height' => null,
+        ];
+
+        // Dimensions
+        if (str_starts_with($mimeType, 'image/')) {
+            $imagesize = @getimagesize($path);
+            if ($imagesize) {
+                $metadata['width'] = (int) $imagesize[0];
+                $metadata['height'] = (int) $imagesize[1];
+            }
+
+            // Exif
+            if (in_array($mimeType, ['image/jpeg', 'image/jpg', 'image/tiff'], true)) {
+                try {
+                    $exif = @exif_read_data($path);
+                    if ($exif) {
+                        $metadata['camera_make'] = $exif['Make'] ?? null;
+                        $metadata['camera_model'] = $exif['Model'] ?? null;
+                        $metadata['lens'] = $exif['UndefinedTag:0xA434'] ?? $exif['LensModel'] ?? null;
+                        $metadata['iso'] = isset($exif['ISOSpeedRatings']) ? (is_array($exif['ISOSpeedRatings']) ? ($exif['ISOSpeedRatings'][0] ?? null) : $exif['ISOSpeedRatings']) : null;
+                        $metadata['shutter_speed'] = $exif['ExposureTime'] ?? null;
+                        $metadata['aperture'] = isset($exif['FNumber']) ? (string) $exif['FNumber'] : null;
+                        $metadata['capture_date'] = $exif['DateTimeOriginal'] ?? $exif['DateTime'] ?? null;
+                        
+                        // GPS
+                        if (isset($exif['GPSLatitude'], $exif['GPSLatitudeRef'], $exif['GPSLongitude'], $exif['GPSLongitudeRef'])) {
+                            $metadata['gps_latitude'] = $this->gpsToDecimal($exif['GPSLatitude'], $exif['GPSLatitudeRef']);
+                            $metadata['gps_longitude'] = $this->gpsToDecimal($exif['GPSLongitude'], $exif['GPSLongitudeRef']);
+                        }
+                    }
+                } catch (\Throwable $e) {
+                    // Ignore exif reading errors
+                }
+            }
+        }
+
+        return $metadata;
+    }
+
+    private function gpsToDecimal(array $coordinates, string $ref): float
+    {
+        $degrees = $this->gpsCoordinateToFloat($coordinates[0] ?? 0);
+        $minutes = $this->gpsCoordinateToFloat($coordinates[1] ?? 0);
+        $seconds = $this->gpsCoordinateToFloat($coordinates[2] ?? 0);
+
+        $decimal = $degrees + ($minutes / 60) + ($seconds / 3600);
+        return in_array(strtoupper($ref), ['S', 'W'], true) ? -$decimal : $decimal;
+    }
+
+    private function gpsCoordinateToFloat(string $coordinate): float
+    {
+        $parts = explode('/', $coordinate);
+        if (count($parts) === 2 && (float) $parts[1] > 0) {
+            return (float) $parts[0] / (float) $parts[1];
+        }
+        return (float) $coordinate;
+    }
+
+    public function adminProjectDropboxImportDashboard(Request $request): \Illuminate\View\View
+    {
+        $running = \App\Models\DropboxImportSession::where('status', 'importing')->count();
+        $completed = \App\Models\DropboxImportSession::where('status', 'completed')->count();
+        $failed = \App\Models\DropboxImportSession::where('status', 'failed')->count();
+        $cancelled = \App\Models\DropboxImportSession::where('status', 'cancelled')->count();
+        $pending = \App\Models\DropboxImportSession::where('status', 'pending')->count();
+
+        $totalFiles = \App\Models\DropboxImportSession::sum('imported_files');
+        $totalStorage = ClientProjectMedia::whereNotNull('import_source')->sum('size_bytes');
+
+        $avgSpeed = \App\Models\DropboxImportSession::where('status', 'completed')
+            ->where('duration', '>', 0)
+            ->get()
+            ->average(fn($s) => $s->total_size / $s->duration) ?? 0;
+
+        $avgDuration = \App\Models\DropboxImportSession::where('status', 'completed')->average('duration') ?? 0;
+
+        $recentSessions = \App\Models\DropboxImportSession::with('project')->latest('id')->limit(6)->get();
+
+        // Daily trend (Feature 5)
+        $dailyImports = \App\Models\DropboxImportSession::selectRaw('DATE(created_at) as date_day, SUM(imported_files) as files, SUM(total_size) as size')
+            ->groupBy('date_day')
+            ->orderBy('date_day', 'desc')
+            ->limit(10)
+            ->get()
+            ->reverse();
+
+        // Top Projects and Photographers
+        $topProjects = ClientProject::select('client_projects.*')
+            ->selectRaw('(SELECT COUNT(*) FROM client_project_media WHERE client_project_media.client_project_id = client_projects.id AND import_source IS NOT NULL) as imported_count')
+            ->orderBy('imported_count', 'desc')
+            ->limit(5)
+            ->get();
+
+        $topPhotographers = User::select('users.*')
+            ->selectRaw('(SELECT COUNT(*) FROM client_project_media WHERE client_project_media.uploaded_by = users.id AND import_source IS NOT NULL) as imported_count')
+            ->orderBy('imported_count', 'desc')
+            ->limit(5)
+            ->get();
+
+        return view('admin.dropbox-import-dashboard', compact(
+            'running', 'completed', 'failed', 'cancelled', 'pending',
+            'totalFiles', 'totalStorage', 'avgSpeed', 'avgDuration',
+            'recentSessions', 'dailyImports', 'topProjects', 'topPhotographers'
+        ));
+    }
+
+    public function adminProjectCloudProvidersIndex(Request $request): \Illuminate\View\View
+    {
+        $providersList = ['dropbox', 'google', 'onedrive', 'box', 'sharepoint', 's3', 'r2'];
+        foreach ($providersList as $p) {
+            \App\Models\CloudProviderSetting::firstOrCreate(['provider' => $p]);
+        }
+
+        $providers = \App\Models\CloudProviderSetting::all();
+        return view('admin.cloud-providers-index', compact('providers'));
+    }
+
+    public function adminProjectCloudProvidersSave(Request $request): \Illuminate\Http\RedirectResponse
+    {
+        $validated = $request->validate([
+            'provider' => ['required', 'string'],
+            'is_active' => ['nullable', 'boolean'],
+            'client_id' => ['nullable', 'string'],
+            'client_secret' => ['nullable', 'string'],
+            'access_token' => ['nullable', 'string'],
+            'refresh_token' => ['nullable', 'string'],
+            'expires_at' => ['nullable', 'date'],
+        ]);
+
+        $provider = \App\Models\CloudProviderSetting::where('provider', $validated['provider'])->firstOrFail();
+        $provider->update([
+            'is_active' => $request->has('is_active'),
+            'client_id' => $validated['client_id'] ?? null,
+            'client_secret' => $validated['client_secret'] ?? null,
+            'access_token' => $validated['access_token'] ?? null,
+            'refresh_token' => $validated['refresh_token'] ?? null,
+            'expires_at' => $validated['expires_at'] ?? null,
+        ]);
+
+        return back()->with('success', ucfirst($validated['provider']) . ' provider settings updated successfully.');
+    }
+
+    public function adminProjectCloudProvidersTest(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'provider' => ['required', 'string'],
+        ]);
+
+        $providerSetting = \App\Models\CloudProviderSetting::where('provider', $validated['provider'])->first();
+
+        $success = false;
+        $message = '';
+        if ($validated['provider'] === 'dropbox') {
+            $token = $providerSetting && !empty($providerSetting->access_token) ? $providerSetting->access_token : config('services.dropbox.access_token');
+            if (empty($token)) {
+                return response()->json(['success' => false, 'message' => 'No access token configured.']);
+            }
+            try {
+                $response = Http::withHeaders([
+                    'Authorization' => "Bearer {$token}",
+                    'Content-Type' => 'application/json',
+                ])
+                ->post('https://api.dropboxapi.com/2/users/get_current_account');
+
+                if ($response->successful()) {
+                    $success = true;
+                    $message = 'Connection successful! Account: ' . ($response->json()['name']['display_name'] ?? 'Unknown');
+                } else {
+                    $message = 'Connection failed: ' . ($response->json()['error_summary'] ?? $response->body());
+                }
+            } catch (\Throwable $e) {
+                $message = 'Connection error: ' . $e->getMessage();
+            }
+        } else {
+            $message = 'Connection test is not implemented yet for ' . ucfirst($validated['provider']) . '.';
+        }
+
+        return response()->json([
+            'success' => $success,
+            'message' => $message,
+        ]);
     }
 }
 

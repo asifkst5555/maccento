@@ -32,6 +32,7 @@ Route::get('/chat/history/{conversation}', [ChatHistoryController::class, 'show'
 Route::post('/package-builder/calculate', [PackageBuilderController::class, 'calculate']);
 Route::post('/package-builder/submit', [PackageBuilderController::class, 'submit']);
 Route::post('/website-form/submit', [WebsiteFormSubmissionController::class, 'store']);
+Route::post('/webhooks/sendgrid/inbound', [\App\Http\Controllers\Api\SendGridInboundController::class, 'parse']);
 
 Route::middleware(['auth:sanctum', 'role:admin,owner,manager'])->prefix('admin')->group(function (): void {
     Route::get('/leads', [AdminLeadController::class, 'index']);

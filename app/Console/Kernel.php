@@ -26,6 +26,8 @@ class Kernel extends ConsoleKernel
             ->weeklyOn(1, '03:00');
         $schedule->command('inbound:pull')
             ->everyMinute();
+        $schedule->command('cloud-import:cleanup')
+            ->daily();
     }
 
     /**

@@ -119,7 +119,7 @@ class AdminRoleAccessTest extends TestCase
         $media = ClientProjectMedia::query()->firstOrFail();
         $this->assertSame($photographer->id, (int) $media->uploaded_by);
         $this->assertSame('raw', (string) $media->delivery_stage);
-        $this->assertStringContainsString('/raw-footage/photographer/user-' . $photographer->id . '-photo-user/', (string) $media->path);
+        $this->assertStringContainsString('/01_raw/photographer/user-' . $photographer->id . '-photo-user/', (string) $media->path);
     }
 
     public function test_assigned_editor_can_upload_edited_media_into_role_scoped_project_folder(): void
@@ -164,7 +164,7 @@ class AdminRoleAccessTest extends TestCase
         $media = ClientProjectMedia::query()->firstOrFail();
         $this->assertSame($editor->id, (int) $media->uploaded_by);
         $this->assertSame('edited', (string) $media->delivery_stage);
-        $this->assertStringContainsString('/edited-final/editor/user-' . $editor->id . '-edit-user/', (string) $media->path);
+        $this->assertStringContainsString('/03_editing/editor/user-' . $editor->id . '-edit-user/', (string) $media->path);
     }
 
 
@@ -210,7 +210,7 @@ class AdminRoleAccessTest extends TestCase
         $this->assertSame($photographer->id, (int) $media->uploaded_by);
         $this->assertSame('raw_zip', (string) $media->type);
         $this->assertSame('raw', (string) $media->delivery_stage);
-        $this->assertStringContainsString('/raw-zip/photographer/user-' . $photographer->id . '-photo-zip-user/', (string) $media->path);
+        $this->assertStringContainsString('/01_raw/photographer/user-' . $photographer->id . '-photo-zip-user/', (string) $media->path);
     }
 
     public function test_manager_can_access_watermark_settings(): void

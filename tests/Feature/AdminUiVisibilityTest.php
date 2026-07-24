@@ -55,18 +55,12 @@ class AdminUiVisibilityTest extends TestCase
         $this
             ->actingAs($photographer)
             ->get(route('admin.clients.index'))
-            ->assertOk()
-            ->assertDontSee('Delete client', false);
+            ->assertForbidden();
 
         $this
             ->actingAs($photographer)
             ->get(route('admin.clients.show', $client))
-            ->assertOk()
-            ->assertDontSee('Create Invoice')
-            ->assertDontSee('Project Invoice')
-            ->assertDontSee('Write a message to client...')
-            ->assertSee('Message sending is available for manager-level roles.')
-            ->assertSee('Read only');
+            ->assertForbidden();
 
         $this
             ->actingAs($photographer)
@@ -119,9 +113,8 @@ class AdminUiVisibilityTest extends TestCase
             ->actingAs($manager)
             ->get(route('admin.clients.show', $client))
             ->assertOk()
-            ->assertSee('Create Invoice')
-            ->assertSee('Project Invoice')
-            ->assertSee('Send Message');
+            ->assertSee('Open Invoices')
+            ->assertSee('Open project');
 
         $this
             ->actingAs($manager)

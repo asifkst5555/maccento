@@ -82,6 +82,19 @@ Route::middleware('auth')->group(function (): void {
         Route::post('/admin/projects/{project}/comments/{comment}/delete', [DashboardController::class, 'adminProjectCommentDestroy'])->name('admin.projects.comments.delete');
         Route::post('/admin/projects/{project}/comments/{comment}/edit', [DashboardController::class, 'adminProjectCommentUpdate'])->name('admin.projects.comments.update');
         Route::post('/admin/projects/{project}/media', [DashboardController::class, 'adminProjectMediaStore'])->name('admin.projects.media.store');
+        Route::post('/admin/projects/{project}/dropbox/scan', [DashboardController::class, 'adminProjectDropboxScan'])->name('admin.projects.dropbox.scan');
+        Route::post('/admin/projects/{project}/dropbox/import-file', [DashboardController::class, 'adminProjectDropboxImportFile'])->name('admin.projects.dropbox.import-file');
+        Route::post('/admin/projects/{project}/dropbox/scan-preview', [DashboardController::class, 'adminProjectDropboxScanPreview'])->name('admin.projects.dropbox.scan-preview');
+        Route::post('/admin/projects/{project}/dropbox/start-queue-import', [DashboardController::class, 'adminProjectDropboxStartQueueImport'])->name('admin.projects.dropbox.start-queue-import');
+        Route::get('/admin/projects/{project}/dropbox/import-progress/{uuid}', [DashboardController::class, 'adminProjectDropboxImportProgress'])->name('admin.projects.dropbox.import-progress');
+        Route::post('/admin/projects/{project}/dropbox/cancel-import/{uuid}', [DashboardController::class, 'adminProjectDropboxCancelImport'])->name('admin.projects.dropbox.cancel-import');
+        Route::post('/admin/projects/{project}/dropbox/retry-failed/{uuid}', [DashboardController::class, 'adminProjectDropboxRetryFailed'])->name('admin.projects.dropbox.retry-failed');
+        Route::get('/admin/projects/{project}/dropbox/export-duplicates/{uuid}', [DashboardController::class, 'adminProjectDropboxExportDuplicates'])->name('admin.projects.dropbox.export-duplicates');
+        Route::get('/admin/media-delivery/import-history', [DashboardController::class, 'adminProjectDropboxImportHistory'])->name('admin.media-delivery.import-history');
+        Route::get('/admin/media-delivery/import-dashboard', [DashboardController::class, 'adminProjectDropboxImportDashboard'])->name('admin.media-delivery.import-dashboard');
+        Route::get('/admin/media-delivery/providers', [DashboardController::class, 'adminProjectCloudProvidersIndex'])->name('admin.media-delivery.providers');
+        Route::post('/admin/media-delivery/providers/save', [DashboardController::class, 'adminProjectCloudProvidersSave'])->name('admin.media-delivery.providers.save');
+        Route::post('/admin/media-delivery/providers/test', [DashboardController::class, 'adminProjectCloudProvidersTest'])->name('admin.media-delivery.providers.test');
         Route::post('/admin/projects/{project}/media/{media}/delete', [DashboardController::class, 'adminProjectMediaDestroy'])->name('admin.projects.media.delete');
         Route::post('/admin/projects/{project}/raw-zip', [DashboardController::class, 'adminProjectRawZipStore'])->name('admin.projects.raw-zip.store');
         Route::post('/admin/projects/{project}/delivery-zip', [DashboardController::class, 'adminProjectDeliveryZipStore'])->name('admin.projects.delivery-zip.store');
@@ -180,7 +193,12 @@ Route::middleware('auth')->group(function (): void {
     Route::middleware('role:admin,owner')->group(function (): void {
         Route::get('/admin/users', [DashboardController::class, 'adminUsersIndex'])->name('admin.users.index');
         Route::post('/admin/users', [DashboardController::class, 'adminUserStore'])->name('admin.users.store');
+        Route::post('/admin/users/bulk', [DashboardController::class, 'adminUserBulkAction'])->name('admin.users.bulk');
+        Route::post('/admin/users/{user}/update', [DashboardController::class, 'adminUserUpdate'])->name('admin.users.update');
+        Route::post('/admin/users/{user}/reset-password', [DashboardController::class, 'adminUserResetPassword'])->name('admin.users.reset-password');
         Route::post('/admin/users/{user}/delete', [DashboardController::class, 'adminUserDestroy'])->name('admin.users.delete');
+        Route::get('/admin/permissions', [DashboardController::class, 'adminPermissionsIndex'])->name('admin.permissions.index');
+        Route::post('/admin/permissions', [DashboardController::class, 'adminPermissionsUpdate'])->name('admin.permissions.update');
         Route::post('/admin/clients', [DashboardController::class, 'adminClientStore'])->name('admin.clients.store');
         Route::post('/admin/clients/{client}/delete', [DashboardController::class, 'adminClientDestroy'])->name('admin.clients.delete');
         Route::post('/admin/projects/{project}/delete', [DashboardController::class, 'adminProjectDestroy'])->name('admin.projects.delete');
@@ -230,6 +248,8 @@ Route::middleware('auth')->group(function (): void {
 });
 
 Route::post('/logout', [AuthOtpController::class, 'logout'])->middleware('auth')->name('logout');
+
+Route::post('/webhooks/sendgrid/inbound', [App\Http\Controllers\Api\SendGridInboundController::class, 'parse']);
 
 
 

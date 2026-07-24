@@ -53,11 +53,11 @@ class AdminPermissionMatrixTest extends TestCase
             ],
             'admin.clients.index' => [
                 'parameters' => [],
-                'allowed' => $roles,
+                'allowed' => ['owner', 'admin', 'manager'],
             ],
             'admin.clients.show' => [
                 'parameters' => [$client],
-                'allowed' => $roles,
+                'allowed' => ['owner', 'admin', 'manager'],
             ],
             'admin.media-delivery.watermark.index' => [
                 'parameters' => [],
@@ -93,6 +93,14 @@ class AdminPermissionMatrixTest extends TestCase
                 'role' => $role,
                 'status' => 'active',
             ]);
+
+            if (in_array($role, ['photographer', 'editor'], true)) {
+                \App\Models\ClientProjectAssignment::create([
+                    'client_project_id' => $project->id,
+                    'user_id' => $user->id,
+                    'assigned_by' => $user->id,
+                ]);
+            }
 
             foreach ($routes as $routeName => $config) {
                 $response = $this

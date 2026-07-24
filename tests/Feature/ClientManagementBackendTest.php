@@ -89,7 +89,7 @@ class ClientManagementBackendTest extends TestCase
             ->post(route('admin.clients.store'), [
                 'name' => 'Updated Client Name',
                 'email' => 'client@example.com',
-                'password' => 'secret12345',
+                'password' => 'K3p9-Wz2a_M7q2_Xy1s!',
                 'phone' => '1234567890',
                 'company' => 'Updated Company',
                 'role' => 'client',

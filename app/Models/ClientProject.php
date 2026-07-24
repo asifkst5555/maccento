@@ -18,6 +18,8 @@ class ClientProject extends Model
         'quote_build_id',
         'created_by',
         'title',
+        'project_code',
+        'folder_name',
         'service_type',
         'property_address',
         'scheduled_at',
@@ -25,6 +27,21 @@ class ClientProject extends Model
         'status',
         'notes',
     ];
+
+    protected static function boot()
+    {
+        parent::boot();
+        static::creating(function ($project) {
+            $project->project_code = 'PR_TEMP_' . \Illuminate\Support\Str::random(10);
+            $project->folder_name = 'pr_temp_' . \Illuminate\Support\Str::random(10);
+        });
+        static::created(function ($project) {
+            $project->project_code = 'PR' . str_pad((string) $project->id, 6, '0', STR_PAD_LEFT);
+            $slugTitle = \Illuminate\Support\Str::snake($project->title ?: 'project');
+            $project->folder_name = strtolower($project->project_code . '_' . $slugTitle);
+            $project->saveQuietly();
+        });
+    }
 
     protected $casts = [
         'scheduled_at' => 'datetime',
@@ -101,5 +118,10 @@ class ClientProject extends Model
     public function isFullyPaid(): bool
     {
         return $this->invoices()->where('status', 'paid')->exists();
+    }
+
+    public function dropboxImportSessions(): HasMany
+    {
+        return $this->hasMany(DropboxImportSession::class, 'client_project_id');
     }
 }
